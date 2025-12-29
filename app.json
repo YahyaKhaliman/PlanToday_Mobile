@@ -1,4 +1,9 @@
 {
   "name": "PlanToday",
-  "displayName": "PlanToday"
+  "displayName": "PlanToday",
+  "extra": {
+    "eas": {
+      "projectId": "65680496-5467-44f4-aef6-a7184c3fcd5e"
+    }
+  }
 }
