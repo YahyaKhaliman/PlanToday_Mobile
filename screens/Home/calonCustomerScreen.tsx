@@ -265,21 +265,21 @@ export default function RekapCalonCustomerScreen({ navigation }: any) {
         <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
 
         <FlatList
-            data={data}
-  keyExtractor={(item, index) => {
-    const sumber = String(item?.sumber || 'UNK');
-    const id = String(item?.id || '').trim();
-    const kode = String(item?.cc_kode || '').trim();
+        data={data}
+        keyExtractor={(item, index) => {
+            const sumber = String(item?.sumber || 'UNK');
+            const id = String(item?.id || '').trim();
+            const kode = String(item?.cc_kode || '').trim();
 
-    // prioritas: id (kalau valid)
-    if (id) return `${sumber}-${id}`;
+            // prioritas: id (kalau valid)
+            if (id) return `${sumber}-${id}`;
 
-    // fallback: cc_kode (biasanya ada)
-    if (kode) return `${sumber}-K-${kode}`;
+            // fallback: cc_kode (biasanya ada)
+            if (kode) return `${sumber}-K-${kode}`;
 
-    // last resort: index (pasti unik)
-    return `${sumber}-IDX-${index}`;
-  }}
+            // last resort: index (pasti unik)
+            return `${sumber}-IDX-${index}`;
+        }}
             renderItem={renderItem}
             ListHeaderComponent={ListHeader}
             ListEmptyComponent={loading ? <ActivityIndicator style={{ marginTop: 20 }} /> : <Text style={styles.empty}>Belum ada data customer.</Text>}
