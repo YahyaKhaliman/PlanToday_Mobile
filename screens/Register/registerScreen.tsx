@@ -18,6 +18,19 @@ import api from '../../services/api';
 import { GlassSelect } from './glassSelect';
 import Toast from 'react-native-toast-message';
 
+const THEME = {
+    primary: '#4F46E5',
+    accent: '#06B6D4',
+    ink: '#0F172A',
+    muted: '#64748B',
+    card: '#FFFFFF',
+    soft: '#F1F5F9',
+    line: 'rgba(15,23,42,0.08)',
+    danger: '#EF4444',
+    bgTop: '#F7F9FF',
+    bgBottom: '#FFFFFF',
+};
+
 export default function RegisterScreen({ navigation }: any) {
     const [nama, setNama] = useState('');
     const [password, setPassword] = useState('');
@@ -32,15 +45,15 @@ export default function RegisterScreen({ navigation }: any) {
     const [openCabang, setOpenCabang] = useState(false);
 
     const jabatanOptions = [
-    { label: 'MANAGER', value: 'MANAGER' },
-    { label: 'SALES', value: 'SALES' },
+        { label: 'MANAGER', value: 'MANAGER' },
+        { label: 'SALES', value: 'SALES' },
     ];
 
     const cabangOptions = [
-    { label: 'PUSAT', value: 'PUSAT' },
-    { label: 'JATIM', value: 'JATIM' },
-    { label: 'JATENG', value: 'JATENG' },
-    { label: 'JAKARTA', value: 'JAKARTA' },
+        { label: 'PUSAT', value: 'PUSAT' },
+        { label: 'JATIM', value: 'JATIM' },
+        { label: 'JATENG', value: 'JATENG' },
+        { label: 'JAKARTA', value: 'JAKARTA' },
     ];
 
     const canSubmit = useMemo(() => {
@@ -52,8 +65,8 @@ export default function RegisterScreen({ navigation }: any) {
         Toast.show({
             type: 'glassError',
             text1: 'Validasi',
-            text2: 'Nama dan password wajib diisi'
-        })
+            text2: 'Nama dan password wajib diisi',
+        });
         return;
         }
 
@@ -61,8 +74,8 @@ export default function RegisterScreen({ navigation }: any) {
         Toast.show({
             type: 'glassError',
             text1: 'Validasi',
-            text2: 'Password minimal 3 karakter'
-        })
+            text2: 'Password minimal 3 karakter',
+        });
         return;
         }
 
@@ -82,10 +95,10 @@ export default function RegisterScreen({ navigation }: any) {
 
         if (!res.data?.success) {
             Toast.show({
-                type: 'glassError',
-                text1: 'Gagal',
-                text2: res.data?.message || 'Registrasi Gagal'
-            })
+            type: 'glassError',
+            text1: 'Gagal',
+            text2: res.data?.message || 'Registrasi Gagal',
+            });
             return;
         }
 
@@ -107,111 +120,167 @@ export default function RegisterScreen({ navigation }: any) {
         Toast.show({
             type: 'glassError',
             text1: 'Error',
-            text2: err?.response?.data?.message || 'Gagal koneksi ke server'
-        })
+            text2: err?.response?.data?.message || 'Gagal koneksi ke server',
+        });
         } finally {
         setLoading(false);
         }
     };
 
     return (
-        <LinearGradient colors={['#5D59A2', '#3B3A82', '#1E224F']} style={styles.container}>
-        <StatusBar barStyle="light-content" />
+        <LinearGradient
+        colors={[THEME.bgTop, THEME.bgBottom]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.container}
+        >
+        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
 
         <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
             style={{ flex: 1 }}
         >
-            <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-            {/* Header */}
-            <View style={styles.header}>
-                <Text style={styles.welcomeText}>Register</Text>
+            <ScrollView
+            contentContainerStyle={styles.scroll}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            >
+            {/* HERO ala Home */}
+            <LinearGradient
+                colors={[
+                'rgba(79,70,229,0.16)',
+                'rgba(6,182,212,0.10)',
+                'rgba(255,255,255,0.00)',
+                ]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.hero}
+            >
+                {/* Header */}
+                <View style={styles.header}>
+                <Text style={styles.welcomeText}>REGISTER</Text>
                 <Text style={styles.subWelcomeText}>PLAN TODAY</Text>
-            </View>
-
-            {/* Form */}
-            <View style={styles.formContainer}>
-                {/* Nama */}
-                <View style={styles.glassInputContainer}>
-                <Text style={styles.iconPlaceholder}>👤</Text>
-                <TextInput
-                    placeholder="Nama"
-                    placeholderTextColor="rgba(255,255,255,0.6)"
-                    value={nama}
-                    onChangeText={setNama}
-                    style={styles.input}
-                />
                 </View>
 
-                {/* Password */}
-                <View style={styles.glassInputContainer}>
-                <Text style={styles.iconPlaceholder}>🔒</Text>
-                <TextInput
-                    placeholder="Password"
-                    placeholderTextColor="rgba(255,255,255,0.6)"
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry={!showPass}
-                    style={styles.input}
-                />
-                <TouchableOpacity
-                    onPress={() => setShowPass(v => !v)}
-                    style={{ paddingHorizontal: 6 }}
-                    disabled={loading}
-                >
-                    <Text style={{ color: '#fff', fontWeight: '800' }}>
-                    {showPass ? 'HIDE' : 'SHOW'}
-                    </Text>
-                </TouchableOpacity>
-                </View>
+                {/* Form Card */}
+                <View style={styles.formWrap}>
+                <View style={styles.formCard}>
+                    <Text style={styles.formTitle}>Buat Akun</Text>
+                    <Text style={styles.formDesc}>Lengkapi data berikut untuk mendaftar</Text>
 
-                {/* Jabatan */}
-                <GlassSelect
+                    {/* Nama */}
+                    <Text style={styles.label}>Nama</Text>
+                    <View style={styles.inputContainer}>
+                    <LinearGradient
+                        colors={['rgba(79,70,229,0.18)', 'rgba(6,182,212,0.14)']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.inputIconWrap}
+                    >
+                        <Text style={styles.iconPlaceholder}>👤</Text>
+                    </LinearGradient>
+
+                    <TextInput
+                        placeholder="Nama"
+                        placeholderTextColor={THEME.muted}
+                        value={nama}
+                        onChangeText={setNama}
+                        style={styles.input}
+                        editable={!loading}
+                        returnKeyType="next"
+                    />
+                    </View>
+
+                    {/* Password */}
+                    <Text style={styles.label}>Password</Text>
+                    <View style={styles.inputContainer}>
+                    <LinearGradient
+                        colors={['rgba(79,70,229,0.18)', 'rgba(6,182,212,0.14)']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.inputIconWrap}
+                    >
+                        <Text style={styles.iconPlaceholder}>🔒</Text>
+                    </LinearGradient>
+
+                    <TextInput
+                        placeholder="Password"
+                        placeholderTextColor={THEME.muted}
+                        value={password}
+                        onChangeText={setPassword}
+                        secureTextEntry={!showPass}
+                        style={styles.input}
+                        editable={!loading}
+                        returnKeyType="done"
+                    />
+
+                    <TouchableOpacity
+                        onPress={() => setShowPass(v => !v)}
+                        style={styles.showBtn}
+                        disabled={loading}
+                        activeOpacity={0.85}
+                    >
+                        <Text style={styles.showBtnText}>{showPass ? 'HIDE' : 'SHOW'}</Text>
+                    </TouchableOpacity>
+                    </View>
+
+                    {/* Jabatan */}
+                    <GlassSelect
                     label="Jabatan"
                     value={jabatan}
                     options={jabatanOptions}
                     visible={openJabatan}
                     onOpen={() => setOpenJabatan(true)}
                     onClose={() => setOpenJabatan(false)}
-                    onSelect={(v) => setJabatan(v as any)}
-                />
+                    onSelect={v => setJabatan(v as any)}
+                    />
 
-                {/* Cabang */}
-                <GlassSelect
+                    {/* Cabang */}
+                    <GlassSelect
                     label="Cabang"
                     value={cabang}
                     options={cabangOptions}
                     visible={openCabang}
                     onOpen={() => setOpenCabang(true)}
                     onClose={() => setOpenCabang(false)}
-                    onSelect={(v) => setCabang(v)}
-                />
+                    onSelect={v => setCabang(v)}
+                    />
 
-                {/* Button Register */}
-                <TouchableOpacity
-                onPress={register}
-                disabled={!canSubmit}
-                style={[styles.primaryButton, !canSubmit && { opacity: 0.7 }]}
-                activeOpacity={0.85}
-                >
-                {loading ? (
-                    <ActivityIndicator color="#fff" />
-                ) : (
-                    <Text style={styles.primaryButtonText}>Register</Text>
-                )}
-                </TouchableOpacity>
+                    {/* Button Register */}
+                    <TouchableOpacity
+                    onPress={register}
+                    disabled={!canSubmit}
+                    activeOpacity={0.9}
+                    style={{ marginTop: 14, opacity: canSubmit ? 1 : 0.65 }}
+                    >
+                    <LinearGradient
+                        colors={[THEME.primary, THEME.accent]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.primaryButton}
+                    >
+                        {loading ? (
+                        <ActivityIndicator color="#fff" />
+                        ) : (
+                        <Text style={styles.primaryButtonText}>Register</Text>
+                        )}
+                    </LinearGradient>
+                    </TouchableOpacity>
 
-                {/* Back to login */}
-                <TouchableOpacity
-                onPress={() => navigation.replace('Login')}
-                style={{ marginTop: 16, alignItems: 'center' }}
-                disabled={loading}
-                >
-                <Text style={styles.footerText}>
-                    <Text style={styles.footerLinkBold}>Login</Text>
-                </Text>
-                </TouchableOpacity>
-            </View>
+                    {/* Back to login */}
+                    <TouchableOpacity
+                    onPress={() => navigation.replace('Login')}
+                    style={styles.footerLink}
+                    disabled={loading}
+                    activeOpacity={0.85}
+                    >
+                    <Text style={styles.footerText}>
+                        Sudah punya akun? <Text style={styles.footerLinkBold}>Login</Text>
+                    </Text>
+                    </TouchableOpacity>
+                </View>
+                </View>
+            </LinearGradient>
             </ScrollView>
         </KeyboardAvoidingView>
         </LinearGradient>
@@ -220,90 +289,133 @@ export default function RegisterScreen({ navigation }: any) {
 
     const styles = StyleSheet.create({
     container: { flex: 1 },
+
     scroll: {
         flexGrow: 1,
         justifyContent: 'center',
-        paddingHorizontal: 30,
-        paddingVertical: 24,
+        paddingHorizontal: 22,
+        paddingTop: Platform.OS === 'android' ? 54 : 10,
+        paddingBottom: 24,
     },
-    header: {
-        alignItems: 'center',
-        marginBottom: 30,
+
+    hero: {
+        borderRadius: 26,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(79,70,229,0.12)',
+        backgroundColor: 'rgba(255,255,255,0.50)',
     },
+
+    header: { alignItems: 'center', marginBottom: 14 },
     welcomeText: {
-        fontSize: 30,
-        fontWeight: '300',
-        color: '#FFFFFF',
+        fontSize: 26,
+        fontWeight: '900',
+        color: THEME.ink,
+        letterSpacing: 0.5,
     },
     subWelcomeText: {
-        fontSize: 14,
-        color: 'rgba(255,255,255,0.8)',
         marginTop: 6,
+        fontSize: 12,
+        fontWeight: '800',
+        color: THEME.muted,
+        textTransform: 'uppercase',
+        letterSpacing: 0.9,
     },
-    formContainer: {
+
+    /* Form card dibuat proporsional (tidak terlalu lebar) */
+    formWrap: { alignItems: 'center' },
+    formCard: {
         width: '100%',
-    },
-
-    // Glass Input
-    glassInputContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-        borderRadius: 15,
+        maxWidth: 380,
+        backgroundColor: THEME.card,
+        borderRadius: 20,
+        padding: 16,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.3)',
-        paddingHorizontal: 15,
-        marginBottom: 15,
-        height: 55,
+        borderColor: THEME.line,
+        shadowColor: '#000',
+        shadowOpacity: 0.06,
+        shadowRadius: 18,
+        shadowOffset: { width: 0, height: 10 },
+        elevation: 3,
     },
-    iconPlaceholder: { fontSize: 18, marginRight: 10 },
-    input: { flex: 1, color: '#FFFFFF', fontSize: 16 },
 
-    // Picker
+    formTitle: {
+        color: THEME.ink,
+        fontSize: 18,
+        fontWeight: '900',
+        textAlign: 'center',
+        letterSpacing: 0.4,
+    },
+    formDesc: {
+        marginTop: 6,
+        marginBottom: 14,
+        color: THEME.muted,
+        fontSize: 12,
+        fontWeight: '700',
+        textAlign: 'center',
+    },
+
     label: {
-        color: 'rgba(255,255,255,0.85)',
+        color: THEME.muted,
         fontSize: 12,
         marginBottom: 6,
         marginLeft: 4,
-    },
-    glassPickerContainer: {
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-        borderRadius: 15,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.3)',
-        marginBottom: 10,
-        overflow: 'hidden',
-    },
-    picker: {
-        height: 52,
-        color: '#FFFFFF', // untuk text selected (kadang Android beda)
+        marginTop: 6,
+        fontWeight: '800',
+        letterSpacing: 0.4,
+        textTransform: 'uppercase',
     },
 
-    // Button
-    primaryButton: {
-        backgroundColor: '#233975',
-        borderRadius: 30,
-        paddingVertical: 15,
-        marginTop: 22,
+    inputContainer: {
+        flexDirection: 'row',
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 5,
-        elevation: 8,
+        backgroundColor: THEME.soft,
+        borderRadius: 15,
+        borderWidth: 1,
+        borderColor: THEME.line,
+        paddingHorizontal: 12,
+        marginBottom: 12,
+        height: 55,
     },
-    primaryButtonText: {
-        color: '#FFFFFF',
-        fontSize: 18,
+    inputIconWrap: {
+        width: 36,
+        height: 36,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(79,70,229,0.14)',
+        marginRight: 10,
+    },
+    iconPlaceholder: { fontSize: 16 },
+
+    input: {
+        flex: 1,
+        color: THEME.ink,
+        fontSize: 16,
         fontWeight: '700',
     },
 
-    footerText: {
-        color: 'rgba(255,255,255,0.8)',
-        fontSize: 13,
+    showBtn: {
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        borderRadius: 12,
+        backgroundColor: 'rgba(15,23,42,0.04)',
+        borderWidth: 1,
+        borderColor: THEME.line,
     },
-    footerLinkBold: {
-        fontWeight: 'bold',
-        textDecorationLine: 'underline',
+    showBtnText: { color: THEME.muted, fontWeight: '900', fontSize: 12, letterSpacing: 0.4 },
+
+    primaryButton: {
+        borderRadius: 16,
+        paddingVertical: 14,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.25)',
     },
+    primaryButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900', letterSpacing: 0.3 },
+
+    footerLink: { marginTop: 14, alignItems: 'center' },
+    footerText: { color: THEME.muted, fontSize: 13, fontWeight: '700' },
+    footerLinkBold: { fontWeight: '900', textDecorationLine: 'underline', color: THEME.ink },
 });

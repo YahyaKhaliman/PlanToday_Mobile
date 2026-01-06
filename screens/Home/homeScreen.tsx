@@ -4,34 +4,46 @@ import {
     Text,
     TouchableOpacity,
     StyleSheet,
-    ScrollView,
     View,
     StatusBar,
+    FlatList,
+    Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Modal from 'react-native-modal';
 import LinearGradient from 'react-native-linear-gradient';
 import { useAuth } from '../../context/authContext';
 
+type Role = 'SALES' | 'MANAGER';
 type MenuItem = {
     title: string;
     route: string;
-    roles?: Array<'SALES' | 'MANAGER'>;
+    roles?: Role[];
     icon?: string;
 };
 
 const menus: MenuItem[] = [
-    { title: 'Calon Customer', route: 'CalonCustomer', roles: ['SALES', 'MANAGER'], icon: '🧾' },
+    { title: 'Calon Customer', route: 'RekapCalonCustomer', roles: ['SALES', 'MANAGER'], icon: '👥' },
     { title: 'Visit Plan', route: 'VisitPlan', roles: ['SALES', 'MANAGER'], icon: '🗓️' },
     { title: 'Visit', route: 'Visit', roles: ['SALES', 'MANAGER'], icon: '📍' },
-    { title: 'Rekap Visit', route: 'RekapVisit', roles: ['SALES', 'MANAGER'], icon: '📊' },
-    { title: 'Rekap Visit Plan', route: 'RekapVisitPlan', roles: ['SALES', 'MANAGER'], icon: '🧮' },
-    { title: 'Rekap Calon Customer', route: 'RekapCalonCustomer', roles: ['SALES', 'MANAGER'], icon: '👥' },
-    ];
+];
 
-    export default function HomeScreen({ navigation }: any) {
+const THEME = {
+    primary: '#4F46E5', 
+    accent: '#06B6D4', 
+    ink: '#0F172A',
+    muted: '#64748B',
+    card: '#FFFFFF',
+    soft: '#F1F5F9',
+    line: 'rgba(15,23,42,0.08)',
+    danger: '#EF4444',
+    bgTop: '#F7F9FF',
+    bgBottom: '#FFFFFF',
+};
+
+export default function HomeScreen({ navigation }: any) {
     const { user, logout } = useAuth();
     const [isModalVisible, setModalVisible] = useState(false);
-
     const toggleModal = () => setModalVisible(v => !v);
 
     const handleNavigate = (route: string) => {
@@ -43,7 +55,7 @@ const menus: MenuItem[] = [
     };
 
     const availableMenus = useMemo(() => {
-        return menus.filter(m => !m.roles || m.roles.includes(user?.jabatan as any));
+        return menus.filter(m => !m.roles || m.roles.includes(user?.jabatan as Role));
     }, [user?.jabatan]);
 
     const initials = useMemo(() => {
@@ -54,184 +66,297 @@ const menus: MenuItem[] = [
     }, [user?.nama]);
 
     return (
-        <LinearGradient colors={['#5D59A2', '#3B3A82', '#1E224F']} style={styles.container}>
-        <StatusBar barStyle="light-content" />
-        <ScrollView contentContainerStyle={styles.scroll}>
+        <LinearGradient
+        colors={[THEME.bgTop, THEME.bgBottom]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.container}
+        >
+        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
 
-            {/* HEADER GLASS / PROFILE */}
-            <View style={styles.headerCard}>
-            <Text style={styles.appTitle}>PlanToday</Text>
+        <SafeAreaView style={styles.safe}>
+            <View style={styles.pagePad}>
+            {/* HERO */}
+            <LinearGradient
+                colors={[
+                'rgba(79,70,229,0.16)',
+                'rgba(6,182,212,0.10)',
+                'rgba(255,255,255,0.00)',
+                ]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.hero}
+            >
+                {/* HEADER */}
+                <View style={styles.headerRow}>
+                <View style={styles.headerCenter}>
+                    <Text style={styles.brandTextBig}>Plan Today</Text>
+                </View>
+                </View>
 
-            <View style={{ marginTop: 14, width: '100%' }}>
-                {/* Profile row */}
+                {/* Profile Card */}
+                <View style={styles.profileCard}>
                 <View style={styles.profileRow}>
-                <View style={styles.avatarCircle}>
+                    <LinearGradient
+                    colors={[THEME.primary, THEME.accent]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.avatar}
+                    >
                     <Text style={styles.avatarText}>{initials}</Text>
-                </View>
+                    </LinearGradient>
 
-                <View style={{ flex: 1 }}>
-                    <Text style={styles.greeting}>Selamat Datang</Text>
-                    <Text style={styles.userName}>{user?.nama}</Text>
-                    <Text style={styles.userMeta}>
-                    {user?.jabatan} • {user?.cabang}
+                    <View style={{ flex: 1 }}>
+                    <Text style={styles.userName} numberOfLines={1}>
+                        {user?.nama || '-'}
                     </Text>
-                </View>
+
+                    <View style={styles.userMetaRow}>
+                        <View style={styles.badge}>
+                        <Text style={styles.badgeText}>{user?.jabatan || '-'}</Text>
+                        </View>
+                        <Text style={styles.dot}>•</Text>
+                        <Text style={styles.userCity} numberOfLines={1}>
+                        {user?.cabang || '-'}
+                        </Text>
+                    </View>
+                    </View>
                 </View>
 
-                {/* Actions in profile card */}
-                <View style={styles.profileActions}>
-                <TouchableOpacity
-                    style={styles.profileBtn}
+                <View style={styles.quickActions}>
+                    <TouchableOpacity
+                    activeOpacity={0.9}
                     onPress={() => handleNavigate('GantiPassword')}
-                    activeOpacity={0.85}
-                >
-                    <Text style={styles.profileBtnIcon}>🔐</Text>
-                    <Text style={styles.profileBtnText}>{"\t"}Ganti {"\n"}Password</Text>
-                </TouchableOpacity>
+                    style={{ flex: 1 }}
+                    >
+                    <LinearGradient
+                        colors={[THEME.primary, THEME.accent]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={[styles.quickBtn, styles.quickBtnPrimary]}
+                    >
+                        <Text style={styles.quickTextPrimary}>Ganti Password</Text>
+                    </LinearGradient>
+                    </TouchableOpacity>
 
-                <TouchableOpacity
-                    style={[styles.profileBtn, styles.profileBtnDanger]}
+                    <TouchableOpacity
+                    style={[styles.quickBtn, styles.quickBtnDanger]}
                     onPress={toggleModal}
-                    activeOpacity={0.85}
-                >
-                    <Text style={styles.profileBtnIcon}>🚪</Text>
-                    <Text style={styles.profileBtnText}>Keluar</Text>
-                </TouchableOpacity>
+                    activeOpacity={0.9}
+                    >
+                    <Text style={styles.quickTextDanger}>Keluar</Text>
+                    </TouchableOpacity>
                 </View>
-            </View>
+                </View>
+            </LinearGradient>
+
+            <Text style={styles.sectionTitle}>Menu</Text>
             </View>
 
-            {/* MENU LIST */}
-            <View style={{ marginTop: 14 }}>
-            {availableMenus.map((item, index) => (
+            {/* MENU VERTIKAL MEMANJANG */}
+            <FlatList
+            data={availableMenus}
+            keyExtractor={(item, idx) => `${item.route}-${idx}`}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) => (
                 <TouchableOpacity
-                key={`${item.route}-${index}`}
-                style={styles.menuCard}
+                style={styles.menuRow}
                 onPress={() => handleNavigate(item.route)}
-                activeOpacity={0.85}
+                activeOpacity={0.88}
                 >
-                <Text style={styles.menuIcon}>{item.icon || '▫️'}</Text>
-                <View style={{ flex: 1 }}>
-                    <Text style={styles.menuTitle}>{item.title}</Text>
-                    <Text style={styles.menuHint}>Tap untuk buka</Text>
+                <LinearGradient
+                    colors={['rgba(79,70,229,0.20)', 'rgba(6,182,212,0.16)']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.menuRowIconWrap}
+                >
+                    <Text style={styles.menuRowIcon}>{item.icon || '▫️'}</Text>
+                </LinearGradient>
+
+                <View style={styles.menuRowText}>
+                    <Text style={styles.menuRowTitle} numberOfLines={1}>
+                    {item.title}
+                    </Text>
+                    <Text style={styles.menuRowHint}>Tap untuk buka</Text>
                 </View>
-                <Text style={styles.chevron}>›</Text>
+
+                <View style={styles.menuRowChevronWrap}>
+                    <Text style={styles.menuRowChevron}>›</Text>
+                </View>
+
+                {/* Accent kanan */}
+                <LinearGradient
+                    colors={['rgba(79,70,229,0.35)', 'rgba(6,182,212,0.35)']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0, y: 1 }}
+                    style={styles.menuRowAccent}
+                />
                 </TouchableOpacity>
-            ))}
-            </View>
+            )}
+            />
 
-        </ScrollView>
-
-        {/* MODAL LOGOUT (GLASS) */}
-        <Modal
+            {/* Modal logout */}
+            <Modal
             isVisible={isModalVisible}
             onBackdropPress={toggleModal}
             backdropOpacity={0.45}
             animationIn="zoomIn"
             animationOut="zoomOut"
-        >
-            <View style={styles.glassModal}>
-            <View style={styles.modalIndicator} />
+            >
+            <View style={styles.modalCard}>
+                <View style={styles.modalIndicator} />
+                <Text style={styles.modalTitle}>Konfirmasi</Text>
+                <Text style={styles.modalSubtitle}>Yakin ingin keluar?</Text>
+                <Text style={styles.modalUserName}>{(user?.nama || '').toUpperCase()}</Text>
 
-            <Text style={styles.modalTitle}>Konfirmasi</Text>
-
-            <Text style={styles.modalSubtitle}>Yakin ingin keluar?</Text>
-            <Text style={styles.modalUserName}>{user?.nama}</Text>
-
-            <View style={styles.modalActionRow}>
+                <View style={styles.modalActionRow}>
                 <TouchableOpacity style={styles.btnCancel} onPress={toggleModal} activeOpacity={0.85}>
-                <Text style={styles.textCancel}>Batal</Text>
+                    <Text style={styles.textCancel}>Batal</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                style={styles.btnLogoutConfirm}
-                onPress={() => {
+                    style={styles.btnLogoutConfirm}
+                    onPress={() => {
                     toggleModal();
                     logout();
-                }}
-                activeOpacity={0.85}
+                    }}
+                    activeOpacity={0.9}
                 >
-                <Text style={styles.textLogout}>Keluar</Text>
+                    <Text style={styles.textLogout}>Keluar</Text>
                 </TouchableOpacity>
+                </View>
             </View>
-            </View>
-        </Modal>
+            </Modal>
+        </SafeAreaView>
         </LinearGradient>
     );
     }
 
     const styles = StyleSheet.create({
     container: { flex: 1 },
-    scroll: {
-        flexGrow: 1,
-        padding: 20,
-        paddingTop: 26,
+    safe: { flex: 1 },
+
+    pagePad: {
+        paddingHorizontal: 20,
+        paddingTop: Platform.OS === 'android' ? 44 : 8,
     },
 
-    // Header glass
-    headerCard: {
-        backgroundColor: 'rgba(255, 255, 255, 0.14)',
-        borderRadius: 18,
+    hero: {
+        borderRadius: 26,
+        padding: 14,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.25)',
-        padding: 18,
-        alignItems: 'center',
-    },
-    appTitle: {
-        color: '#fff',
-        fontSize: 22,
-        fontWeight: '800',
-        letterSpacing: 0.4,
+        borderColor: 'rgba(79,70,229,0.12)',
+        backgroundColor: 'rgba(255,255,255,0.50)',
     },
 
-    // Profile
-    profileRow: {
+    /* HEADER CENTERED */
+    headerRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        justifyContent: 'space-between',
+        marginBottom: 12,
     },
-    avatarCircle: {
-        width: 46,
-        height: 46,
-        borderRadius: 23,
-        backgroundColor: 'rgba(255,255,255,0.16)',
+    headerSide: {
+        width: 92,
+        height: 36,
+    },
+    headerCenter: { flex: 1, alignItems: 'center' },
+    brandTextBig: {
+        fontSize: 26,
+        fontWeight: '900',
+        color: THEME.ink,
+        letterSpacing: 0.5,
+    },
+    brandSubtitle: {
+        marginTop: 2,
+        fontSize: 11,
+        fontWeight: '800',
+        color: THEME.muted,
+        letterSpacing: 0.8,
+        textTransform: 'uppercase',
+    },
+
+    logoutChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 999,
+        backgroundColor: 'rgba(239,68,68,0.10)',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.22)',
+        borderColor: 'rgba(239,68,68,0.18)',
+    },
+    logoutChipText: { color: THEME.danger, fontWeight: '900' },
+
+    profileCard: {
+        backgroundColor: THEME.card,
+        borderRadius: 20,
+        padding: 16,
+        borderWidth: 1,
+        borderColor: THEME.line,
+        shadowColor: '#000',
+        shadowOpacity: 0.06,
+        shadowRadius: 18,
+        shadowOffset: { width: 0, height: 10 },
+        elevation: 3,
+    },
+
+    profileRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+
+    avatar: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    avatarText: {
-        color: '#fff',
-        fontWeight: '900',
-        letterSpacing: 0.6,
-    },
+    avatarText: { color: '#FFFFFF', fontWeight: '900', letterSpacing: 0.6 },
 
-    greeting: {
-        color: 'rgba(255,255,255,0.85)',
-        fontSize: 13,
-        textTransform: 'uppercase',
-        letterSpacing: 0.8,
-    },
+    /* USER INFO EMPHASIS */
     userName: {
-        textTransform: 'uppercase',
-        marginTop: 6,
-        color: '#fff',
-        fontSize: 20,
+        color: THEME.ink,
+        fontSize: 19,
+        fontWeight: '900',
+    },
+    userMetaRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 8,
+        flexWrap: 'wrap',
+    },
+    badge: {
+        paddingVertical: 4,
+        paddingHorizontal: 10,
+        borderRadius: 999,
+        backgroundColor: 'rgba(79,70,229,0.10)',
+        borderWidth: 1,
+        borderColor: 'rgba(79,70,229,0.18)',
+    },
+    badgeText: {
+        color: THEME.primary,
+        fontSize: 12,
+        fontWeight: '900',
+        letterSpacing: 0.2,
+    },
+    dot: { marginHorizontal: 8, color: THEME.muted, fontWeight: '900' },
+    userCity: {
+        color: THEME.ink,
+        fontSize: 13,
         fontWeight: '800',
     },
-    userMeta: {
-        textTransform: 'uppercase',
+    userHint: {
         marginTop: 6,
-        color: 'rgba(255,255,255,0.75)',
-        fontSize: 13,
+        color: THEME.muted,
+        fontSize: 12,
+        fontWeight: '700',
     },
 
-    profileActions: {
-        marginTop: 14,
-        flexDirection: 'row',
-        gap: 12,
-    },
-    profileBtn: {
+    /* QUICK ACTIONS */
+    quickActions: { flexDirection: 'row', gap: 10, marginTop: 14 },
+
+    quickBtn: {
         flex: 1,
         flexDirection: 'row',
         gap: 8,
@@ -239,113 +364,128 @@ const menus: MenuItem[] = [
         justifyContent: 'center',
         paddingVertical: 12,
         borderRadius: 14,
-        backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    },
+    quickBtnPrimary: {
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.22)',
+        borderColor: 'rgba(255,255,255,0.25)',
     },
-    profileBtnDanger: {
-        backgroundColor: 'rgba(231, 76, 60, 0.22)', 
-        borderColor: 'rgba(255,255,255,0.22)',
-    },
-    profileBtnIcon: {
-        fontSize: 16,
-    },
-    profileBtnText: {
-        color: '#fff',
-        fontWeight: '900',
-        fontSize: 13,
-        textTransform: 'uppercase',
-        letterSpacing: 0.7,
+    quickBtnDanger: {
+        backgroundColor: 'rgba(239,68,68,0.10)',
+        borderWidth: 1,
+        borderColor: 'rgba(239,68,68,0.18)',
     },
 
-    // Menu cards
-    menuCard: {
+    quickTextPrimary: { color: '#FFFFFF', fontWeight: '900', fontSize: 13 },
+    quickTextDanger: { color: THEME.danger, fontWeight: '900', fontSize: 13 },
+
+    sectionTitle: {
+        marginTop: 16,
+        marginBottom: 10,
+        color: THEME.ink,
+        fontWeight: '900',
+        fontSize: 16,
+    },
+
+    /* LIST MENU */
+    listContent: {
+        paddingHorizontal: 20,
+        paddingBottom: 18,
+        paddingTop: 6,
+        gap: 10,
+    },
+
+    menuRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 12,
-        backgroundColor: 'rgba(255, 255, 255, 0.12)',
-        borderRadius: 16,
+        backgroundColor: THEME.card,
+        borderRadius: 18,
+        padding: 14,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.22)',
-        paddingVertical: 14,
-        paddingHorizontal: 14,
-        marginBottom: 12,
-    },
-    menuIcon: {
-        fontSize: 18,
-        width: 28,
-        textAlign: 'center',
-    },
-    menuTitle: {
-        color: '#fff',
-        fontSize: 15,
-        fontWeight: '800',
-    },
-    menuHint: {
-        marginTop: 2,
-        color: 'rgba(255,255,255,0.7)',
-        fontSize: 12,
-    },
-    chevron: {
-        color: 'rgba(255,255,255,0.9)',
-        fontSize: 26,
-        marginLeft: 6,
-        marginTop: -2,
+        borderColor: THEME.line,
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOpacity: 0.05,
+        shadowRadius: 14,
+        shadowOffset: { width: 0, height: 8 },
+        elevation: 2,
     },
 
-    // Modal styles
-    glassModal: {
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    menuRowIconWrap: {
+        width: 44,
+        height: 44,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(79,70,229,0.14)',
+    },
+    menuRowIcon: { fontSize: 18 },
+
+    menuRowText: { flex: 1 },
+    menuRowTitle: { color: THEME.ink, fontSize: 14, fontWeight: '900' },
+    menuRowHint: { marginTop: 4, color: THEME.muted, fontSize: 12, fontWeight: '700' },
+
+    menuRowChevronWrap: {
+        width: 32,
+        height: 32,
+        borderRadius: 12,
+        backgroundColor: 'rgba(15,23,42,0.04)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: THEME.line,
+    },
+    menuRowChevron: { color: THEME.muted, fontSize: 18, fontWeight: '900', marginTop: -2 },
+
+    menuRowAccent: {
+        position: 'absolute',
+        right: 0,
+        top: 0,
+        bottom: 0,
+        width: 6,
+    },
+
+    /* MODAL */
+    modalCard: {
+        backgroundColor: '#FFF',
         borderRadius: 22,
         padding: 22,
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.3)',
+        borderColor: THEME.line,
     },
     modalIndicator: {
         width: 44,
         height: 4,
-        backgroundColor: '#DDD',
+        backgroundColor: '#E5E7EB',
         borderRadius: 2,
         marginBottom: 18,
     },
-    modalTitle: {
-        fontSize: 18,
-        fontWeight: '900',
-        color: '#1E224F',
-    },
-    modalSubtitle: {
-        marginTop: 10,
-        fontSize: 13,
-        color: '#555',
-        textAlign: 'center',
-    },
+    modalTitle: { fontSize: 18, fontWeight: '900', color: THEME.ink },
+    modalSubtitle: { marginTop: 10, fontSize: 13, color: THEME.muted, textAlign: 'center' },
     modalUserName: {
         marginTop: 6,
-        fontSize: 15,
-        fontWeight: '800',
-        color: '#111827',
-        textTransform: 'uppercase',
+        fontSize: 14,
+        fontWeight: '900',
+        color: THEME.ink,
+        letterSpacing: 0.6,
     },
-    modalActionRow: {
-        flexDirection: 'row',
-        gap: 12,
-        marginTop: 18,
-    },
+    modalActionRow: { flexDirection: 'row', gap: 12, marginTop: 18 },
     btnCancel: {
         flex: 1,
         paddingVertical: 12,
         borderRadius: 12,
-        backgroundColor: '#EEF0F6',
+        backgroundColor: '#EEF2F7',
         alignItems: 'center',
     },
     btnLogoutConfirm: {
         flex: 1,
         paddingVertical: 12,
         borderRadius: 12,
-        backgroundColor: '#E74C3C',
+        backgroundColor: THEME.danger,
         alignItems: 'center',
     },
-    textCancel: { color: '#6B7280', fontWeight: '800' },
+    textCancel: { color: THEME.muted, fontWeight: '900' },
     textLogout: { color: '#FFF', fontWeight: '900' },
 });

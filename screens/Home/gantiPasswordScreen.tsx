@@ -1,22 +1,35 @@
 /* eslint-disable react-native/no-inline-styles */
 import React, { useMemo, useState } from 'react';
 import {
-        View,
-        Text,
-        TextInput,
-        TouchableOpacity,
-        ActivityIndicator,
-        KeyboardAvoidingView,
-        Platform,
-        ScrollView,
-        StyleSheet,
-        StatusBar,
+    View,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    ActivityIndicator,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    StatusBar,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import api from '../../services/api';
 import { useAuth } from '../../context/authContext';
 import Toast from 'react-native-toast-message';
 import Modal from 'react-native-modal';
+
+const THEME = {
+    primary: '#4F46E5',
+    accent: '#06B6D4',
+    ink: '#0F172A',
+    muted: '#64748B',
+    card: '#FFFFFF',
+    soft: '#F1F5F9',
+    line: 'rgba(15,23,42,0.08)',
+    danger: '#EF4444',
+    bgTop: '#F7F9FF',
+    bgBottom: '#FFFFFF',
+};
 
 export default function GantiPasswordScreen({ navigation }: any) {
     const { user, logout } = useAuth();
@@ -28,16 +41,14 @@ export default function GantiPasswordScreen({ navigation }: any) {
 
     const [loading, setLoading] = useState(false);
 
-    // modal konfirmasi logout setelah berhasil ganti password
     const [isModalVisible, setModalVisible] = useState(false);
-    const toggleModal = () => setModalVisible((v) => !v);
+    const toggleModal = () => setModalVisible(v => !v);
 
     const canSubmit = useMemo(() => {
         return oldPassword.length >= 3 && newPassword.length >= 3 && !loading;
     }, [oldPassword, newPassword, loading]);
 
     const simpan = async () => {
-        // VALIDASI pakai Toast
         if (oldPassword.length < 3 || newPassword.length < 3) {
         Toast.show({
             type: 'glassError',
@@ -81,11 +92,9 @@ export default function GantiPasswordScreen({ navigation }: any) {
             text2: res.data?.message || 'Password berhasil diubah',
         });
 
-        // reset form
         setOldPassword('');
         setNewPassword('');
 
-        // tampilkan modal konfirmasi logout
         setModalVisible(true);
         } catch (err: any) {
         Toast.show({
@@ -99,90 +108,138 @@ export default function GantiPasswordScreen({ navigation }: any) {
     };
 
     return (
-        <LinearGradient colors={['#5D59A2', '#3B3A82', '#1E224F']} style={styles.container}>
-        <StatusBar barStyle="light-content" />
+        <LinearGradient
+        colors={[THEME.bgTop, THEME.bgBottom]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.container}
+        >
+        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
 
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-            <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-            {/* Header */}
-            <View style={styles.header}>
+            <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            {/* HERO ala Home */}
+            <LinearGradient
+                colors={[
+                'rgba(79,70,229,0.16)',
+                'rgba(6,182,212,0.10)',
+                'rgba(255,255,255,0.00)',
+                ]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.hero}
+            >
+                {/* Header */}
+                <View style={styles.header}>
                 <Text style={styles.title}>Ganti Password</Text>
-                <Text style={styles.subtitle}>Setelah berhasil, kamu akan logout untuk login ulang</Text>
-            </View>
+                </View>
 
-            {/* Form Card */}
-            <View style={styles.formCard}>
+                {/* Form Card */}
+                <View style={styles.formCard}>
+                {/* Password Lama */}
                 <Text style={styles.label}>Password Lama</Text>
-                <View style={styles.glassInputContainer}>
-                <Text style={styles.icon}>🔒</Text>
-                <TextInput
+                <View style={styles.inputContainer}>
+                    <LinearGradient
+                    colors={['rgba(79,70,229,0.18)', 'rgba(6,182,212,0.14)']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.inputIconWrap}
+                    >
+                    <Text style={styles.icon}>🔒</Text>
+                    </LinearGradient>
+
+                    <TextInput
                     value={oldPassword}
                     onChangeText={setOldPassword}
                     secureTextEntry={!showOld}
                     placeholder="..."
-                    placeholderTextColor="rgba(255,255,255,0.6)"
+                    placeholderTextColor={THEME.muted}
                     style={styles.input}
                     editable={!loading}
                     autoCapitalize="none"
                     autoCorrect={false}
-                />
-                <TouchableOpacity
-                    onPress={() => setShowOld((v) => !v)}
+                    />
+
+                    <TouchableOpacity
+                    onPress={() => setShowOld(v => !v)}
                     style={styles.showBtn}
                     disabled={loading}
                     activeOpacity={0.85}
-                >
-                    <Text style={styles.showText}>{showOld ? 'HIDE' : 'SHOW'}</Text>
-                </TouchableOpacity>
+                    >
+                    <Text style={styles.showBtnText}>{showOld ? 'HIDE' : 'SHOW'}</Text>
+                    </TouchableOpacity>
                 </View>
 
+                {/* Password Baru */}
                 <Text style={styles.label}>Password Baru</Text>
-                <View style={styles.glassInputContainer}>
-                <Text style={styles.icon}>🔐</Text>
-                <TextInput
+                <View style={styles.inputContainer}>
+                    <LinearGradient
+                    colors={['rgba(79,70,229,0.18)', 'rgba(6,182,212,0.14)']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.inputIconWrap}
+                    >
+                    <Text style={styles.icon}>🔐</Text>
+                    </LinearGradient>
+
+                    <TextInput
                     value={newPassword}
                     onChangeText={setNewPassword}
                     secureTextEntry={!showNew}
                     placeholder="..."
-                    placeholderTextColor="rgba(255,255,255,0.6)"
+                    placeholderTextColor={THEME.muted}
                     style={styles.input}
                     editable={!loading}
                     autoCapitalize="none"
                     autoCorrect={false}
-                />
-                <TouchableOpacity
-                    onPress={() => setShowNew((v) => !v)}
+                    />
+
+                    <TouchableOpacity
+                    onPress={() => setShowNew(v => !v)}
                     style={styles.showBtn}
                     disabled={loading}
                     activeOpacity={0.85}
-                >
-                    <Text style={styles.showText}>{showNew ? 'HIDE' : 'SHOW'}</Text>
-                </TouchableOpacity>
+                    >
+                    <Text style={styles.showBtnText}>{showNew ? 'HIDE' : 'SHOW'}</Text>
+                    </TouchableOpacity>
                 </View>
 
                 {/* Button Simpan */}
                 <TouchableOpacity
-                onPress={simpan}
-                disabled={!canSubmit}
-                style={[styles.primaryButton, !canSubmit && { opacity: 0.6 }]}
-                activeOpacity={0.85}
+                    onPress={simpan}
+                    disabled={!canSubmit}
+                    activeOpacity={0.9}
+                    style={{ marginTop: 10, opacity: canSubmit ? 1 : 0.6 }}
                 >
-                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>SIMPAN</Text>}
+                    <LinearGradient
+                    colors={[THEME.primary, THEME.accent]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.primaryButton}
+                    >
+                    {loading ? (
+                        <ActivityIndicator color="#fff" />
+                    ) : (
+                        <Text style={styles.primaryButtonText}>SIMPAN</Text>
+                    )}
+                    </LinearGradient>
                 </TouchableOpacity>
 
                 {/* Back */}
                 <TouchableOpacity
-                onPress={() => navigation.goBack()}
-                disabled={loading}
-                style={styles.secondaryButton}
-                activeOpacity={0.85}
+                    onPress={() => navigation.goBack()}
+                    disabled={loading}
+                    style={styles.secondaryButton}
+                    activeOpacity={0.85}
                 >
-                <Text style={styles.secondaryButtonText}>Kembali</Text>
+                    <Text style={styles.secondaryButtonText}>Kembali</Text>
                 </TouchableOpacity>
-            </View>
+                </View>
+            </LinearGradient>
             </ScrollView>
         </KeyboardAvoidingView>
 
+        {/* Modal logout */}
         <Modal
             isVisible={isModalVisible}
             onBackdropPress={toggleModal}
@@ -190,14 +247,14 @@ export default function GantiPasswordScreen({ navigation }: any) {
             animationIn="zoomIn"
             animationOut="zoomOut"
         >
-            <View style={styles.glassModal}>
+            <View style={styles.modalCard}>
             <View style={styles.modalIndicator} />
 
             <Text style={styles.modalTitle}>Berhasil</Text>
             <Text style={styles.modalSubtitle}>Password sudah diubah.</Text>
             <Text style={styles.modalSubtitle}>Silakan login ulang.</Text>
 
-            <Text style={styles.modalUserName}>{user?.nama}</Text>
+            <Text style={styles.modalUserName}>{user?.nama || '-'}</Text>
 
             <View style={styles.modalActionRow}>
                 <TouchableOpacity style={styles.btnCancel} onPress={toggleModal} activeOpacity={0.85}>
@@ -223,126 +280,162 @@ export default function GantiPasswordScreen({ navigation }: any) {
 
     const styles = StyleSheet.create({
     container: { flex: 1 },
+
     scroll: {
         flexGrow: 1,
         justifyContent: 'center',
-        paddingHorizontal: 25,
-        paddingVertical: 40,
+        paddingHorizontal: 22,
+        paddingTop: Platform.OS === 'android' ? 54 : 10,
+        paddingBottom: 24,
     },
 
-    header: { alignItems: 'center', marginBottom: 22 },
-    title: { fontSize: 30, fontWeight: '300', color: '#fff', letterSpacing: 1 },
-    subtitle: { color: 'rgba(255,255,255,0.7)', fontSize: 13, marginTop: 6, textAlign: 'center' },
+    hero: {
+        borderRadius: 26,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(79,70,229,0.12)',
+        backgroundColor: 'rgba(255,255,255,0.50)',
+    },
+
+    header: { alignItems: 'center', marginBottom: 14 },
+    title: { fontSize: 26, fontWeight: '900', color: THEME.ink, letterSpacing: 0.4 },
+    subtitle: {
+        marginTop: 8,
+        color: THEME.muted,
+        fontSize: 12,
+        fontWeight: '700',
+        textAlign: 'center',
+        lineHeight: 16,
+    },
 
     formCard: {
-        backgroundColor: 'rgba(255,255,255,0.10)',
+        backgroundColor: THEME.card,
         borderRadius: 20,
-        padding: 20,
+        padding: 16,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.20)',
+        borderColor: THEME.line,
+        shadowColor: '#000',
+        shadowOpacity: 0.06,
+        shadowRadius: 18,
+        shadowOffset: { width: 0, height: 10 },
+        elevation: 3,
+    },
+
+    formTitle: {
+        color: THEME.ink,
+        fontSize: 18,
+        fontWeight: '900',
+        textAlign: 'center',
+        letterSpacing: 0.2,
+        marginBottom: 8,
     },
 
     label: {
-        color: 'rgba(255,255,255,0.9)',
-        fontSize: 13,
-        fontWeight: '600',
-        marginBottom: 8,
-        marginLeft: 5,
+        color: THEME.muted,
+        fontSize: 12,
+        marginBottom: 6,
+        marginLeft: 4,
         marginTop: 10,
+        fontWeight: '800',
+        letterSpacing: 0.4,
+        textTransform: 'uppercase',
     },
 
-    glassInputContainer: {
+    inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
+        backgroundColor: THEME.soft,
         borderRadius: 15,
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.30)',
-        paddingHorizontal: 15,
+        borderColor: THEME.line,
+        paddingHorizontal: 12,
         marginBottom: 12,
         height: 55,
     },
 
-    icon: { fontSize: 18, marginRight: 10 },
-    input: { flex: 1, color: '#fff', fontSize: 16 },
+    inputIconWrap: {
+        width: 36,
+        height: 36,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: 'rgba(79,70,229,0.14)',
+        marginRight: 10,
+    },
 
-    showBtn: { paddingHorizontal: 6, paddingVertical: 8 },
-    showText: { color: '#fff', fontWeight: '800' },
+    icon: { fontSize: 16 },
+    input: { flex: 1, color: THEME.ink, fontSize: 16, fontWeight: '700' },
+
+    showBtn: {
+        paddingHorizontal: 10,
+        paddingVertical: 8,
+        borderRadius: 12,
+        backgroundColor: 'rgba(15,23,42,0.04)',
+        borderWidth: 1,
+        borderColor: THEME.line,
+    },
+    showBtnText: { color: THEME.muted, fontWeight: '900', fontSize: 12, letterSpacing: 0.4 },
 
     primaryButton: {
-        backgroundColor: '#233975',
-        borderRadius: 30,
-        paddingVertical: 15,
-        marginTop: 18,
+        borderRadius: 16,
+        paddingVertical: 14,
         alignItems: 'center',
-        elevation: 5,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 5,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.25)',
     },
-    primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 1 },
+    primaryButtonText: { color: '#fff', fontSize: 14, fontWeight: '900', letterSpacing: 1 },
 
     secondaryButton: {
-        marginTop: 12,
+        marginTop: 10,
         alignItems: 'center',
         paddingVertical: 10,
+        borderRadius: 14,
     },
-    secondaryButtonText: { color: 'rgba(255,255,255,0.65)', fontSize: 14, fontWeight: '700' },
+    secondaryButtonText: { color: THEME.muted, fontSize: 14, fontWeight: '800' },
 
-    // Modal styles
-    glassModal: {
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    /* Modal ala Home */
+    modalCard: {
+        backgroundColor: THEME.card,
         borderRadius: 22,
         padding: 22,
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.3)',
+        borderColor: THEME.line,
     },
     modalIndicator: {
         width: 44,
         height: 4,
-        backgroundColor: '#DDD',
+        backgroundColor: '#E5E7EB',
         borderRadius: 2,
         marginBottom: 18,
     },
-    modalTitle: {
-        fontSize: 18,
-        fontWeight: '900',
-        color: '#1E224F',
-    },
-    modalSubtitle: {
-        marginTop: 8,
-        fontSize: 13,
-        color: '#555',
-        textAlign: 'center',
-    },
+    modalTitle: { fontSize: 18, fontWeight: '900', color: THEME.ink },
+    modalSubtitle: { marginTop: 8, fontSize: 13, color: THEME.muted, textAlign: 'center', fontWeight: '700' },
     modalUserName: {
         marginTop: 10,
-        fontSize: 15,
-        fontWeight: '800',
-        color: '#111827',
+        fontSize: 14,
+        fontWeight: '900',
+        color: THEME.ink,
         textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
-    modalActionRow: {
-        flexDirection: 'row',
-        gap: 12,
-        marginTop: 18,
-    },
+    modalActionRow: { flexDirection: 'row', gap: 12, marginTop: 18 },
+
     btnCancel: {
         flex: 1,
         paddingVertical: 12,
         borderRadius: 12,
-        backgroundColor: '#EEF0F6',
+        backgroundColor: '#EEF2F7',
         alignItems: 'center',
     },
     btnLogoutConfirm: {
         flex: 1,
         paddingVertical: 12,
         borderRadius: 12,
-        backgroundColor: '#E74C3C',
+        backgroundColor: THEME.danger,
         alignItems: 'center',
     },
-    textCancel: { color: '#6B7280', fontWeight: '800' },
+    textCancel: { color: THEME.muted, fontWeight: '900' },
     textLogout: { color: '#FFF', fontWeight: '900' },
 });

@@ -1,441 +1,535 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
     View,
     Text,
-    TextInput,
-    ScrollView,
+    StyleSheet,
+    FlatList,
     TouchableOpacity,
     ActivityIndicator,
-    KeyboardAvoidingView,
-    Platform,
-    StyleSheet,
     StatusBar,
+    TextInput,
+    Platform,
+    Modal,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import api from '../../services/api';
 import { useAuth } from '../../context/authContext';
+import { Linking } from 'react-native';
 import Toast from 'react-native-toast-message';
-import Modal from 'react-native-modal';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
-export default function CalonCustomerScreen({ navigation }: any) {
+type CalonCustomer = {
+    id?: number;
+    cc_kode: string;
+    cc_nama: string;
+    cc_alamat: string;
+    cc_cp?: string;
+    cc_telp?: string;
+    cc_kota?: string;
+    sumber?: string;
+};
+
+const THEME = {
+    primary: '#4F46E5',
+    accent: '#06B6D4',
+    ink: '#0F172A',
+    muted: '#64748B',
+    card: '#FFFFFF',
+    soft: '#F1F5F9',
+    line: 'rgba(15,23,42,0.08)',
+    danger: '#EF4444',
+    bgTop: '#F7F9FF',
+    bgBottom: '#FFFFFF',
+    wa: '#22C55E',
+};
+
+export default function RekapCalonCustomerScreen({ navigation }: any) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { user } = useAuth();
 
-    const [cariKeyword, setCariKeyword] = useState('');
-
-    const [nama, setNama] = useState('');
-    const [alamat, setAlamat] = useState('');
-    const [telp, setTelp] = useState('');
-    const [pic, setPic] = useState('');
+    const [data, setData] = useState<CalonCustomer[]>([]);
     const [loading, setLoading] = useState(false);
 
-    const cabang = user?.cabang || '';
+    const [keyword, setKeyword] = useState('');
 
-    const [isSuccessModalVisible, setSuccessModalVisible] = useState(false);
-    const [savedKode, setSavedKode] = useState<string>('');
+    // ===== FAB + Modal Filter =====
+    const [showFab, setShowFab] = useState(false);
+    const [openFilter, setOpenFilter] = useState(false);
 
-    const closeSuccessModal = () => setSuccessModalVisible(false);
+    // ===== mini edit fab =====
+    const [selectedItem, setSelectedItem] = useState<CalonCustomer | null>(null);
+    const [showEditFab, setShowEditFab] = useState(false);
 
-    const resetForm = () => {
-        setNama('');
-        setAlamat('');
-        setTelp('');
-        setPic('');
-    };
+    const clearKeyword = useCallback(() => setKeyword(''), []);
 
-    const canSubmit = useMemo(() => {
-        return nama.trim().length > 0 && !loading;
-    }, [nama, loading]);
+    const SearchBox = useMemo(
+        () => (
+        <View style={styles.searchBox}>
+            <Text style={styles.searchIcon}>🔍</Text>
 
-    const gotoCariCustomer = () => {
-        navigation.navigate('CariCustomer', {
-        keyword: cariKeyword,
-        from: 'CALON_CUSTOMER',
-        });
-    };
+            <TextInput
+            value={keyword}
+            onChangeText={setKeyword}
+            placeholder="Cari customer..."
+            placeholderTextColor={THEME.muted}
+            style={styles.searchInput}
+            autoCorrect={false}
+            />
 
-    const simpan = async () => {
-        if (!nama.trim()) {
-        Toast.show({
+            {!!keyword.trim() && (
+            <TouchableOpacity onPress={clearKeyword} activeOpacity={0.8} style={styles.clearBtn}>
+                <MaterialIcons name="close" size={18} color={THEME.muted} />
+            </TouchableOpacity>
+            )}
+        </View>
+        ),
+        [keyword, clearKeyword]
+    );
+
+    const refreshRekap = useCallback(async () => {
+        setLoading(true);
+        try {
+            const res = await api.get('/rekap-calon-customer', {
+            });
+
+            setData((res.data?.data || []).map((x: any) => ({
+                id: x.id,
+                cc_kode: x.cc_kode,
+                cc_nama: x.cc_nama,
+                cc_alamat: x.cc_alamat,
+                cc_cp: x.cc_cp ?? '',
+                cc_telp: x.cc_telp ?? '',
+                cc_kota: x.cc_kota ?? '',
+            })));
+        } catch (err: any) {
+            Toast.show({
             type: 'glassError',
-            text1: 'Validasi',
-            text2: 'Nama customer wajib diisi',
-        });
-        return;
+            text1: 'Error',
+            text2: err?.response?.data?.message || 'Gagal mengambil rekap calon customer',
+            });
+            setData([]);
+        } finally {
+            setLoading(false);
         }
+    }, []);
+
+    const searchCustomer = useCallback(async (q: string) => {
+        // eslint-disable-next-line @typescript-eslint/no-shadow
+        const keyword = String(q || '').trim();
+        if (!keyword) return;
 
         setLoading(true);
         try {
-        const payload = {
-            nama: nama.trim(),
-            alamat: alamat.trim(),
-            cabang,
-            telp: telp.trim(),
-            pic: pic.trim(),
-        };
+            const res = await api.get('/cari-customer', {
+            params: { search: keyword },
+            });
 
-        const res = await api.post('/calon-customer', payload);
-
-        if (!res.data?.success) {
+            setData(res.data?.data || []);
+        } catch (err: any) {
             Toast.show({
             type: 'glassError',
-            text1: 'Gagal Menyimpan',
-            text2: res.data?.message || 'Gagal menyimpan data',
+            text1: 'Error',
+            text2: err?.response?.data?.message || 'Gagal mencari customer',
             });
+            setData([]);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        const q = keyword.trim();
+
+        const t = setTimeout(() => {
+            if (!q) {
+            refreshRekap();          
+            } else {
+            searchCustomer(q);    
+        }
+    }, 350); 
+    return () => clearTimeout(t);
+    }, [keyword, refreshRekap, searchCustomer]);
+
+    useFocusEffect(
+        React.useCallback(() => {
+        refreshRekap();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        }, [])
+    );
+
+    const kirimWA = useCallback(async () => {
+        try {
+        const res = await api.get('/rekap-calon-customer/wa', {
+            params: {
+            cc_nama: keyword.trim() || undefined,
+            },
+        });
+
+        const waText = res.data?.wa_text;
+        if (!waText) {
+            Toast.show({ type: 'glassSuccess', text1: 'Info', text2: 'Data WA tidak tersedia' });
             return;
         }
 
-        const kode = res.data?.data?.cc_kode;
-        setSavedKode(String(kode || '-'));
+        const url = `whatsapp://send?text=${encodeURIComponent(waText)}`;
+        const canOpen = await Linking.canOpenURL(url);
 
-        setSuccessModalVisible(true);
+        if (!canOpen) {
+            Toast.show({ type: 'glassError', text1: 'Info', text2: 'WhatsApp tidak ditemukan di device' });
+            return;
+        }
+
+        await Linking.openURL(url);
         } catch (err: any) {
         Toast.show({
             type: 'glassError',
             text1: 'Error',
-            text2: err?.response?.data?.message || 'Gagal Koneksi ke server',
+            text2: err?.response?.data?.message || 'Gagal membuat rekap WA',
         });
-        } finally {
-        setLoading(false);
         }
-    };
+    }, [keyword]);
+
+    // ===== scroll handler =====
+    const onScroll = useCallback((e: any) => {
+        const y = e.nativeEvent.contentOffset.y || 0;
+        setShowFab(y > 200);
+        setShowEditFab(false);
+    }, []);
+
+    const openEdit = useCallback((item: CalonCustomer) => {
+        setSelectedItem(item);
+        setShowEditFab(true);
+    }, []);
+    
+    const handleRefresh = useCallback(() => {
+        setKeyword('');        // balik ke awal
+        setShowEditFab(false); // optional: tutup mini edit
+    }, []);
+
+    const renderItem = useCallback(
+        ({ item }: { item: CalonCustomer }) => {
+        const nama = item.cc_nama || '-';
+        const kota = item.cc_kota || '-';
+        const alamat = item.cc_alamat || '-';
+        const cp = item.cc_cp || '-';
+        const telp = item.cc_telp || '-';
+
+        return (
+            <TouchableOpacity activeOpacity={0.9} onPress={() => openEdit(item)}>
+            <View style={styles.cardCompact}>
+                <View style={{ flex: 1 }}>
+                <Text style={styles.compactTitle} numberOfLines={1}>
+                    {nama}
+                </Text>
+
+                <View style={styles.inlineRow}>
+                    <MaterialIcons name="place" size={14} color={THEME.accent} style={{ marginRight: 6 }} />
+                    <Text style={styles.compactSub} numberOfLines={1}>
+                    {kota} • {alamat}
+                    </Text>
+                </View>
+
+                <View style={[styles.inlineRow, { marginTop: 6, flexWrap: 'wrap' }]}>
+                    <Text style={styles.miniChip}>CP: {cp}</Text>
+                    <Text style={styles.miniChip}>Telp: {telp}</Text>
+                </View>
+                </View>
+            </View>
+            </TouchableOpacity>
+        );
+        },
+        [openEdit]
+    );
+
+    const ListHeader = (
+        <View style={styles.headerWrap}>
+        <View style={styles.header}>
+            <Text style={styles.title}>Calon Customer</Text>
+            <Text style={styles.subtitle}>Rekap daftar calon customer</Text>
+        </View>
+
+        {SearchBox}
+
+        <Text style={styles.smallHint}>
+            Menampilkan: <Text style={{ fontWeight: '900' }}>{data.length}</Text> data
+        </Text>
+
+        <View style={styles.divider} />
+        </View>
+    );
 
     return (
-        <LinearGradient colors={['#5D59A2', '#3B3A82', '#1E224F']} style={styles.container}>
-        <StatusBar barStyle="light-content" />
+        <LinearGradient colors={[THEME.bgTop, THEME.bgBottom]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
 
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-            <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-            {/* Header */}
-            <View style={styles.header}>
-                <Text style={styles.title}>Calon Customer</Text>
-                <Text style={styles.subtitle}>Isi data calon customer baru</Text>
+        <FlatList
+            data={data}
+  keyExtractor={(item, index) => {
+    const sumber = String(item?.sumber || 'UNK');
+    const id = String(item?.id || '').trim();
+    const kode = String(item?.cc_kode || '').trim();
 
-                <View style={styles.badgeRow}>
-                <View style={styles.badge}>
-                    <Text style={styles.badgeText}>{(cabang || '-').toUpperCase()}</Text>
-                </View>
-                </View>
+    // prioritas: id (kalau valid)
+    if (id) return `${sumber}-${id}`;
+
+    // fallback: cc_kode (biasanya ada)
+    if (kode) return `${sumber}-K-${kode}`;
+
+    // last resort: index (pasti unik)
+    return `${sumber}-IDX-${index}`;
+  }}
+            renderItem={renderItem}
+            ListHeaderComponent={ListHeader}
+            ListEmptyComponent={loading ? <ActivityIndicator style={{ marginTop: 20 }} /> : <Text style={styles.empty}>Belum ada data customer.</Text>}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            onScroll={onScroll}
+            scrollEventThrottle={16}
+            onTouchStart={() => setShowEditFab(false)}
+        />
+
+        {/* FAB Filter (🔍) */}
+        {showFab && (
+            <TouchableOpacity activeOpacity={0.9} onPress={() => setOpenFilter(true)} style={styles.fab}>
+            <View style={styles.fabInner}>
+                <Text style={{ fontSize: 18 }}>🔍</Text>
             </View>
+            </TouchableOpacity>
+        )}
 
-            {/* ✅ MENU CARI CUSTOMER (BARU) */}
-            <View style={styles.searchCard}>
-                <Text style={styles.searchLabel}>Cari Customer</Text>
+        {/* mini FAB Edit (✏️) */}
+        {showEditFab && selectedItem && (
+            <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => {
+                setShowEditFab(false);
+                navigation.navigate('EditCalonCustomer', { data: selectedItem });
+            }}
+            style={styles.editFab}
+            >
+            <View style={styles.fabInner}>
+                <MaterialIcons name="edit" size={22} color={THEME.ink} />
+            </View>
+            </TouchableOpacity>
+        )}
 
-                <View style={styles.searchRow}>
-                <View style={[styles.glassInputContainer, { flex: 1, marginBottom: 0 }]}>
-                    <Text style={styles.icon}>🔎</Text>
-                    <TextInput
-                    value={cariKeyword}
-                    onChangeText={setCariKeyword}
-                    placeholder="Cari customer"
-                    placeholderTextColor="rgba(255,255,255,0.6)"
-                    style={styles.input}
-                    editable={!loading}
-                    returnKeyType="search"
-                    onSubmitEditing={gotoCariCustomer}
-                    />
+        {/* Modal Filter */}
+        <Modal visible={openFilter} transparent animationType="fade" onRequestClose={() => setOpenFilter(false)}>
+            <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+                <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Filter</Text>
+                <TouchableOpacity onPress={() => setOpenFilter(false)} activeOpacity={0.8}>
+                    <Text style={styles.modalClose}>✕</Text>
+                </TouchableOpacity>
                 </View>
 
+                {SearchBox}
+
+                <View style={[styles.row2, { marginTop: 14 }]}>
                 <TouchableOpacity
-                    onPress={gotoCariCustomer}
+                    style={[styles.modalBtn, { backgroundColor: THEME.accent }]}
+                    onPress={() => {
+                    setOpenFilter(false);
+                    refreshRekap();
+                    }}
                     disabled={loading}
-                    activeOpacity={0.85}
-                    style={[styles.searchBtn, loading && { opacity: 0.7 }]}
+                    activeOpacity={0.9}
                 >
-                    <Text style={styles.searchBtnText}>CARI</Text>
-                </TouchableOpacity>
-                </View>
-            </View>
-
-            {/* Form Card (Glass) */}
-            <View style={styles.formCard}>
-                <Text style={styles.label}>Nama Customer</Text>
-                <View style={styles.glassInputContainer}>
-                <Text style={styles.icon}>🏢</Text>
-                <TextInput
-                    value={nama}
-                    onChangeText={setNama}
-                    placeholder="Nama customer..."
-                    placeholderTextColor="rgba(255,255,255,0.6)"
-                    style={styles.input}
-                    editable={!loading}
-                />
-                </View>
-
-                <Text style={styles.label}>Alamat</Text>
-                <View style={[styles.glassInputContainer, { height: 110, alignItems: 'flex-start', paddingTop: 12 }]}>
-                <Text style={[styles.icon, { marginTop: 2 }]}>📍</Text>
-                <TextInput
-                    value={alamat}
-                    onChangeText={setAlamat}
-                    placeholder="Alamat lengkap..."
-                    placeholderTextColor="rgba(255,255,255,0.6)"
-                    multiline
-                    textAlignVertical="top"
-                    style={[styles.input, { height: 92 }]}
-                    editable={!loading}
-                />
-                </View>
-
-                <Text style={styles.label}>Cabang</Text>
-                <View style={[styles.glassInputContainer, { opacity: 0.8 }]}>
-                <Text style={styles.icon}>🏷️</Text>
-                <TextInput value={cabang} editable={false} style={[styles.input, { color: 'rgba(255,255,255,0.85)' }]} />
-                </View>
-
-                <Text style={styles.label}>No Telp</Text>
-                <View style={styles.glassInputContainer}>
-                <Text style={styles.icon}>📞</Text>
-                <TextInput
-                    value={telp}
-                    onChangeText={(t) => setTelp(t.replace(/[^0-9+]/g, ''))}
-                    placeholder="08xxxxxxxxxx"
-                    placeholderTextColor="rgba(255,255,255,0.6)"
-                    keyboardType="phone-pad"
-                    style={styles.input}
-                    editable={!loading}
-                />
-                </View>
-
-                <Text style={styles.label}>Narahubung (CP)</Text>
-                <View style={styles.glassInputContainer}>
-                <Text style={styles.icon}>👤</Text>
-                <TextInput
-                    value={pic}
-                    onChangeText={setPic}
-                    placeholder="Nama contact person..."
-                    placeholderTextColor="rgba(255,255,255,0.6)"
-                    style={styles.input}
-                    editable={!loading}
-                />
-                </View>
-
-                {/* Action Buttons */}
-                <TouchableOpacity
-                onPress={simpan}
-                disabled={!canSubmit}
-                activeOpacity={0.85}
-                style={[styles.primaryButton, !canSubmit && { opacity: 0.7 }]}
-                >
-                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Simpan</Text>}
-                </TouchableOpacity>
-
-                <TouchableOpacity onPress={() => navigation.goBack()} disabled={loading} activeOpacity={0.85} style={styles.secondaryButton}>
-                <Text style={styles.secondaryButtonText}>Kembali</Text>
-                </TouchableOpacity>
-            </View>
-            </ScrollView>
-        </KeyboardAvoidingView>
-
-        <Modal
-            isVisible={isSuccessModalVisible}
-            onBackdropPress={closeSuccessModal}
-            backdropOpacity={0.45}
-            animationIn="zoomIn"
-            animationOut="zoomOut"
-        >
-            <View style={styles.glassModal}>
-            <View style={styles.modalIndicator} />
-
-            <Text style={styles.modalTitle}>Sukses</Text>
-            <Text style={styles.modalSubtitle}>Calon customer berhasil disimpan.</Text>
-
-            <Text style={styles.modalSubtitle}>Kode:</Text>
-            <Text style={styles.modalUserName}>{savedKode || '-'}</Text>
-
-            <View style={styles.modalActionRow}>
-                <TouchableOpacity
-                style={styles.btnCancel}
-                onPress={() => {
-                    closeSuccessModal();
-                    resetForm();
-                }}
-                activeOpacity={0.85}
-                >
-                <Text style={styles.textCancel}>Tambah Lagi</Text>
+                    <Text style={styles.modalBtnText}>Refresh</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                style={styles.btnLogoutConfirm}
-                onPress={() => {
-                    closeSuccessModal();
-                    navigation.reset({
-                    index: 0,
-                    routes: [{ name: 'Home' }],
-                    });
-                }}
-                activeOpacity={0.85}
+                    style={[styles.modalBtn, { backgroundColor: THEME.wa }]}
+                    onPress={() => {
+                    setOpenFilter(false);
+                    kirimWA();
+                    }}
+                    disabled={loading}
+                    activeOpacity={0.9}
                 >
-                <Text style={styles.textLogout}>Ke Home</Text>
+                    <Text style={styles.modalBtnText}>Kirim WA</Text>
                 </TouchableOpacity>
+                </View>
             </View>
             </View>
         </Modal>
+
+        {/* Bottom Action Bar */}
+        <View style={styles.bottomAction}>
+            <TouchableOpacity style={[styles.actionBtn, styles.actionBtnPrimary]} onPress={() => navigation.navigate('CalonCustomer')} activeOpacity={0.9}>
+            <Text style={styles.bottomActionText}>+ Tambah</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.actionBtn, styles.actionBtnSoft]} onPress={handleRefresh} disabled={loading} activeOpacity={0.9}>
+            {loading ? (<ActivityIndicator color={THEME.primary} />) : (<Text style={[styles.bottomActionText, { color: THEME.primary }]}>Refresh</Text>)}
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.actionBtn, styles.actionBtnWa]} onPress={kirimWA} disabled={loading} activeOpacity={0.9}>
+            <Text style={styles.bottomActionText}>Kirim WA</Text>
+            </TouchableOpacity>
+        </View>
         </LinearGradient>
     );
     }
 
     const styles = StyleSheet.create({
     container: { flex: 1 },
-    scroll: {
-        flexGrow: 1,
-        justifyContent: 'center',
-        paddingHorizontal: 24,
-        paddingVertical: 24,
+
+    listContent: {
+        paddingHorizontal: 20,
+        paddingTop: Platform.OS === 'android' ? 54 : 18,
+        paddingBottom: 120,
     },
 
-    header: { alignItems: 'center', marginBottom: 18 },
-    title: { fontSize: 30, fontWeight: '300', color: '#fff' },
-    subtitle: { marginTop: 6, color: 'rgba(255,255,255,0.8)', fontSize: 13 },
+    headerWrap: {
+        backgroundColor: THEME.bgBottom,
+        paddingBottom: 10,
+    },
 
-    badgeRow: { marginTop: 12, flexDirection: 'row' },
-    badge: {
-        backgroundColor: 'rgba(255,255,255,0.15)',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.25)',
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 999,
-    },
-    badgeText: { color: '#fff', fontWeight: '800', letterSpacing: 0.6, fontSize: 12 },
+    header: { alignItems: 'center', marginBottom: 10 },
+    title: { fontSize: 25, fontWeight: '900', color: THEME.ink, letterSpacing: 0.2 },
+    subtitle: { color: THEME.muted, fontSize: 12, marginTop: 6, fontWeight: '700', textAlign: 'center' },
 
-    // ✅ Search card
-    searchCard: {
-        backgroundColor: 'rgba(255,255,255,0.08)',
-        borderRadius: 18,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.18)',
-        padding: 16,
-        marginBottom: 12,
-    },
-    searchLabel: {
-        color: 'rgba(255,255,255,0.85)',
-        fontSize: 12,
-        marginBottom: 8,
-        marginLeft: 4,
-    },
-    searchRow: {
+    divider: { marginTop: 10, height: 1, backgroundColor: THEME.line },
+
+    smallHint: { marginTop: 10, color: THEME.muted, fontSize: 12, textAlign: 'center', fontWeight: '700' },
+
+    searchBox: {
         flexDirection: 'row',
         alignItems: 'center',
+        backgroundColor: THEME.soft,
+        borderRadius: 15,
+        borderWidth: 1,
+        borderColor: THEME.line,
+        paddingHorizontal: 12,
+        height: 55,
+        marginBottom: 10,
+    },
+    searchIcon: { fontSize: 16, marginRight: 10 },
+    searchInput: { flex: 1, color: THEME.ink, fontSize: 14, fontWeight: '900' },
+
+    clearBtn: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: 'rgba(15,23,42,0.05)',
+        borderWidth: 1,
+        borderColor: 'rgba(15,23,42,0.08)',
+    },
+
+    cardCompact: {
+        backgroundColor: THEME.card,
+        borderRadius: 16,
+        paddingHorizontal: 14,
+        paddingVertical: 12,
+        borderWidth: 1,
+        borderColor: THEME.line,
+        marginBottom: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOpacity: 0.04,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 6 },
+        elevation: 1,
+    },
+    compactTitle: { color: THEME.ink, fontSize: 15, fontWeight: '900' },
+    compactSub: { color: THEME.muted, fontSize: 12, fontWeight: '800', flex: 1 },
+
+    inlineRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
+
+    miniChip: {
+        color: THEME.ink,
+        fontSize: 11,
+        fontWeight: '900',
+        backgroundColor: 'rgba(15,23,42,0.04)',
+        borderWidth: 1,
+        borderColor: THEME.line,
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 999,
+        overflow: 'hidden',
+        marginRight: 8,
+        marginBottom: 6,
+    },
+
+    empty: { textAlign: 'center', marginTop: 18, color: THEME.muted, fontSize: 13, fontWeight: '700' },
+
+    bottomAction: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        backgroundColor: THEME.card,
+        borderTopWidth: 1,
+        borderTopColor: THEME.line,
+        flexDirection: 'row',
         gap: 10,
     },
-    searchBtn: {
-        backgroundColor: '#233975',
-        height: 55,
-        paddingHorizontal: 16,
-        borderRadius: 15,
+
+    actionBtn: {
+        flex: 1,
+        borderRadius: 14,
+        paddingVertical: 14,
+        alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.2)',
-        alignItems: 'center',
     },
-    searchBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 12, letterSpacing: 1 },
 
-    formCard: {
-        backgroundColor: 'rgba(255,255,255,0.10)',
+    actionBtnPrimary: { backgroundColor: THEME.accent, borderColor: 'rgba(79,70,229,0.18)' },
+    actionBtnSoft: { backgroundColor: 'rgba(79,70,229,0.08)', borderColor: 'rgba(79,70,229,0.18)' },
+    actionBtnWa: { backgroundColor: THEME.wa, borderColor: 'rgba(34,197,94,0.18)' },
+
+    bottomActionText: { color: '#FFFFFF', fontWeight: '900', fontSize: 13, letterSpacing: 0.3 },
+
+    fab: { position: 'absolute', right: 16, bottom: 90 },
+    editFab: { position: 'absolute', right: 16, bottom: 152 },
+
+    fabInner: {
+        width: 52,
+        height: 52,
+        borderRadius: 26,
+        backgroundColor: 'rgba(255,255,255,0.78)',
+        borderWidth: 1,
+        borderColor: 'rgba(15,23,42,0.10)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOpacity: 0.12,
+        shadowRadius: 12,
+        shadowOffset: { width: 0, height: 8 },
+        elevation: 3,
+    },
+
+    modalBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.35)',
+        paddingHorizontal: 16,
+        justifyContent: 'flex-end',
+        paddingBottom: 18,
+    },
+
+    modalCard: {
+        backgroundColor: 'rgba(255,255,255,0.96)',
         borderRadius: 18,
         borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.2)',
-        padding: 16,
+        borderColor: 'rgba(15,23,42,0.10)',
+        padding: 14,
     },
 
-    label: {
-        color: 'rgba(255,255,255,0.85)',
-        fontSize: 12,
-        marginBottom: 6,
-        marginLeft: 4,
-        marginTop: 6,
-    },
+    modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+    modalTitle: { color: THEME.ink, fontWeight: '900', fontSize: 16 },
+    modalClose: { color: THEME.muted, fontWeight: '900', fontSize: 18, paddingHorizontal: 6 },
 
-    glassInputContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-        borderRadius: 15,
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.3)',
-        paddingHorizontal: 14,
-        marginBottom: 10,
-        height: 55,
-    },
-    icon: { fontSize: 18, marginRight: 10 },
-    input: { flex: 1, color: '#fff', fontSize: 15,},
+    row2: { flexDirection: 'row', gap: 10, marginTop: 4 },
 
-    primaryButton: {
-        backgroundColor: '#233975',
-        borderRadius: 30,
-        paddingVertical: 14,
-        marginTop: 14,
-        alignItems: 'center',
-        elevation: 8,
-    },
-    primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 0.5 },
-
-    secondaryButton: {
-        backgroundColor: 'rgba(255,255,255,0.12)',
-        borderRadius: 30,
-        paddingVertical: 12,
-        marginTop: 10,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.22)',
-    },
-    secondaryButtonText: { color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: '800' },
-
-    // Modal styles
-    glassModal: {
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        borderRadius: 22,
-        padding: 22,
-        alignItems: 'center',
-        borderWidth: 1,
-        borderColor: 'rgba(255, 255, 255, 0.3)',
-    },
-    modalIndicator: {
-        width: 44,
-        height: 4,
-        backgroundColor: '#DDD',
-        borderRadius: 2,
-        marginBottom: 18,
-    },
-    modalTitle: {
-        fontSize: 18,
-        fontWeight: '900',
-        color: '#1E224F',
-    },
-    modalSubtitle: {
-        marginTop: 8,
-        fontSize: 13,
-        color: '#555',
-        textAlign: 'center',
-    },
-    modalUserName: {
-        marginTop: 8,
-        fontSize: 16,
-        fontWeight: '900',
-        color: '#111827',
-        textTransform: 'uppercase',
-    },
-    modalActionRow: {
-        flexDirection: 'row',
-        gap: 12,
-        marginTop: 18,
-    },
-    btnCancel: {
-        flex: 1,
-        paddingVertical: 12,
-        borderRadius: 12,
-        backgroundColor: '#EEF0F6',
-        alignItems: 'center',
-    },
-    btnLogoutConfirm: {
-        flex: 1,
-        paddingVertical: 12,
-        borderRadius: 12,
-        backgroundColor: '#233975',
-        alignItems: 'center',
-    },
-    textCancel: { color: '#6B7280', fontWeight: '800' },
-    textLogout: { color: '#FFF', fontWeight: '900' },
+    modalBtn: { flex: 1, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+    modalBtnText: { color: '#fff', fontWeight: '900', letterSpacing: 0.3 },
 });
