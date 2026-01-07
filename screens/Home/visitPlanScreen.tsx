@@ -650,12 +650,12 @@ export default function VisitPlanGabunganScreen({ navigation }: any) {
         </View>
       </Modal>
 
-      {/* Bottom Action Bar (tetap seperti sebelumnya, style mengikuti referensi) */}
+      {/* Bottom Action Bar */}
       <View style={styles.bottomAction}>
         {!isManager && (
           <TouchableOpacity
             style={[styles.actionBtn, styles.actionBtnPrimary]}
-            onPress={() => navigation.navigate('TambahVisit')}
+            onPress={() => navigation.navigate('TambahVisitPlan')}
             activeOpacity={0.9}
           >
             <Text style={styles.bottomActionText}>+ Tambah</Text>
