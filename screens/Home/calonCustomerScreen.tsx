@@ -64,6 +64,10 @@ export default function RekapCalonCustomerScreen({ navigation }: any) {
 
     const clearKeyword = useCallback(() => setKeyword(''), []);
 
+    // Open WA
+    const [openWaOption, setOpenWaOption] = useState(false);
+    const [waPendingText, setWaPendingText] = useState<string>('');
+    
     const SearchBox = useMemo(
         () => (
         <View style={styles.searchBox}>
@@ -159,6 +163,42 @@ export default function RekapCalonCustomerScreen({ navigation }: any) {
         }, [])
     );
 
+    const openWA = async (text: string, mode: 'app' | 'business') => {
+        const encoded = encodeURIComponent(text);
+
+        const waApp = `whatsapp://send?text=${encoded}`;
+        const waBiz = `whatsapp-business://send?text=${encoded}`;
+        const waWeb = `https://wa.me/?text=${encoded}`;
+
+        const waAppIntent = `intent://send?text=${encoded}#Intent;scheme=whatsapp;package=com.whatsapp;end`;
+        const waBizIntent = `intent://send?text=${encoded}#Intent;scheme=whatsapp-business;package=com.whatsapp.w4b;end`;
+
+        try {
+        if (mode === 'business') {
+            if (await Linking.canOpenURL(waBiz)) return Linking.openURL(waBiz);
+            if (Platform.OS === 'android' && (await Linking.canOpenURL(waBizIntent))) return Linking.openURL(waBizIntent);
+
+            // fallback kalau business nggak ada, coba WA biasa
+            if (await Linking.canOpenURL(waApp)) return Linking.openURL(waApp);
+            if (Platform.OS === 'android' && (await Linking.canOpenURL(waAppIntent))) return Linking.openURL(waAppIntent);
+
+            return Linking.openURL(waWeb);
+        }
+
+        // mode === 'app'
+        if (await Linking.canOpenURL(waApp)) return Linking.openURL(waApp);
+        if (Platform.OS === 'android' && (await Linking.canOpenURL(waAppIntent))) return Linking.openURL(waAppIntent);
+
+        // fallback kalau WA biasa nggak ada, coba business
+        if (await Linking.canOpenURL(waBiz)) return Linking.openURL(waBiz);
+        if (Platform.OS === 'android' && (await Linking.canOpenURL(waBizIntent))) return Linking.openURL(waBizIntent);
+
+        return Linking.openURL(waWeb);
+        } catch {
+        return Linking.openURL(waWeb);
+        }
+    };
+
     const kirimWA = useCallback(async () => {
         try {
         const res = await api.get('/rekap-calon-customer/wa', {
@@ -173,15 +213,8 @@ export default function RekapCalonCustomerScreen({ navigation }: any) {
             return;
         }
 
-        const url = `whatsapp://send?text=${encodeURIComponent(waText)}`;
-        const canOpen = await Linking.canOpenURL(url);
-
-        if (!canOpen) {
-            Toast.show({ type: 'glassError', text1: 'Info', text2: 'WhatsApp tidak ditemukan di device' });
-            return;
-        }
-
-        await Linking.openURL(url);
+        setWaPendingText(waText);
+        setOpenWaOption(true);
         } catch (err: any) {
         Toast.show({
             type: 'glassError',
@@ -271,13 +304,8 @@ export default function RekapCalonCustomerScreen({ navigation }: any) {
             const id = String(item?.id || '').trim();
             const kode = String(item?.cc_kode || '').trim();
 
-            // prioritas: id (kalau valid)
             if (id) return `${sumber}-${id}`;
-
-            // fallback: cc_kode (biasanya ada)
             if (kode) return `${sumber}-K-${kode}`;
-
-            // last resort: index (pasti unik)
             return `${sumber}-IDX-${index}`;
         }}
             renderItem={renderItem}
@@ -290,7 +318,7 @@ export default function RekapCalonCustomerScreen({ navigation }: any) {
             onTouchStart={() => setShowEditFab(false)}
         />
 
-        {/* FAB Filter (🔍) */}
+        {/* FAB Filter (Pencarian) */}
         {showFab && (
             <TouchableOpacity activeOpacity={0.9} onPress={() => setOpenFilter(true)} style={styles.fab}>
             <View style={styles.fabInner}>
@@ -299,7 +327,7 @@ export default function RekapCalonCustomerScreen({ navigation }: any) {
             </TouchableOpacity>
         )}
 
-        {/* mini FAB Edit (✏️) */}
+        {/* mini FAB Edit */}
         {showEditFab && selectedItem && (
             <TouchableOpacity
             activeOpacity={0.9}
@@ -355,6 +383,55 @@ export default function RekapCalonCustomerScreen({ navigation }: any) {
                 </View>
             </View>
             </View>
+        </Modal>
+        
+        {/* Modal WA */}
+        <Modal
+        visible={openWaOption}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setOpenWaOption(false)}
+        >
+        <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Kirim lewat</Text>
+                <TouchableOpacity onPress={() => setOpenWaOption(false)} activeOpacity={0.8}>
+                <Text style={styles.modalClose}>✕</Text>
+                </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+                style={[styles.waPickBtn, { backgroundColor: '#25D366' }]}
+                activeOpacity={0.9}
+                onPress={async () => {
+                setOpenWaOption(false);
+                await openWA(waPendingText, 'app');
+                }}
+            >
+                <Text style={styles.waPickText}>WhatsApp</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+                style={[styles.waPickBtn, { backgroundColor: '#128C7E' }]}
+                activeOpacity={0.9}
+                onPress={async () => {
+                setOpenWaOption(false);
+                await openWA(waPendingText, 'business');
+                }}
+            >
+                <Text style={styles.waPickText}>WhatsApp Business</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+                style={[styles.waPickBtn, { backgroundColor: 'rgba(15,23,42,0.06)', borderWidth: 1, borderColor: THEME.line }]}
+                activeOpacity={0.9}
+                onPress={() => setOpenWaOption(false)}
+            >
+                <Text style={[styles.waPickText, { color: THEME.ink }]}>Batal</Text>
+            </TouchableOpacity>
+            </View>
+        </View>
         </Modal>
 
         {/* Bottom Action Bar */}
@@ -440,9 +517,11 @@ export default function RekapCalonCustomerScreen({ navigation }: any) {
     },
     compactTitle: { color: THEME.ink, fontSize: 15, fontWeight: '900' },
     compactSub: { color: THEME.muted, fontSize: 12, fontWeight: '800', flex: 1 },
-
-    inlineRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
-
+    inlineRow: { 
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        marginTop: 6 
+    },
     miniChip: {
         color: THEME.ink,
         fontSize: 11,
@@ -457,9 +536,13 @@ export default function RekapCalonCustomerScreen({ navigation }: any) {
         marginRight: 8,
         marginBottom: 6,
     },
-
-    empty: { textAlign: 'center', marginTop: 18, color: THEME.muted, fontSize: 13, fontWeight: '700' },
-
+    empty: { 
+        textAlign: 'center', 
+        marginTop: 18, 
+        color: THEME.muted, 
+        fontSize: 13, 
+        fontWeight: '700' 
+    },
     bottomAction: {
         position: 'absolute',
         left: 0,
@@ -473,7 +556,6 @@ export default function RekapCalonCustomerScreen({ navigation }: any) {
         flexDirection: 'row',
         gap: 10,
     },
-
     actionBtn: {
         flex: 1,
         borderRadius: 14,
@@ -482,16 +564,34 @@ export default function RekapCalonCustomerScreen({ navigation }: any) {
         justifyContent: 'center',
         borderWidth: 1,
     },
-
-    actionBtnPrimary: { backgroundColor: THEME.accent, borderColor: 'rgba(79,70,229,0.18)' },
-    actionBtnSoft: { backgroundColor: 'rgba(79,70,229,0.08)', borderColor: 'rgba(79,70,229,0.18)' },
-    actionBtnWa: { backgroundColor: THEME.wa, borderColor: 'rgba(34,197,94,0.18)' },
-
-    bottomActionText: { color: '#FFFFFF', fontWeight: '900', fontSize: 13, letterSpacing: 0.3 },
-
-    fab: { position: 'absolute', right: 16, bottom: 90 },
-    editFab: { position: 'absolute', right: 16, bottom: 152 },
-
+    actionBtnPrimary: { 
+        backgroundColor: THEME.accent, 
+        borderColor: 'rgba(79,70,229,0.18)' 
+    },
+    actionBtnSoft: { 
+        backgroundColor: 'rgba(79,70,229,0.08)', 
+        borderColor: 'rgba(79,70,229,0.18)' 
+    },
+    actionBtnWa: { 
+        backgroundColor: THEME.wa, 
+        borderColor: 'rgba(34,197,94,0.18)' 
+    },
+    bottomActionText: { 
+        color: '#FFFFFF', 
+        fontWeight: '900', 
+        fontSize: 13, 
+        letterSpacing: 0.3
+    },
+    fab: { 
+        position: 'absolute', 
+        right: 16, 
+        bottom: 90 
+    },
+    editFab: { 
+        position: 'absolute', 
+        right: 16, 
+        bottom: 152 
+    },
     fabInner: {
         width: 52,
         height: 52,
@@ -507,7 +607,6 @@ export default function RekapCalonCustomerScreen({ navigation }: any) {
         shadowOffset: { width: 0, height: 8 },
         elevation: 3,
     },
-
     modalBackdrop: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.35)',
@@ -515,7 +614,6 @@ export default function RekapCalonCustomerScreen({ navigation }: any) {
         justifyContent: 'flex-end',
         paddingBottom: 18,
     },
-
     modalCard: {
         backgroundColor: 'rgba(255,255,255,0.96)',
         borderRadius: 18,
@@ -523,13 +621,50 @@ export default function RekapCalonCustomerScreen({ navigation }: any) {
         borderColor: 'rgba(15,23,42,0.10)',
         padding: 14,
     },
-
-    modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-    modalTitle: { color: THEME.ink, fontWeight: '900', fontSize: 16 },
-    modalClose: { color: THEME.muted, fontWeight: '900', fontSize: 18, paddingHorizontal: 6 },
-
-    row2: { flexDirection: 'row', gap: 10, marginTop: 4 },
-
-    modalBtn: { flex: 1, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-    modalBtnText: { color: '#fff', fontWeight: '900', letterSpacing: 0.3 },
+    modalHeader: { 
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        justifyContent: 'space-between', 
+        marginBottom: 8 
+    },
+    modalTitle: { 
+        color: THEME.ink, 
+        fontWeight: '900', 
+        fontSize: 16 
+    },
+    modalClose: { 
+        color: THEME.muted, 
+        fontWeight: '900', 
+        fontSize: 18, 
+        paddingHorizontal: 6 
+    },
+    row2: { 
+        flexDirection: 'row', 
+        gap: 10, 
+        marginTop: 4 
+    },
+    modalBtn: { 
+        flex: 1, 
+        height: 50, 
+        borderRadius: 14, 
+        alignItems: 'center', 
+        justifyContent: 'center' 
+    },
+    modalBtnText: { 
+        color: '#fff', 
+        fontWeight: '900', 
+        letterSpacing: 0.3 
+    },
+    waPickBtn: {
+        height: 50,
+        borderRadius: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 10,
+    },
+    waPickText: {
+        color: '#fff',
+        fontWeight: '900',
+        letterSpacing: 0.3,
+    },
 });

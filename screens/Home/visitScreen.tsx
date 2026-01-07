@@ -128,10 +128,14 @@ export default function VisitGabunganScreen({ navigation }: any) {
 
   const normalizeYmd = (v: string) => String(v || '').slice(0, 10);
 
+  // Open WA
+  const [openWaOption, setOpenWaOption] = useState(false);
+  const [waPendingText, setWaPendingText] = useState<string>('');
+
   const formatDdMmYyyy = (ymd: string) => {
     try {
       const [y, m, d] = ymd.split('-').map(Number);
-      const dt = new Date(y, m - 1, d); // LOCAL, no timezone shift
+      const dt = new Date(y, m - 1, d);
       const bulan = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
       return `${dt.getDate()} ${bulan[dt.getMonth()]} ${dt.getFullYear()}`;
     } catch {
@@ -242,6 +246,42 @@ export default function VisitGabunganScreen({ navigation }: any) {
       }, [tanggalAwal, tanggalAkhir, userParam])
     );
 
+  const openWA = async (text: string, mode: 'app' | 'business') => {
+    const encoded = encodeURIComponent(text);
+
+    const waApp = `whatsapp://send?text=${encoded}`;
+    const waBiz = `whatsapp-business://send?text=${encoded}`;
+    const waWeb = `https://wa.me/?text=${encoded}`;
+
+    const waAppIntent = `intent://send?text=${encoded}#Intent;scheme=whatsapp;package=com.whatsapp;end`;
+    const waBizIntent = `intent://send?text=${encoded}#Intent;scheme=whatsapp-business;package=com.whatsapp.w4b;end`;
+
+    try {
+      if (mode === 'business') {
+        if (await Linking.canOpenURL(waBiz)) return Linking.openURL(waBiz);
+        if (Platform.OS === 'android' && (await Linking.canOpenURL(waBizIntent))) return Linking.openURL(waBizIntent);
+
+        // fallback kalau business nggak ada, coba WA biasa
+        if (await Linking.canOpenURL(waApp)) return Linking.openURL(waApp);
+        if (Platform.OS === 'android' && (await Linking.canOpenURL(waAppIntent))) return Linking.openURL(waAppIntent);
+
+        return Linking.openURL(waWeb);
+      }
+
+      // mode === 'app'
+      if (await Linking.canOpenURL(waApp)) return Linking.openURL(waApp);
+      if (Platform.OS === 'android' && (await Linking.canOpenURL(waAppIntent))) return Linking.openURL(waAppIntent);
+
+      // fallback kalau WA biasa nggak ada, coba business
+      if (await Linking.canOpenURL(waBiz)) return Linking.openURL(waBiz);
+      if (Platform.OS === 'android' && (await Linking.canOpenURL(waBizIntent))) return Linking.openURL(waBizIntent);
+
+      return Linking.openURL(waWeb);
+    } catch {
+      return Linking.openURL(waWeb);
+    }
+  };
+
   const kirimWA = useCallback(async () => {
     if (!userParam) {
       Toast.show({
@@ -268,15 +308,8 @@ export default function VisitGabunganScreen({ navigation }: any) {
         return;
       }
 
-      const url = `whatsapp://send?text=${encodeURIComponent(waText)}`;
-      const canOpen = await Linking.canOpenURL(url);
-
-      if (!canOpen) {
-        Toast.show({ type: 'glassError', text1: 'Info', text2: 'WhatsApp tidak ditemukan di device' });
-        return;
-      }
-
-      await Linking.openURL(url);
+      setWaPendingText(waText);
+      setOpenWaOption(true);
     } catch (err: any) {
       Toast.show({
         type: 'glassError',
@@ -571,6 +604,55 @@ export default function VisitGabunganScreen({ navigation }: any) {
         </View>
       </Modal>
 
+      {/* Modal WA */}
+      <Modal
+        visible={openWaOption}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setOpenWaOption(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Kirim lewat</Text>
+              <TouchableOpacity onPress={() => setOpenWaOption(false)} activeOpacity={0.8}>
+                <Text style={styles.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.waPickBtn, { backgroundColor: '#25D366' }]}
+              activeOpacity={0.9}
+              onPress={async () => {
+                setOpenWaOption(false);
+                await openWA(waPendingText, 'app');
+              }}
+            >
+              <Text style={styles.waPickText}>WhatsApp</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.waPickBtn, { backgroundColor: '#128C7E' }]}
+              activeOpacity={0.9}
+              onPress={async () => {
+                setOpenWaOption(false);
+                await openWA(waPendingText, 'business');
+              }}
+            >
+              <Text style={styles.waPickText}>WhatsApp Business</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.waPickBtn, { backgroundColor: 'rgba(15,23,42,0.06)', borderWidth: 1, borderColor: THEME.line }]}
+              activeOpacity={0.9}
+              onPress={() => setOpenWaOption(false)}
+            >
+              <Text style={[styles.waPickText, { color: THEME.ink }]}>Batal</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Bottom Action Bar (tetap seperti sebelumnya, style mengikuti referensi) */}
       <View style={styles.bottomAction}>
         {!isManager && (
@@ -604,7 +686,6 @@ export default function VisitGabunganScreen({ navigation }: any) {
           style={[
             styles.actionBtn,
             styles.actionBtnWa,
-            // optional: kalau manager, biar tombolnya tetap proporsional (melebar)
             isManager && { flex: 1 },
           ]}
           onPress={kirimWA}
@@ -799,5 +880,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 6,
+  },
+  waPickBtn: {
+    height: 50,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  waPickText: {
+    color: '#fff',
+    fontWeight: '900',
+    letterSpacing: 0.3,
   },
 });
