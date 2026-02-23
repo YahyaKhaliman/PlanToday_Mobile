@@ -26,6 +26,7 @@ const menus: MenuItem[] = [
     { title: 'Calon Customer', route: 'RekapCalonCustomer', roles: ['SALES', 'MANAGER'], icon: '👥' },
     { title: 'Visit Plan', route: 'VisitPlan', roles: ['SALES', 'MANAGER'], icon: '🗓️' },
     { title: 'Visit', route: 'Visit', roles: ['SALES', 'MANAGER'], icon: '📍' },
+    { title: 'Achievement', route: 'Achievement', roles: ['SALES', 'MANAGER'], icon: '🏅' },
 ];
 
 const THEME = {

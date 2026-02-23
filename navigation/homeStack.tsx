@@ -14,6 +14,8 @@ import GantiPasswordScreen from '../screens/Home/gantiPasswordScreen';
 import EditVisitPlanScreen from '../screens/Home/editVisitPlanScreen';
 import EditVisitScreen from '../screens/Home/editVisitScreen';
 import EditCalonCustomerScreen from '../screens/Home/editCalonCustomerScreen'
+import AchievementScreen from '../screens/Achievement/achievementScreen';
+import AchievementDetailUserRangeScreen from '../screens/Achievement/achievementDetailUserScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -33,6 +35,8 @@ export default function HomeStack() {
         <Stack.Screen name="RekapVisitPlanDetail" component={RekapVisitPlanDetailScreen} />
         <Stack.Screen name="RekapCalonCustomer" component={RekapCalonCustomerScreen} />
         <Stack.Screen name="GantiPassword" component={GantiPasswordScreen} />
+        <Stack.Screen name="Achievement" component={AchievementScreen} />
+        <Stack.Screen name="AchievementDetailUserRange" component={AchievementDetailUserRangeScreen} />
         </Stack.Navigator>
     );
 }

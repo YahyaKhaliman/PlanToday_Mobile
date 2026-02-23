@@ -130,7 +130,6 @@ export function GlassSelect({
         fontWeight: '700',
     },
 
-    /* Bottom Sheet - ikut modal Home (card putih) */
     sheet: {
         backgroundColor: THEME.card,
         borderTopLeftRadius: 22,

@@ -20,8 +20,8 @@ import api from '../../services/api';
 import { useAuth } from '../../context/authContext';
 
 const THEME = {
-  primary: '#4F46E5', 
-  accent: '#06B6D4', 
+  primary: '#4F46E5',
+  accent: '#06B6D4',
   ink: '#0F172A',
   muted: '#64748B',
   card: '#FFFFFF',
@@ -40,7 +40,7 @@ export default function LoginScreen({ navigation }: any) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [rememberMe, setRememberMe] = useState(false);
 
-  const { setUser } = useAuth();
+  const { setUser, setToken  } = useAuth();
 
   const canLogin = useMemo(() => {
     return username.trim().length > 0 && password.length > 0 && !loading;
@@ -78,6 +78,7 @@ export default function LoginScreen({ navigation }: any) {
         });
         return;
       }
+      setToken(res.data.token);
       setUser(res.data.user);
     } catch (err: any) {
       const errorMsg = err.response?.data?.message || 'Gagal koneksi ke server';

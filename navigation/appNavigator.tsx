@@ -18,8 +18,25 @@ import RekapVisitPlanDetailScreen from '../screens/Home/rekapVisitPlanDetailScre
 import GantiPasswordScreen from '../screens/Home/gantiPasswordScreen';
 import EditVisitPlanScreen from '../screens/Home/editVisitPlanScreen';
 import EditVisitScreen from '../screens/Home/editVisitScreen';
+import AchievementScreen from '../screens/Achievement/achievementScreen';
+import AchievementDetailUserRangeScreen from '../screens/Achievement/achievementDetailUserScreen'
 
 const Stack = createNativeStackNavigator();
+
+export type RootStackParamList = {
+    AchievementOmset: undefined;
+    AchievementDetailUserRange: {
+        kode: string;
+        nama: string;
+        jabatan: string;
+        fromYear: number;
+        fromMonth: number;
+        toYear: number;
+        toMonth: number;
+        target?: number;
+        realisasi?: number;
+    };
+};
 
 export default function AppNavigator() {
     const { user } = useAuth();
@@ -42,6 +59,8 @@ export default function AppNavigator() {
                 <Stack.Screen name="RekapVisitPlanDetail" component={RekapVisitPlanDetailScreen} />
                 <Stack.Screen name="RekapCalonCustomer" component={RekapCalonCustomerScreen} />
                 <Stack.Screen name="GantiPassword" component={GantiPasswordScreen} />
+                <Stack.Screen name="Achievement" component={AchievementScreen} />
+                <Stack.Screen name="AchievementDetailUserRange" component={AchievementDetailUserRangeScreen} />
             </>
             ) : (
             <>

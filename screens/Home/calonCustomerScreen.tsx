@@ -185,11 +185,9 @@ export default function RekapCalonCustomerScreen({ navigation }: any) {
             return Linking.openURL(waWeb);
         }
 
-        // mode === 'app'
         if (await Linking.canOpenURL(waApp)) return Linking.openURL(waApp);
         if (Platform.OS === 'android' && (await Linking.canOpenURL(waAppIntent))) return Linking.openURL(waAppIntent);
 
-        // fallback kalau WA biasa nggak ada, coba business
         if (await Linking.canOpenURL(waBiz)) return Linking.openURL(waBiz);
         if (Platform.OS === 'android' && (await Linking.canOpenURL(waBizIntent))) return Linking.openURL(waBizIntent);
 
@@ -237,8 +235,8 @@ export default function RekapCalonCustomerScreen({ navigation }: any) {
     }, []);
     
     const handleRefresh = useCallback(() => {
-        setKeyword('');        // balik ke awal
-        setShowEditFab(false); // optional: tutup mini edit
+        setKeyword('');       
+        setShowEditFab(false); 
     }, []);
 
     const renderItem = useCallback(
