@@ -1,5 +1,6 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
     Text,
     TouchableOpacity,
@@ -8,6 +9,8 @@ import {
     StatusBar,
     FlatList,
     Platform,
+    BackHandler,
+    ToastAndroid,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Modal from 'react-native-modal';
@@ -45,7 +48,33 @@ const THEME = {
 export default function HomeScreen({ navigation }: any) {
     const { user, logout } = useAuth();
     const [isModalVisible, setModalVisible] = useState(false);
+    const lastBackPressRef = useRef<number>(0);
     const toggleModal = () => setModalVisible(v => !v);
+
+    useFocusEffect(
+        useCallback(() => {
+            const onBackPress = () => {
+                const now = Date.now();
+                const isDoublePress = now - lastBackPressRef.current < 2000;
+
+                if (isDoublePress) {
+                    BackHandler.exitApp();
+                    return true;
+                }
+
+                lastBackPressRef.current = now;
+                if (Platform.OS === 'android') {
+                    ToastAndroid.show('Tekan sekali lagi untuk keluar aplikasi', ToastAndroid.SHORT);
+                }
+
+                return true;
+            };
+
+            const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+            return () => subscription.remove();
+        }, [])
+    );
 
     const handleNavigate = (route: string) => {
         try {

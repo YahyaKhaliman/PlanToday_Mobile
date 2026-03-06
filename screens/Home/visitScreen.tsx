@@ -86,7 +86,16 @@ export default function VisitGabunganScreen({ navigation }: any) {
   const isManager = String(user?.jabatan || '').toUpperCase() === 'MANAGER';
   const namaUser = user?.nama || '';
 
-  const today = useMemo(() => new Date().toISOString().substring(0, 10), []);
+  const currentMonthRange = useMemo(() => {
+    const now = new Date();
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    return {
+      start: dateToYmd(firstDay),
+      end: dateToYmd(lastDay),
+    };
+  }, []);
   const CABANG_VALUES = useMemo(() => ['PUSAT', 'JATIM', 'JATENG', 'JAKARTA'], []);
 
   const [loading, setLoading] = useState(false);
@@ -107,8 +116,8 @@ export default function VisitGabunganScreen({ navigation }: any) {
   const salesOptions = useMemo(() => listSales.map((n) => ({ label: n, value: n })), [listSales]);
 
   // ===== rentang tanggal =====
-  const [tanggalAwal, setTanggalAwal] = useState<string>(today);
-  const [tanggalAkhir, setTanggalAkhir] = useState<string>(today);
+  const [tanggalAwal, setTanggalAwal] = useState<string>(currentMonthRange.start);
+  const [tanggalAkhir, setTanggalAkhir] = useState<string>(currentMonthRange.end);
   const [showAwal, setShowAwal] = useState(false);
   const [showAkhir, setShowAkhir] = useState(false);
 
