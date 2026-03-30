@@ -60,9 +60,11 @@ const MONTHS = [
   { label: 'Des', value: '12' },
 ];
 
-const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
+const clamp = (n: number, min: number, max: number) =>
+  Math.max(min, Math.min(max, n));
 const toIndex = (y: number, m: number) => y * 12 + (m - 1);
-const progressPct = (r: number, t: number) => (!t ? 0 : clamp((r / t) * 100, 0, 500));
+const progressPct = (r: number, t: number) =>
+  !t ? 0 : clamp((r / t) * 100, 0, 500);
 
 const rupiahShort = (n: number) => {
   const v = Number(n || 0);
@@ -142,7 +144,12 @@ export default function AchievementOmsetScreen({ navigation }: any) {
 
       setLoading(true);
       try {
-        const params: any = { fromYear: fy, fromMonth: fm, toYear: ty, toMonth: tm };
+        const params: any = {
+          fromYear: fy,
+          fromMonth: fm,
+          toYear: ty,
+          toMonth: tm,
+        };
 
         const res = await api.get('/achievement/omset/range', {
           params,
@@ -150,7 +157,7 @@ export default function AchievementOmsetScreen({ navigation }: any) {
         });
 
         const arr = (res.data?.data || []) as any[];
-        const mapped: UserAggRow[] = arr.map((x) => ({
+        const mapped: UserAggRow[] = arr.map(x => ({
           kode: String(x.kode || ''),
           nama: String(x.nama || '-'),
           jabatan: String(x.jabatan || '-'),
@@ -160,15 +167,15 @@ export default function AchievementOmsetScreen({ navigation }: any) {
         }));
 
         setRows(mapped);
-      } catch (err: any) {
-        const msg = err?.response?.data?.message || 'Gagal mengambil achievement';
+      } catch {
+        const msg = 'Gagal mengambil achievement';
         Toast.show({ type: 'glassError', text1: 'Error', text2: msg });
         setRows([]);
       } finally {
         setLoading(false);
       }
     },
-    [token]
+    [token],
   );
 
   const applyRange = useCallback(
@@ -193,7 +200,7 @@ export default function AchievementOmsetScreen({ navigation }: any) {
 
       await fetchRange(fY, fM, tY, tM);
     },
-    [fetchRange]
+    [fetchRange],
   );
 
   useEffect(() => {
@@ -232,46 +239,60 @@ export default function AchievementOmsetScreen({ navigation }: any) {
   }, [closePickers]);
 
   /** SELECT MONTH */
-  const onSelectMonth = useCallback((v: string) => {
-    const m = clamp(Number(v), 1, 12);
+  const onSelectMonth = useCallback(
+    (v: string) => {
+      const m = clamp(Number(v), 1, 12);
 
-    if (pickerMode === 'modal') {
-      if (pickerTarget === 'start') setDraftFromMonth(m);
-      else setDraftToMonth(m);
-    } else {
-      if (pickerTarget === 'start') setFromMonth(m);
-      else setToMonth(m);
-    }
+      if (pickerMode === 'modal') {
+        if (pickerTarget === 'start') setDraftFromMonth(m);
+        else setDraftToMonth(m);
+      } else {
+        if (pickerTarget === 'start') setFromMonth(m);
+        else setToMonth(m);
+      }
 
-    setOpenMonthGrid(false);        // ✅ tutup month dulu
+      setOpenMonthGrid(false); // ✅ tutup month dulu
 
-    setTimeout(() => {
-      setOpenYearGrid(true);        // ✅ baru buka year
-    }, 200);
-  }, [pickerMode, pickerTarget]);
+      setTimeout(() => {
+        setOpenYearGrid(true); // ✅ baru buka year
+      }, 200);
+    },
+    [pickerMode, pickerTarget],
+  );
 
   /** SELECT YEAR */
-  const onSelectYear = useCallback(async (v: string) => {
-    const y = Number(v);
+  const onSelectYear = useCallback(
+    async (v: string) => {
+      const y = Number(v);
 
-    if (pickerMode === 'modal') {
-      if (pickerTarget === 'start') setDraftFromYear(y);
-      else setDraftToYear(y);
+      if (pickerMode === 'modal') {
+        if (pickerTarget === 'start') setDraftFromYear(y);
+        else setDraftToYear(y);
+
+        setOpenYearGrid(false);
+        return;
+      }
 
       setOpenYearGrid(false);
-      return;
-    }
 
-    setOpenYearGrid(false);
-
-    if (pickerTarget === 'start') {
-      setFromYear(y);
-      await applyRange(y, fromMonth, toYear, toMonth);
-    } else {
-      setToYear(y);
-      await applyRange(fromYear, fromMonth, y, toMonth);
-    }
-  }, [pickerMode, pickerTarget, applyRange, fromMonth, fromYear, toMonth, toYear]);
+      if (pickerTarget === 'start') {
+        setFromYear(y);
+        await applyRange(y, fromMonth, toYear, toMonth);
+      } else {
+        setToYear(y);
+        await applyRange(fromYear, fromMonth, y, toMonth);
+      }
+    },
+    [
+      pickerMode,
+      pickerTarget,
+      applyRange,
+      fromMonth,
+      fromYear,
+      toMonth,
+      toYear,
+    ],
+  );
 
   /** FILTER MODAL OPEN */
   const openFilterModal = useCallback(() => {
@@ -288,12 +309,21 @@ export default function AchievementOmsetScreen({ navigation }: any) {
     if (!isManager) return rows;
     const q = keyword.trim().toLowerCase();
     if (!q) return rows;
-    return rows.filter((r) => r.nama.toLowerCase().includes(q) || r.jabatan.toLowerCase().includes(q));
+    return rows.filter(
+      r =>
+        r.nama.toLowerCase().includes(q) || r.jabatan.toLowerCase().includes(q),
+    );
   }, [rows, keyword, isManager]);
 
   const summary = useMemo(() => {
-    const totalTarget = filteredRows.reduce((a, b) => a + Number(b.target || 0), 0);
-    const totalReal = filteredRows.reduce((a, b) => a + Number(b.realisasi || 0), 0);
+    const totalTarget = filteredRows.reduce(
+      (a, b) => a + Number(b.target || 0),
+      0,
+    );
+    const totalReal = filteredRows.reduce(
+      (a, b) => a + Number(b.realisasi || 0),
+      0,
+    );
     const prog = progressPct(totalReal, totalTarget);
     return {
       totalTarget,
@@ -316,16 +346,28 @@ export default function AchievementOmsetScreen({ navigation }: any) {
     <View style={styles.row2}>
       <View style={styles.col}>
         <Text style={styles.label}>Periode Awal</Text>
-        <TouchableOpacity style={styles.dateSelect} onPress={openStartInline} activeOpacity={0.9}>
-          <Text style={styles.dateText}>{formatMonthYear(fromMonth, fromYear)}</Text>
+        <TouchableOpacity
+          style={styles.dateSelect}
+          onPress={openStartInline}
+          activeOpacity={0.9}
+        >
+          <Text style={styles.dateText}>
+            {formatMonthYear(fromMonth, fromYear)}
+          </Text>
           <MaterialIcons name="edit-calendar" color={THEME.ink} size={22} />
         </TouchableOpacity>
       </View>
 
       <View style={styles.col}>
         <Text style={styles.label}>Periode Akhir</Text>
-        <TouchableOpacity style={styles.dateSelect} onPress={openEndInline} activeOpacity={0.9}>
-          <Text style={styles.dateText}>{formatMonthYear(toMonth, toYear)}</Text>
+        <TouchableOpacity
+          style={styles.dateSelect}
+          onPress={openEndInline}
+          activeOpacity={0.9}
+        >
+          <Text style={styles.dateText}>
+            {formatMonthYear(toMonth, toYear)}
+          </Text>
           <MaterialIcons name="edit-calendar" color={THEME.ink} size={22} />
         </TouchableOpacity>
       </View>
@@ -336,16 +378,28 @@ export default function AchievementOmsetScreen({ navigation }: any) {
     <View style={styles.row2}>
       <View style={styles.col}>
         <Text style={styles.label}>Periode Awal</Text>
-        <TouchableOpacity style={styles.dateSelect} onPress={openStartModal} activeOpacity={0.9}>
-          <Text style={styles.dateText}>{formatMonthYear(draftFromMonth, draftFromYear)}</Text>
+        <TouchableOpacity
+          style={styles.dateSelect}
+          onPress={openStartModal}
+          activeOpacity={0.9}
+        >
+          <Text style={styles.dateText}>
+            {formatMonthYear(draftFromMonth, draftFromYear)}
+          </Text>
           <MaterialIcons name="edit-calendar" color={THEME.ink} size={22} />
         </TouchableOpacity>
       </View>
 
       <View style={styles.col}>
         <Text style={styles.label}>Periode Akhir</Text>
-        <TouchableOpacity style={styles.dateSelect} onPress={openEndModal} activeOpacity={0.9}>
-          <Text style={styles.dateText}>{formatMonthYear(draftToMonth, draftToYear)}</Text>
+        <TouchableOpacity
+          style={styles.dateSelect}
+          onPress={openEndModal}
+          activeOpacity={0.9}
+        >
+          <Text style={styles.dateText}>
+            {formatMonthYear(draftToMonth, draftToYear)}
+          </Text>
           <MaterialIcons name="edit-calendar" color={THEME.ink} size={22} />
         </TouchableOpacity>
       </View>
@@ -366,7 +420,11 @@ export default function AchievementOmsetScreen({ navigation }: any) {
           autoCorrect={false}
         />
         {!!keyword.trim() && (
-          <TouchableOpacity onPress={clearKeyword} activeOpacity={0.8} style={styles.clearBtn}>
+          <TouchableOpacity
+            onPress={clearKeyword}
+            activeOpacity={0.8}
+            style={styles.clearBtn}
+          >
             <MaterialIcons name="close" size={18} color={THEME.muted} />
           </TouchableOpacity>
         )}
@@ -375,8 +433,15 @@ export default function AchievementOmsetScreen({ navigation }: any) {
   }, [keyword, clearKeyword, isManager]);
 
   return (
-    <LinearGradient colors={[THEME.bgTop, THEME.bgBottom]} style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+    <LinearGradient
+      colors={[THEME.bgTop, THEME.bgBottom]}
+      style={styles.container}
+    >
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="transparent"
+        translucent
+      />
 
       <FlatList
         data={filteredRows}
@@ -389,7 +454,9 @@ export default function AchievementOmsetScreen({ navigation }: any) {
           <View>
             <View style={styles.header}>
               <Text style={styles.title}>Achievement</Text>
-              <Text style={styles.subTitle}>{isManager ? 'Rekap Semua User' : 'Rekap Achievement Saya'}</Text>
+              <Text style={styles.subTitle}>
+                {isManager ? 'Rekap Semua User' : 'Rekap Achievement Saya'}
+              </Text>
             </View>
 
             <View style={styles.card}>
@@ -397,7 +464,9 @@ export default function AchievementOmsetScreen({ navigation }: any) {
               <Text style={styles.heroValue}>{summary.prog.toFixed(2)}%</Text>
 
               <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${summary.fill}%` }]} />
+                <View
+                  style={[styles.progressFill, { width: `${summary.fill}%` }]}
+                />
               </View>
 
               <View style={styles.chip}>
@@ -406,7 +475,12 @@ export default function AchievementOmsetScreen({ navigation }: any) {
                   size={14}
                   color={summary.isMet ? THEME.ok : THEME.warn}
                 />
-                <Text style={[styles.chipText, { color: summary.isMet ? THEME.ok : THEME.warn }]}>
+                <Text
+                  style={[
+                    styles.chipText,
+                    { color: summary.isMet ? THEME.ok : THEME.warn },
+                  ]}
+                >
                   {summary.isMet ? 'TARGET TERCAPAI' : 'BELUM TERCAPAI'}
                 </Text>
               </View>
@@ -416,8 +490,14 @@ export default function AchievementOmsetScreen({ navigation }: any) {
               {PeriodRowInline}
 
               <View style={[styles.moneyBlock, { marginTop: 12 }]}>
-                <Row label="Total Target" value={rupiahShort(summary.totalTarget)} />
-                <Row label="Total Realisasi" value={rupiahShort(summary.totalReal)} />
+                <Row
+                  label="Total Target"
+                  value={rupiahShort(summary.totalTarget)}
+                />
+                <Row
+                  label="Total Realisasi"
+                  value={rupiahShort(summary.totalReal)}
+                />
                 <Row label="Jumlah User" value={`${filteredRows.length}`} />
               </View>
               <View style={styles.line} />
@@ -431,7 +511,11 @@ export default function AchievementOmsetScreen({ navigation }: any) {
           const achValue = Number(item.ach || prog);
 
           const badgeStyle =
-            achValue >= 100 ? styles.badgeOk : achValue > 0 ? styles.badgeWarn : styles.badgeMissing;
+            achValue >= 100
+              ? styles.badgeOk
+              : achValue > 0
+              ? styles.badgeWarn
+              : styles.badgeMissing;
 
           return (
             <TouchableOpacity
@@ -458,16 +542,21 @@ export default function AchievementOmsetScreen({ navigation }: any) {
                     {item.nama} • {item.jabatan}
                   </Text>
                   <Text style={styles.userMeta} numberOfLines={1}>
-                    Target: {rupiahShort(item.target)} • Realisasi: {rupiahShort(item.realisasi)}
+                    Target: {rupiahShort(item.target)} • Realisasi:{' '}
+                    {rupiahShort(item.realisasi)}
                   </Text>
 
                   <View style={styles.userBarTrack}>
-                    <View style={[styles.userBarFill, { width: `${barFill}%` }]} />
+                    <View
+                      style={[styles.userBarFill, { width: `${barFill}%` }]}
+                    />
                   </View>
                 </View>
 
                 <View style={[styles.achBadge, badgeStyle]}>
-                  <Text style={styles.achBadgeText}>{achValue.toFixed(2)}%</Text>
+                  <Text style={styles.achBadgeText}>
+                    {achValue.toFixed(2)}%
+                  </Text>
                 </View>
               </View>
             </TouchableOpacity>
@@ -477,14 +566,20 @@ export default function AchievementOmsetScreen({ navigation }: any) {
           loading ? (
             <ActivityIndicator style={{ marginTop: 20 }} />
           ) : (
-            <Text style={styles.empty}>{token ? 'Data tidak ditemukan' : 'Silakan login ulang'}</Text>
+            <Text style={styles.empty}>
+              {token ? 'Data tidak ditemukan' : 'Silakan login ulang'}
+            </Text>
           )
         }
       />
 
       {/* FAB filter */}
       {showFab && (
-        <TouchableOpacity activeOpacity={0.9} onPress={openFilterModal} style={styles.fab}>
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={openFilterModal}
+          style={styles.fab}
+        >
           <View style={styles.fabInner}>
             <Text style={{ fontSize: 18 }}>🔍</Text>
           </View>
@@ -524,7 +619,12 @@ export default function AchievementOmsetScreen({ navigation }: any) {
                 onPress={() => {
                   setOpenFilter(false);
                   closePickers();
-                  applyRange(draftFromYear, draftFromMonth, draftToYear, draftToMonth);
+                  applyRange(
+                    draftFromYear,
+                    draftFromMonth,
+                    draftToYear,
+                    draftToMonth,
+                  );
                 }}
                 disabled={loading}
                 activeOpacity={0.9}
@@ -553,7 +653,9 @@ export default function AchievementOmsetScreen({ navigation }: any) {
                 disabled={loading}
                 activeOpacity={0.9}
               >
-                <Text style={[styles.modalBtnText, { color: THEME.primary }]}>Reset</Text>
+                <Text style={[styles.modalBtnText, { color: THEME.primary }]}>
+                  Reset
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -563,7 +665,9 @@ export default function AchievementOmsetScreen({ navigation }: any) {
       {/* MonthGridSelect */}
       <MonthGridSelect
         visible={openMonthGrid}
-        title={pickerTarget === 'start' ? 'Pilih Bulan Awal' : 'Pilih Bulan Akhir'}
+        title={
+          pickerTarget === 'start' ? 'Pilih Bulan Awal' : 'Pilih Bulan Akhir'
+        }
         value={String(
           pickerMode === 'modal'
             ? pickerTarget === 'start'
@@ -571,7 +675,7 @@ export default function AchievementOmsetScreen({ navigation }: any) {
               : draftToMonth
             : pickerTarget === 'start'
             ? fromMonth
-            : toMonth
+            : toMonth,
         )}
         options={MONTHS}
         theme={THEME}
@@ -582,7 +686,9 @@ export default function AchievementOmsetScreen({ navigation }: any) {
       {/* YearGridSelect */}
       <YearGridSelect
         visible={openYearGrid}
-        title={pickerTarget === 'start' ? 'Pilih Tahun Awal' : 'Pilih Tahun Akhir'}
+        title={
+          pickerTarget === 'start' ? 'Pilih Tahun Awal' : 'Pilih Tahun Akhir'
+        }
         value={String(
           pickerMode === 'modal'
             ? pickerTarget === 'start'
@@ -590,7 +696,7 @@ export default function AchievementOmsetScreen({ navigation }: any) {
               : draftToYear
             : pickerTarget === 'start'
             ? fromYear
-            : toYear
+            : toYear,
         )}
         years={years}
         theme={THEME}
@@ -610,16 +716,47 @@ const styles = StyleSheet.create({
   },
 
   header: { marginBottom: 12 },
-  title: { fontSize: 25, fontWeight: '900', color: THEME.ink, textAlign: 'center' },
-  subTitle: { color: THEME.muted, fontSize: 12, fontWeight: '800', textAlign: 'center', marginTop: 2 },
+  title: {
+    fontSize: 25,
+    fontWeight: '900',
+    color: THEME.ink,
+    textAlign: 'center',
+  },
+  subTitle: {
+    color: THEME.muted,
+    fontSize: 12,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginTop: 2,
+  },
 
-  card: { backgroundColor: THEME.card, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: THEME.line },
+  card: {
+    backgroundColor: THEME.card,
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: THEME.line,
+  },
 
   heroLabel: { color: THEME.muted, fontSize: 12, fontWeight: '900' },
-  heroValue: { color: THEME.ink, fontSize: 28, fontWeight: '900', marginVertical: 8 },
+  heroValue: {
+    color: THEME.ink,
+    fontSize: 28,
+    fontWeight: '900',
+    marginVertical: 8,
+  },
 
-  progressTrack: { height: 10, borderRadius: 999, backgroundColor: 'rgba(15,23,42,0.08)', overflow: 'hidden' },
-  progressFill: { height: 10, borderRadius: 999, backgroundColor: 'rgba(6,182,212,0.75)' },
+  progressTrack: {
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: 'rgba(15,23,42,0.08)',
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: 10,
+    borderRadius: 999,
+    backgroundColor: 'rgba(6,182,212,0.75)',
+  },
 
   chip: { marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 6 },
   chipText: { fontSize: 11, fontWeight: '900' },
@@ -652,8 +789,18 @@ const styles = StyleSheet.create({
   },
   dateText: { flex: 1, color: THEME.ink, fontSize: 14, fontWeight: '900' },
 
-  moneyBlock: { backgroundColor: THEME.soft, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: THEME.line },
-  row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 },
+  moneyBlock: {
+    backgroundColor: THEME.soft,
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: THEME.line,
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+  },
   key: { color: THEME.muted, fontSize: 12, fontWeight: '900' },
   val: { color: THEME.ink, fontSize: 12, fontWeight: '900' },
 
@@ -673,22 +820,66 @@ const styles = StyleSheet.create({
 
   detailTitle: { marginTop: 10, fontWeight: '900', color: THEME.ink },
 
-  userCard: { marginTop: 10, backgroundColor: THEME.card, borderRadius: 18, padding: 14, borderWidth: 1, borderColor: THEME.line },
+  userCard: {
+    marginTop: 10,
+    backgroundColor: THEME.card,
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: THEME.line,
+  },
   userTopRow: { flexDirection: 'row', alignItems: 'center' },
   userName: { fontWeight: '900', color: THEME.ink },
-  userMeta: { color: THEME.muted, fontSize: 12, marginTop: 4, fontWeight: '800' },
+  userMeta: {
+    color: THEME.muted,
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: '800',
+  },
 
-  userBarTrack: { marginTop: 10, height: 8, borderRadius: 999, backgroundColor: 'rgba(15,23,42,0.08)', overflow: 'hidden' },
-  userBarFill: { height: 8, borderRadius: 999, backgroundColor: 'rgba(6,182,212,0.75)' },
+  userBarTrack: {
+    marginTop: 10,
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(15,23,42,0.08)',
+    overflow: 'hidden',
+  },
+  userBarFill: {
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: 'rgba(6,182,212,0.75)',
+  },
 
-  achBadge: { paddingHorizontal: 10, paddingVertical: 8, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center', minWidth: 74 },
+  achBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 74,
+  },
   achBadgeText: { fontWeight: '900', color: THEME.ink, fontSize: 12 },
 
-  badgeOk: { backgroundColor: 'rgba(22,163,74,0.10)', borderColor: 'rgba(22,163,74,0.22)' },
-  badgeWarn: { backgroundColor: 'rgba(245,158,11,0.10)', borderColor: 'rgba(245,158,11,0.22)' },
-  badgeMissing: { backgroundColor: 'rgba(148,163,184,0.12)', borderColor: 'rgba(148,163,184,0.22)' },
+  badgeOk: {
+    backgroundColor: 'rgba(22,163,74,0.10)',
+    borderColor: 'rgba(22,163,74,0.22)',
+  },
+  badgeWarn: {
+    backgroundColor: 'rgba(245,158,11,0.10)',
+    borderColor: 'rgba(245,158,11,0.22)',
+  },
+  badgeMissing: {
+    backgroundColor: 'rgba(148,163,184,0.12)',
+    borderColor: 'rgba(148,163,184,0.22)',
+  },
 
-  empty: { textAlign: 'center', marginTop: 20, color: THEME.muted, fontWeight: '700' },
+  empty: {
+    textAlign: 'center',
+    marginTop: 20,
+    color: THEME.muted,
+    fontWeight: '700',
+  },
 
   fab: { position: 'absolute', right: 16, bottom: 24 },
   fabInner: {
@@ -707,12 +898,40 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
 
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)', paddingHorizontal: 16, justifyContent: 'flex-end', paddingBottom: 18 },
-  modalCard: { backgroundColor: 'rgba(255,255,255,0.96)', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(15,23,42,0.10)', padding: 14 },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    paddingHorizontal: 16,
+    justifyContent: 'flex-end',
+    paddingBottom: 18,
+  },
+  modalCard: {
+    backgroundColor: 'rgba(255,255,255,0.96)',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.10)',
+    padding: 14,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
   modalTitle: { color: THEME.ink, fontWeight: '900', fontSize: 16 },
-  modalClose: { color: THEME.muted, fontWeight: '900', fontSize: 18, paddingHorizontal: 6 },
+  modalClose: {
+    color: THEME.muted,
+    fontWeight: '900',
+    fontSize: 18,
+    paddingHorizontal: 6,
+  },
 
-  modalBtn: { flex: 1, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  modalBtn: {
+    flex: 1,
+    height: 50,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   modalBtnText: { color: '#fff', fontWeight: '900', letterSpacing: 0.3 },
 });
