@@ -1,10 +1,18 @@
 /* eslint-disable react-native/no-inline-styles */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, StatusBar, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  StatusBar,
+  Platform,
+} from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../../navigation/appNavigator';
 import CircularProgress from '../Achievement/circularProgress';
@@ -24,22 +32,38 @@ const THEME = {
 };
 
 const MONTH_LABELS = [
-  'Jan','Feb','Mar','Apr','Mei','Juni',
-  'Juli','Agust','Sept','Okt','Nov','Des',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'Mei',
+  'Jun',
+  'Jul',
+  'Agu',
+  'Sep',
+  'Okt',
+  'Nov',
+  'Des',
 ];
 
-const rupiahFull = (n: number) => `Rp ${Number(n || 0).toLocaleString('id-ID')}`;
+const rupiahFull = (n: number) =>
+  `Rp ${Number(n || 0).toLocaleString('id-ID')}`;
 const percent2 = (n?: number) => `${Number(n || 0).toFixed(2)}%`;
 
-const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
-const progressPct = (realisasi: number, target: number) => (!target ? 0 : clamp((realisasi / target) * 100, 0, 500));
+const clamp = (v: number, min: number, max: number) =>
+  Math.max(min, Math.min(max, v));
+const progressPct = (realisasi: number, target: number) =>
+  !target ? 0 : clamp((realisasi / target) * 100, 0, 500);
 
 const fmtMonthYear = (m: number, y: number) => {
   const label = MONTH_LABELS[clamp(m, 1, 12) - 1] || `${m}`;
   return `${label} ${y}`;
 };
 
-type Nav = NativeStackNavigationProp<RootStackParamList, 'AchievementDetailUserRange'>;
+type Nav = NativeStackNavigationProp<
+  RootStackParamList,
+  'AchievementDetailUserRange'
+>;
 type R = RouteProp<RootStackParamList, 'AchievementDetailUserRange'>;
 
 function Row({ label, value, valueStyle }: any) {
@@ -54,6 +78,7 @@ function Row({ label, value, valueStyle }: any) {
 export default function AchievementDetailUserRangeScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<R>();
+  const insets = useSafeAreaInsets();
 
   const {
     nama,
@@ -68,7 +93,10 @@ export default function AchievementDetailUserRangeScreen() {
 
   const periodLabel = useMemo(() => {
     if (!fromYear || !fromMonth || !toYear || !toMonth) return '-';
-    return `${fmtMonthYear(fromMonth, fromYear)} — ${fmtMonthYear(toMonth, toYear)}`;
+    return `${fmtMonthYear(fromMonth, fromYear)} — ${fmtMonthYear(
+      toMonth,
+      toYear,
+    )}`;
   }, [fromMonth, fromYear, toMonth, toYear]);
 
   // kalau dari list sudah bawa agregat, pakai itu
@@ -82,8 +110,15 @@ export default function AchievementDetailUserRangeScreen() {
   const isMet = realisasi >= target && target > 0;
 
   return (
-    <LinearGradient colors={[THEME.bgTop, THEME.bgBottom]} style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+    <LinearGradient
+      colors={[THEME.bgTop, THEME.bgBottom]}
+      style={[styles.container, { paddingBottom: insets.bottom + 20 }]}
+    >
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="transparent"
+        translucent
+      />
 
       {/* HEADER */}
       <View style={styles.header}>
@@ -114,7 +149,12 @@ export default function AchievementDetailUserRangeScreen() {
                 size={14}
                 color={isMet ? THEME.ok : THEME.warn}
               />
-              <Text style={[styles.chipText, { color: isMet ? THEME.ok : THEME.warn }]}>
+              <Text
+                style={[
+                  styles.chipText,
+                  { color: isMet ? THEME.ok : THEME.warn },
+                ]}
+              >
                 {isMet ? 'TARGET TERCAPAI' : 'BELUM TERCAPAI'}
               </Text>
             </View>
@@ -141,7 +181,11 @@ export default function AchievementDetailUserRangeScreen() {
       </View>
 
       {/* BUTTON KEMBALI */}
-      <TouchableOpacity activeOpacity={0.9} onPress={() => navigation.goBack()} style={styles.backButton}>
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={() => navigation.goBack()}
+        style={styles.backButton}
+      >
         <MaterialIcons name="arrow-back" size={20} color={THEME.ink} />
         <Text style={styles.backButtonText}>Kembali</Text>
       </TouchableOpacity>
@@ -158,9 +202,27 @@ const styles = StyleSheet.create({
   },
 
   header: { marginBottom: 12, alignItems: 'center' },
-  title: { fontSize: 25, fontWeight: '900', color: THEME.ink, letterSpacing: 0.2, textAlign: 'center' },
-  subTitle: { color: THEME.muted, fontSize: 12, fontWeight: '800', marginTop: 2, textAlign: 'center' },
-  periodText: { color: THEME.muted, fontSize: 12, fontWeight: '900', marginTop: 6, textAlign: 'center' },
+  title: {
+    fontSize: 25,
+    fontWeight: '900',
+    color: THEME.ink,
+    letterSpacing: 0.2,
+    textAlign: 'center',
+  },
+  subTitle: {
+    color: THEME.muted,
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  periodText: {
+    color: THEME.muted,
+    fontSize: 12,
+    fontWeight: '900',
+    marginTop: 6,
+    textAlign: 'center',
+  },
 
   card: {
     backgroundColor: THEME.card,
@@ -172,7 +234,12 @@ const styles = StyleSheet.create({
   },
 
   heroLabel: { color: THEME.muted, fontSize: 12, fontWeight: '900' },
-  heroValue: { color: THEME.ink, fontSize: 28, fontWeight: '900', marginVertical: 8, },
+  heroValue: {
+    color: THEME.ink,
+    fontSize: 28,
+    fontWeight: '900',
+    marginVertical: 8,
+  },
 
   progressTrack: {
     height: 10,
@@ -210,9 +277,20 @@ const styles = StyleSheet.create({
     borderColor: THEME.line,
   },
 
-  row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, gap: 12 },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    gap: 12,
+  },
   key: { color: THEME.muted, fontSize: 12, fontWeight: '900', flex: 1 },
-  val: { color: THEME.ink, fontSize: 12, fontWeight: '900', flex: 1, textAlign: 'right' },
+  val: {
+    color: THEME.ink,
+    fontSize: 12,
+    fontWeight: '900',
+    flex: 1,
+    textAlign: 'right',
+  },
 
   positive: { color: THEME.ok },
   negative: { color: '#DC2626' },

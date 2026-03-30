@@ -16,6 +16,8 @@ import LinearGradient from 'react-native-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Toast from 'react-native-toast-message';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { usePressGuard } from '../../utils/usePressGuard';
 
 import api from '../../services/api';
 import { useAuth } from '../../context/authContext';
@@ -42,7 +44,7 @@ type SelectedCustomerPayload = {
 };
 
 const ymdToDate = (ymd: string) => {
-  const [y, m, d] = ymd.split('-').map((n) => parseInt(n, 10));
+  const [y, m, d] = ymd.split('-').map(n => parseInt(n, 10));
   return new Date(y, m - 1, d);
 };
 
@@ -55,9 +57,22 @@ const dateToYmd = (dt: Date) => {
 
 const formatDisplayDate = (ymd: string) => {
   try {
-    const [y, m, d] = ymd.split('-').map((n) => parseInt(n, 10));
+    const [y, m, d] = ymd.split('-').map(n => parseInt(n, 10));
     const dt = new Date(y, m - 1, d);
-    const bulan = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const bulan = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mei',
+      'Jun',
+      'Jul',
+      'Agu',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Des',
+    ];
     return `${dt.getDate()} ${bulan[dt.getMonth()]} ${dt.getFullYear()}`;
   } catch {
     return ymd;
@@ -66,6 +81,8 @@ const formatDisplayDate = (ymd: string) => {
 
 export default function TambahVisitPlanScreen({ navigation, route }: any) {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
+  const runGuardedPress = usePressGuard();
 
   const cabang = String(user?.cabang || '');
   const namaSales = String(user?.nama || '');
@@ -81,7 +98,8 @@ export default function TambahVisitPlanScreen({ navigation, route }: any) {
   const [showDate, setShowDate] = useState(false);
 
   useEffect(() => {
-    const selected: SelectedCustomerPayload | undefined = route?.params?.selectedCustomer;
+    const selected: SelectedCustomerPayload | undefined =
+      route?.params?.selectedCustomer;
     if (selected) {
       setCustomerKode(String(selected.kode || ''));
       setCustomer(String(selected.nama || ''));
@@ -89,16 +107,31 @@ export default function TambahVisitPlanScreen({ navigation, route }: any) {
   }, [route?.params?.selectedCustomer]);
 
   const canSubmit = useMemo(() => {
-    return customer.trim().length > 0 && customerKode.trim().length > 0 && tanggal.trim().length > 0 && !loading;
+    return (
+      customer.trim().length > 0 &&
+      customerKode.trim().length > 0 &&
+      tanggal.trim().length > 0 &&
+      !loading
+    );
   }, [customer, customerKode, tanggal, loading]);
 
   const simpan = async () => {
+    if (loading) return;
+
     if (!customer.trim() || !customerKode.trim()) {
-      Toast.show({ type: 'glassError', text1: 'Validasi', text2: 'Customer harus dipilih terlebih dahulu' });
+      Toast.show({
+        type: 'glassError',
+        text1: 'Validasi',
+        text2: 'Customer harus dipilih terlebih dahulu',
+      });
       return;
     }
     if (!tanggal.trim()) {
-      Toast.show({ type: 'glassError', text1: 'Validasi', text2: 'Tanggal plan wajib dipilih' });
+      Toast.show({
+        type: 'glassError',
+        text1: 'Validasi',
+        text2: 'Tanggal plan wajib dipilih',
+      });
       return;
     }
 
@@ -135,7 +168,10 @@ export default function TambahVisitPlanScreen({ navigation, route }: any) {
       Toast.show({
         type: 'glassError',
         text1: 'Gagal Simpan',
-        text2: err?.response?.data?.message || err?.message || 'Gagal koneksi ke server',
+        text2:
+          err?.response?.data?.message ||
+          err?.message ||
+          'Gagal koneksi ke server',
       });
     } finally {
       setLoading(false);
@@ -149,11 +185,21 @@ export default function TambahVisitPlanScreen({ navigation, route }: any) {
       end={{ x: 1, y: 1 }}
       style={styles.container}
     >
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="transparent"
+        translucent
+      />
 
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+      >
         <ScrollView
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={[
+            styles.scroll,
+            { paddingBottom: 28 + insets.bottom },
+          ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -166,7 +212,11 @@ export default function TambahVisitPlanScreen({ navigation, route }: any) {
             {/* Sales (Cabang) */}
             <Text style={styles.label}>Sales (Cabang)</Text>
             <View style={[styles.inputWrap, { opacity: 0.7 }]}>
-              <TextInput value={`${namaSales} (${cabang})`} editable={false} style={styles.input} />
+              <TextInput
+                value={`${namaSales} (${cabang})`}
+                editable={false}
+                style={styles.input}
+              />
             </View>
 
             {/* Customer */}
@@ -175,7 +225,7 @@ export default function TambahVisitPlanScreen({ navigation, route }: any) {
               <View style={[styles.inputWrap, { flex: 1, marginBottom: 0 }]}>
                 <TextInput
                   value={customer}
-                  onChangeText={(t) => {
+                  onChangeText={t => {
                     setCustomer(t);
                     if (customerKode) setCustomerKode('');
                   }}
@@ -186,7 +236,14 @@ export default function TambahVisitPlanScreen({ navigation, route }: any) {
               </View>
 
               <TouchableOpacity
-                onPress={() => navigation.navigate('CariCustomer', { keyword: customer, from: 'TAMBAHVISITPLAN' })}
+                onPress={() =>
+                  runGuardedPress('add-visit-plan:go-search', () =>
+                    navigation.navigate('CariCustomer', {
+                      keyword: customer,
+                      from: 'TAMBAHVISITPLAN',
+                    }),
+                  )
+                }
                 style={styles.btnSoft}
                 activeOpacity={0.9}
               >
@@ -194,12 +251,22 @@ export default function TambahVisitPlanScreen({ navigation, route }: any) {
               </TouchableOpacity>
             </View>
 
-            {!!customerKode && <Text style={styles.helper}>Kode: {customerKode}</Text>}
+            {!!customerKode && (
+              <Text style={styles.helper}>Kode: {customerKode}</Text>
+            )}
 
             {/* Tanggal Plan */}
             <Text style={styles.label}>Tanggal Rencana Visit</Text>
-            <TouchableOpacity onPress={() => setShowDate(true)} activeOpacity={0.9} style={styles.selectWrap}>
-              <Text style={[styles.selectText, !tanggal && { color: THEME.muted }]}>{tanggal ? formatDisplayDate(tanggal) : 'Pilih Tanggal'}</Text>
+            <TouchableOpacity
+              onPress={() => setShowDate(true)}
+              activeOpacity={0.9}
+              style={styles.selectWrap}
+            >
+              <Text
+                style={[styles.selectText, !tanggal && { color: THEME.muted }]}
+              >
+                {tanggal ? formatDisplayDate(tanggal) : 'Pilih Tanggal'}
+              </Text>
               <MaterialIcons name="edit-calendar" size={22} color={THEME.ink} />
             </TouchableOpacity>
 
@@ -214,7 +281,7 @@ export default function TambahVisitPlanScreen({ navigation, route }: any) {
                 }}
               />
             )}
-            
+
             {/* Catatan  */}
             <Text style={styles.label}>Catatan</Text>
             <View style={styles.textAreaWrap}>
@@ -236,10 +303,23 @@ export default function TambahVisitPlanScreen({ navigation, route }: any) {
               style={[styles.btnPrimary, !canSubmit && { opacity: 0.55 }]}
               activeOpacity={0.9}
             >
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnPrimaryText}>SIMPAN RENCANA</Text>}
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.btnPrimaryText}>SIMPAN RENCANA</Text>
+              )}
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => navigation.navigate("VisitPlan")} disabled={loading} style={styles.btnGhost} activeOpacity={0.9}>
+            <TouchableOpacity
+              onPress={() =>
+                runGuardedPress('add-visit-plan:cancel', () =>
+                  navigation.navigate('VisitPlan'),
+                )
+              }
+              disabled={loading}
+              style={styles.btnGhost}
+              activeOpacity={0.9}
+            >
               <Text style={styles.btnGhostText}>Batal</Text>
             </TouchableOpacity>
           </View>
@@ -259,8 +339,18 @@ const styles = StyleSheet.create({
   },
 
   header: { alignItems: 'center', marginBottom: 12 },
-  title: { fontSize: 26, fontWeight: '900', color: THEME.ink, letterSpacing: 0.2 },
-  subtitle: { color: THEME.muted, fontSize: 12, marginTop: 6, fontWeight: '700' },
+  title: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: THEME.ink,
+    letterSpacing: 0.2,
+  },
+  subtitle: {
+    color: THEME.muted,
+    fontSize: 12,
+    marginTop: 6,
+    fontWeight: '700',
+  },
 
   card: {
     backgroundColor: THEME.card,
@@ -313,9 +403,20 @@ const styles = StyleSheet.create({
   input: { flex: 1, color: THEME.ink, fontSize: 15, fontWeight: '800' },
   selectText: { flex: 1, color: THEME.ink, fontSize: 14, fontWeight: '900' },
 
-  row: { flexDirection: 'row', gap: 10, alignItems: 'center', marginBottom: 10 },
+  row: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
 
-  helper: { color: THEME.muted, fontSize: 12, fontWeight: '800', marginTop: -4, marginLeft: 4 },
+  helper: {
+    color: THEME.muted,
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: -4,
+    marginLeft: 4,
+  },
 
   btnPrimary: {
     marginTop: 14,
@@ -337,7 +438,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  btnSoftText: { color: THEME.primary, fontWeight: '900', letterSpacing: 0.4, fontSize: 12 },
+  btnSoftText: {
+    color: THEME.primary,
+    fontWeight: '900',
+    letterSpacing: 0.4,
+    fontSize: 12,
+  },
 
   btnGhost: { marginTop: 10, alignItems: 'center', paddingVertical: 10 },
   btnGhostText: { color: THEME.muted, fontWeight: '900' },

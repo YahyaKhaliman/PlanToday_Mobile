@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Modal from 'react-native-modal';
 import LinearGradient from 'react-native-linear-gradient';
 import { useAuth } from '../../context/authContext';
+import { usePressGuard } from '../../utils/usePressGuard';
 
 type Role = 'SALES' | 'MANAGER';
 type MenuItem = {
@@ -62,9 +63,18 @@ const THEME = {
 
 export default function HomeScreen({ navigation }: any) {
   const { user, logout } = useAuth();
+  const runGuardedPress = usePressGuard();
   const [isModalVisible, setModalVisible] = useState(false);
   const lastBackPressRef = useRef<number>(0);
-  const toggleModal = () => setModalVisible(v => !v);
+  const toggleModal = () => {
+    runGuardedPress(
+      'home:toggle-modal',
+      () => {
+        setModalVisible(v => !v);
+      },
+      250,
+    );
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -98,11 +108,13 @@ export default function HomeScreen({ navigation }: any) {
   );
 
   const handleNavigate = (route: string) => {
-    try {
-      navigation.navigate(route);
-    } catch {
-      console.log('Menu belum tersedia:', route);
-    }
+    runGuardedPress(`home:navigate:${route}`, () => {
+      try {
+        navigation.navigate(route);
+      } catch {
+        console.log('Menu belum tersedia:', route);
+      }
+    });
   };
 
   const availableMenus = useMemo(() => {
@@ -283,8 +295,10 @@ export default function HomeScreen({ navigation }: any) {
               <TouchableOpacity
                 style={styles.btnLogoutConfirm}
                 onPress={() => {
-                  toggleModal();
-                  logout();
+                  runGuardedPress('home:logout', () => {
+                    setModalVisible(false);
+                    logout();
+                  });
                 }}
                 activeOpacity={0.9}
               >

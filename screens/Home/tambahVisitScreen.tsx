@@ -18,10 +18,16 @@ import LinearGradient from 'react-native-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Toast from 'react-native-toast-message';
 import Geolocation from 'react-native-geolocation-service';
-import { launchCamera, launchImageLibrary, Asset } from 'react-native-image-picker';
+import {
+  launchCamera,
+  launchImageLibrary,
+  Asset,
+} from 'react-native-image-picker';
 import RNBlobUtil from 'react-native-blob-util';
 import ImageResizer from 'react-native-image-resizer';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { usePressGuard } from '../../utils/usePressGuard';
 
 import api from '../../services/api';
 import { useAuth } from '../../context/authContext';
@@ -56,7 +62,8 @@ type PhotoState = {
   sizeBytes?: number;
 };
 
-const toFileUri = (uri: string) => (uri.startsWith('file://') ? uri : `file://${uri}`);
+const toFileUri = (uri: string) =>
+  uri.startsWith('file://') ? uri : `file://${uri}`;
 const stripFileScheme = (uri: string) => uri.replace('file://', '');
 
 const safeFileName = (name: string | undefined, fallback: string) => {
@@ -66,7 +73,7 @@ const safeFileName = (name: string | undefined, fallback: string) => {
 };
 
 const ymdToDate = (ymd: string) => {
-  const [y, m, d] = ymd.split('-').map((n) => parseInt(n, 10));
+  const [y, m, d] = ymd.split('-').map(n => parseInt(n, 10));
   return new Date(y, m - 1, d);
 };
 
@@ -79,20 +86,42 @@ const dateToYmd = (dt: Date) => {
 
 const formatDisplayDate = (ymd: string) => {
   try {
-    const [y, m, d] = ymd.split('-').map((n) => parseInt(n, 10));
+    const [y, m, d] = ymd.split('-').map(n => parseInt(n, 10));
     const dt = new Date(y, m - 1, d);
-    const bulan = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    const bulan = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mei',
+      'Jun',
+      'Jul',
+      'Agu',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Des',
+    ];
     return `${dt.getDate()} ${bulan[dt.getMonth()]} ${dt.getFullYear()}`;
   } catch {
     return ymd;
   }
 };
 
-async function compressToUnderLimit(inputUri: string): Promise<{ uri: string; sizeBytes: number }> {
+async function compressToUnderLimit(
+  inputUri: string,
+): Promise<{ uri: string; sizeBytes: number }> {
   const inputFileUri = toFileUri(inputUri);
 
   for (const preset of COMPRESS_PRESETS) {
-    const resized = await ImageResizer.createResizedImage(inputFileUri, preset.max, preset.max, 'JPEG', preset.quality, 0);
+    const resized = await ImageResizer.createResizedImage(
+      inputFileUri,
+      preset.max,
+      preset.max,
+      'JPEG',
+      preset.quality,
+      0,
+    );
 
     const outUri = toFileUri(resized.uri);
     const stat = await RNBlobUtil.fs.stat(stripFileScheme(outUri));
@@ -104,7 +133,14 @@ async function compressToUnderLimit(inputUri: string): Promise<{ uri: string; si
   }
 
   const lastPreset = COMPRESS_PRESETS[COMPRESS_PRESETS.length - 1];
-  const last = await ImageResizer.createResizedImage(inputFileUri, lastPreset.max, lastPreset.max, 'JPEG', lastPreset.quality, 0);
+  const last = await ImageResizer.createResizedImage(
+    inputFileUri,
+    lastPreset.max,
+    lastPreset.max,
+    'JPEG',
+    lastPreset.quality,
+    0,
+  );
   const lastUri = toFileUri(last.uri);
   const statLast = await RNBlobUtil.fs.stat(stripFileScheme(lastUri));
   const lastSize = Number(statLast.size || 0);
@@ -114,6 +150,8 @@ async function compressToUnderLimit(inputUri: string): Promise<{ uri: string; si
 
 export default function VisitScreen({ navigation, route }: any) {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
+  const runGuardedPress = usePressGuard();
 
   const cabang = String(user?.cabang || '');
   const namaSales = String(user?.nama || '');
@@ -181,14 +219,20 @@ export default function VisitScreen({ navigation, route }: any) {
       });
 
       const rows = resp.data?.data || [];
-      const foundDone = rows.find((x: any) => String(x?.cus_kode || '').trim() === String(cusKode).trim());
+      const foundDone = rows.find(
+        (x: any) => String(x?.cus_kode || '').trim() === String(cusKode).trim(),
+      );
 
       if (foundDone) {
         setExistingVisitId(Number(foundDone.id));
         setNote(String(foundDone.note || ''));
         setCatatan(String(foundDone.catatan || ''));
         setVisitLoaded(true);
-        Toast.show({ type: 'glassSuccess', text1: 'Visit ditemukan', text2: 'Form terisi dari visit (DONE)' });
+        Toast.show({
+          type: 'glassSuccess',
+          text1: 'Visit ditemukan',
+          text2: 'Form terisi dari visit (DONE)',
+        });
         return;
       }
     } catch {
@@ -218,25 +262,38 @@ export default function VisitScreen({ navigation, route }: any) {
   }, [customerKode, tanggal]);
 
   const canSubmit = useMemo(() => {
-    return customer.trim().length > 0 && customerKode.trim().length > 0 && tanggal.trim().length > 0 && !loading;
+    return (
+      customer.trim().length > 0 &&
+      customerKode.trim().length > 0 &&
+      tanggal.trim().length > 0 &&
+      !loading
+    );
   }, [customer, customerKode, tanggal, loading]);
 
   // Location
   const requestLocationPermission = async () => {
     if (Platform.OS !== 'android') return true;
-    const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION, {
-      title: 'Izin Lokasi',
-      message: 'Aplikasi membutuhkan izin lokasi untuk mengisi latitude & longitude.',
-      buttonPositive: 'OK',
-      buttonNegative: 'Batal',
-    });
+    const granted = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+      {
+        title: 'Izin Lokasi',
+        message:
+          'Aplikasi membutuhkan izin lokasi untuk mengisi latitude & longitude.',
+        buttonPositive: 'OK',
+        buttonNegative: 'Batal',
+      },
+    );
     return granted === PermissionsAndroid.RESULTS.GRANTED;
   };
 
   const ambilLokasi = async () => {
     const ok = await requestLocationPermission();
     if (!ok) {
-      Toast.show({ type: 'glassError', text1: 'Izin Ditolak', text2: 'Location permission not granted' });
+      Toast.show({
+        type: 'glassError',
+        text1: 'Izin Ditolak',
+        text2: 'Location permission not granted',
+      });
       return;
     }
 
@@ -244,12 +301,20 @@ export default function VisitScreen({ navigation, route }: any) {
       (pos: any) => {
         setLatitude(String(pos.coords.latitude));
         setLongitude(String(pos.coords.longitude));
-        Toast.show({ type: 'glassSuccess', text1: 'Lokasi Ditemukan', text2: 'Latitude & Longitude berhasil diambil' });
+        Toast.show({
+          type: 'glassSuccess',
+          text1: 'Lokasi Ditemukan',
+          text2: 'Latitude & Longitude berhasil diambil',
+        });
       },
       (err: any) => {
-        Toast.show({ type: 'glassError', text1: 'Gagal Ambil Lokasi', text2: err?.message || 'Tidak bisa mengambil lokasi' });
+        Toast.show({
+          type: 'glassError',
+          text1: 'Gagal Ambil Lokasi',
+          text2: err?.message || 'Tidak bisa mengambil lokasi',
+        });
       },
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 10000 }
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 10000 },
     );
   };
 
@@ -257,9 +322,15 @@ export default function VisitScreen({ navigation, route }: any) {
   const setPhotoFromAsset = async (asset: Asset) => {
     if (!asset?.uri) return;
 
-    Toast.show({ type: 'glassSuccess', text1: 'Foto dipilih', text2: 'Mengompres foto...' });
+    Toast.show({
+      type: 'glassSuccess',
+      text1: 'Foto dipilih',
+      text2: 'Mengompres foto...',
+    });
 
-    const { uri: compressedUri, sizeBytes } = await compressToUnderLimit(asset.uri);
+    const { uri: compressedUri, sizeBytes } = await compressToUnderLimit(
+      asset.uri,
+    );
     const finalName = safeFileName(asset.fileName, `visit_${Date.now()}.jpg`);
 
     setPhoto({
@@ -273,7 +344,9 @@ export default function VisitScreen({ navigation, route }: any) {
       Toast.show({
         type: 'glassError',
         text1: 'Foto masih terlalu besar',
-        text2: `Hasil kompres ${(sizeBytes / 1024 / 1024).toFixed(2)} MB > 1 MB.`,
+        text2: `Hasil kompres ${(sizeBytes / 1024 / 1024).toFixed(
+          2,
+        )} MB > 1 MB.`,
       });
     } else {
       Toast.show({
@@ -285,10 +358,18 @@ export default function VisitScreen({ navigation, route }: any) {
   };
 
   const pickFromCamera = async () => {
-    const res = await launchCamera({ mediaType: 'photo', quality: 0.8, saveToPhotos: true });
+    const res = await launchCamera({
+      mediaType: 'photo',
+      quality: 0.8,
+      saveToPhotos: true,
+    });
     if (res.didCancel) return;
     if (res.errorCode) {
-      Toast.show({ type: 'glassError', text1: 'Kamera Gagal', text2: res.errorMessage || 'Gagal membuka kamera' });
+      Toast.show({
+        type: 'glassError',
+        text1: 'Kamera Gagal',
+        text2: res.errorMessage || 'Gagal membuka kamera',
+      });
       return;
     }
     const asset = res.assets?.[0];
@@ -297,10 +378,18 @@ export default function VisitScreen({ navigation, route }: any) {
   };
 
   const pickFromGallery = async () => {
-    const res = await launchImageLibrary({ mediaType: 'photo', quality: 0.8, selectionLimit: 1 });
+    const res = await launchImageLibrary({
+      mediaType: 'photo',
+      quality: 0.8,
+      selectionLimit: 1,
+    });
     if (res.didCancel) return;
     if (res.errorCode) {
-      Toast.show({ type: 'glassError', text1: 'Galeri Gagal', text2: res.errorMessage || 'Gagal membuka galeri' });
+      Toast.show({
+        type: 'glassError',
+        text1: 'Galeri Gagal',
+        text2: res.errorMessage || 'Gagal membuka galeri',
+      });
       return;
     }
     const asset = res.assets?.[0];
@@ -332,7 +421,7 @@ export default function VisitScreen({ navigation, route }: any) {
           type: photo.type || 'image/jpeg',
           data: RNBlobUtil.wrap(filePath),
         },
-      ]
+      ],
     );
 
     const status = resp.info().status;
@@ -366,12 +455,22 @@ export default function VisitScreen({ navigation, route }: any) {
   };
 
   const simpan = async () => {
+    if (loading) return;
+
     if (!customer.trim() || !customerKode.trim()) {
-      Toast.show({ type: 'glassError', text1: 'Validasi', text2: 'Customer harus dipilih terlebih dahulu' });
+      Toast.show({
+        type: 'glassError',
+        text1: 'Validasi',
+        text2: 'Customer harus dipilih terlebih dahulu',
+      });
       return;
     }
     if (!tanggal.trim()) {
-      Toast.show({ type: 'glassError', text1: 'Validasi', text2: 'Tanggal Visit wajib dipilih' });
+      Toast.show({
+        type: 'glassError',
+        text1: 'Validasi',
+        text2: 'Tanggal Visit wajib dipilih',
+      });
       return;
     }
 
@@ -391,16 +490,26 @@ export default function VisitScreen({ navigation, route }: any) {
 
       if (existingVisitId) {
         const res = await api.put(`/visits/${existingVisitId}`, payload);
-        if (!res.data?.success) throw new Error(res.data?.message || 'Gagal update visit');
+        if (!res.data?.success)
+          throw new Error(res.data?.message || 'Gagal update visit');
         visitId = existingVisitId;
 
-        Toast.show({ type: 'glassSuccess', text1: 'Update Berhasil', text2: 'Visit diperbarui' });
+        Toast.show({
+          type: 'glassSuccess',
+          text1: 'Update Berhasil',
+          text2: 'Visit diperbarui',
+        });
       } else {
         const res = await api.post('/visits', payload);
-        if (!res.data?.success) throw new Error(res.data?.message || 'Gagal menyimpan visit');
+        if (!res.data?.success)
+          throw new Error(res.data?.message || 'Gagal menyimpan visit');
         visitId = Number(res.data?.data?.id || 0) || null;
 
-        Toast.show({ type: 'glassSuccess', text1: 'Simpan Berhasil', text2: 'Visit tersimpan' });
+        Toast.show({
+          type: 'glassSuccess',
+          text1: 'Simpan Berhasil',
+          text2: 'Visit tersimpan',
+        });
       }
 
       setLastVisitId(visitId);
@@ -429,7 +538,10 @@ export default function VisitScreen({ navigation, route }: any) {
       Toast.show({
         type: 'glassError',
         text1: 'Gagal',
-        text2: err?.response?.data?.message || err?.message || 'Gagal koneksi ke server',
+        text2:
+          err?.response?.data?.message ||
+          err?.message ||
+          'Gagal koneksi ke server',
       });
     } finally {
       setLoading(false);
@@ -438,11 +550,19 @@ export default function VisitScreen({ navigation, route }: any) {
 
   const uploadUlang = async () => {
     if (!lastVisitId) {
-      Toast.show({ type: 'glassError', text1: 'Tidak Ada ID', text2: 'ID visit tidak ditemukan' });
+      Toast.show({
+        type: 'glassError',
+        text1: 'Tidak Ada ID',
+        text2: 'ID visit tidak ditemukan',
+      });
       return;
     }
     if (!photo?.uri) {
-      Toast.show({ type: 'glassError', text1: 'Foto Kosong', text2: 'Silakan pilih foto dulu' });
+      Toast.show({
+        type: 'glassError',
+        text1: 'Foto Kosong',
+        text2: 'Silakan pilih foto dulu',
+      });
       return;
     }
 
@@ -451,20 +571,47 @@ export default function VisitScreen({ navigation, route }: any) {
       await uploadPhoto(lastVisitId);
       setUploadPending(false);
       setPhoto(null);
-      Toast.show({ type: 'glassSuccess', text1: 'Upload Berhasil', text2: 'Foto berhasil diupload' });
+      Toast.show({
+        type: 'glassSuccess',
+        text1: 'Upload Berhasil',
+        text2: 'Foto berhasil diupload',
+      });
     } catch (e: any) {
-      Toast.show({ type: 'glassError', text1: 'Upload Gagal', text2: e?.message || 'Gagal upload foto' });
+      Toast.show({
+        type: 'glassError',
+        text1: 'Upload Gagal',
+        text2: e?.message || 'Gagal upload foto',
+      });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <LinearGradient colors={[THEME.bgTop, THEME.bgBottom]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+    <LinearGradient
+      colors={[THEME.bgTop, THEME.bgBottom]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.container}
+    >
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="transparent"
+        translucent
+      />
 
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+      >
+        <ScrollView
+          contentContainerStyle={[
+            styles.scroll,
+            { paddingBottom: 28 + insets.bottom },
+          ]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           <View style={styles.header}>
             <Text style={styles.title}>Visit</Text>
             <Text style={styles.subtitle}>Input Kunjungan</Text>
@@ -474,7 +621,11 @@ export default function VisitScreen({ navigation, route }: any) {
             {/* Sales */}
             <Text style={styles.label}>Sales (Cabang)</Text>
             <View style={[styles.inputWrap, { opacity: 0.7 }]}>
-              <TextInput value={`${namaSales} (${cabang})`} editable={false} style={styles.input} />
+              <TextInput
+                value={`${namaSales} (${cabang})`}
+                editable={false}
+                style={styles.input}
+              />
             </View>
 
             {/* Customer */}
@@ -483,7 +634,7 @@ export default function VisitScreen({ navigation, route }: any) {
               <View style={[styles.inputWrap, { flex: 1, marginBottom: 0 }]}>
                 <TextInput
                   value={customer}
-                  onChangeText={(t) => {
+                  onChangeText={t => {
                     setCustomer(t);
                     if (customerKode) setCustomerKode('');
                     setExistingVisitId(null);
@@ -496,7 +647,14 @@ export default function VisitScreen({ navigation, route }: any) {
               </View>
 
               <TouchableOpacity
-                onPress={() => navigation.navigate('CariCustomer', { keyword: customer, from: 'TAMBAHVISIT' })}
+                onPress={() =>
+                  runGuardedPress('add-visit:go-search', () =>
+                    navigation.navigate('CariCustomer', {
+                      keyword: customer,
+                      from: 'TAMBAHVISIT',
+                    }),
+                  )
+                }
                 style={styles.btnSoft}
                 activeOpacity={0.9}
               >
@@ -504,7 +662,9 @@ export default function VisitScreen({ navigation, route }: any) {
               </TouchableOpacity>
             </View>
 
-            {!!customerKode && <Text style={styles.helper}>Kode: {customerKode}</Text>}
+            {!!customerKode && (
+              <Text style={styles.helper}>Kode: {customerKode}</Text>
+            )}
             {visitLoaded && (
               <Text style={styles.helperOk}>
                 • Mode: <Text style={{ fontWeight: '900' }}>UPDATE</Text>
@@ -513,8 +673,16 @@ export default function VisitScreen({ navigation, route }: any) {
 
             {/* Tanggal */}
             <Text style={styles.label}>Tanggal Visit</Text>
-            <TouchableOpacity onPress={() => setShowDate(true)} activeOpacity={0.9} style={styles.selectWrap}>
-              <Text style={[styles.selectText, !tanggal && { color: THEME.muted }]}>{tanggal ? formatDisplayDate(tanggal) : 'Pilih Tanggal'}</Text>
+            <TouchableOpacity
+              onPress={() => setShowDate(true)}
+              activeOpacity={0.9}
+              style={styles.selectWrap}
+            >
+              <Text
+                style={[styles.selectText, !tanggal && { color: THEME.muted }]}
+              >
+                {tanggal ? formatDisplayDate(tanggal) : 'Pilih Tanggal'}
+              </Text>
               <MaterialIcons name="edit-calendar" size={22} color={THEME.ink} />
             </TouchableOpacity>
 
@@ -534,14 +702,32 @@ export default function VisitScreen({ navigation, route }: any) {
             <Text style={[styles.label, { marginTop: 14 }]}>Lokasi</Text>
             <View style={styles.row}>
               <View style={[styles.inputWrap, { flex: 1, marginBottom: 0 }]}>
-                <TextInput value={latitude} editable={false} placeholder="Latitude" placeholderTextColor={THEME.muted} style={styles.input} />
+                <TextInput
+                  value={latitude}
+                  editable={false}
+                  placeholder="Latitude"
+                  placeholderTextColor={THEME.muted}
+                  style={styles.input}
+                />
               </View>
               <View style={[styles.inputWrap, { flex: 1, marginBottom: 0 }]}>
-                <TextInput value={longitude} editable={false} placeholder="Longitude" placeholderTextColor={THEME.muted} style={styles.input} />
+                <TextInput
+                  value={longitude}
+                  editable={false}
+                  placeholder="Longitude"
+                  placeholderTextColor={THEME.muted}
+                  style={styles.input}
+                />
               </View>
             </View>
 
-            <TouchableOpacity onPress={ambilLokasi} style={styles.btnAccent} activeOpacity={0.9}>
+            <TouchableOpacity
+              onPress={() =>
+                runGuardedPress('add-visit:get-location', ambilLokasi, 800)
+              }
+              style={styles.btnAccent}
+              activeOpacity={0.9}
+            >
               <Text style={styles.btnAccentText}>AMBIL LOKASI</Text>
             </TouchableOpacity>
 
@@ -550,26 +736,64 @@ export default function VisitScreen({ navigation, route }: any) {
 
             {photo?.uri ? (
               <>
-                <Image source={{ uri: photo.uri }} style={styles.photo} resizeMode="cover" />
-                <Text style={styles.photoMeta}>Size: {photo.sizeBytes ? `${(photo.sizeBytes / 1024).toFixed(0)} KB` : '-'}</Text>
+                <Image
+                  source={{ uri: photo.uri }}
+                  style={styles.photo}
+                  resizeMode="cover"
+                />
+                <Text style={styles.photoMeta}>
+                  Size:{' '}
+                  {photo.sizeBytes
+                    ? `${(photo.sizeBytes / 1024).toFixed(0)} KB`
+                    : '-'}
+                </Text>
               </>
             ) : (
               <View style={styles.photoEmpty}>
-                <Text style={{ color: THEME.muted, fontWeight: '800' }}>Belum ada foto</Text>
+                <Text style={{ color: THEME.muted, fontWeight: '800' }}>
+                  Belum ada foto
+                </Text>
               </View>
             )}
 
             {uploadPending && (
-              <TouchableOpacity onPress={uploadUlang} disabled={loading} style={[styles.btnPrimary, { marginTop: 10 }]} activeOpacity={0.9}>
-                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnPrimaryText}>UPLOAD ULANG FOTO</Text>}
+              <TouchableOpacity
+                onPress={() =>
+                  runGuardedPress('add-visit:retry-upload', uploadUlang, 800)
+                }
+                disabled={loading}
+                style={[styles.btnPrimary, { marginTop: 10 }]}
+                activeOpacity={0.9}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.btnPrimaryText}>UPLOAD ULANG FOTO</Text>
+                )}
               </TouchableOpacity>
             )}
 
             <View style={styles.row}>
-              <TouchableOpacity onPress={pickFromCamera} style={[styles.btnSoft, { flex: 1 }]} activeOpacity={0.9}>
+              <TouchableOpacity
+                onPress={() =>
+                  runGuardedPress('add-visit:pick-camera', pickFromCamera, 800)
+                }
+                style={[styles.btnSoft, { flex: 1 }]}
+                activeOpacity={0.9}
+              >
                 <Text style={styles.btnSoftText}>KAMERA</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={pickFromGallery} style={[styles.btnSoft, { flex: 1 }]} activeOpacity={0.9}>
+              <TouchableOpacity
+                onPress={() =>
+                  runGuardedPress(
+                    'add-visit:pick-gallery',
+                    pickFromGallery,
+                    800,
+                  )
+                }
+                style={[styles.btnSoft, { flex: 1 }]}
+                activeOpacity={0.9}
+              >
                 <Text style={styles.btnSoftText}>GALERI</Text>
               </TouchableOpacity>
             </View>
@@ -604,11 +828,31 @@ export default function VisitScreen({ navigation, route }: any) {
               />
             </View>
 
-            <TouchableOpacity onPress={simpan} disabled={!canSubmit} style={[styles.btnPrimary, !canSubmit && { opacity: 0.55 }]} activeOpacity={0.9}>
-              {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnPrimaryText}>{existingVisitId ? 'UPDATE VISIT' : 'SIMPAN VISIT'}</Text>}
+            <TouchableOpacity
+              onPress={simpan}
+              disabled={!canSubmit}
+              style={[styles.btnPrimary, !canSubmit && { opacity: 0.55 }]}
+              activeOpacity={0.9}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.btnPrimaryText}>
+                  {existingVisitId ? 'UPDATE VISIT' : 'SIMPAN VISIT'}
+                </Text>
+              )}
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => navigation.navigate("Visit")} disabled={loading} style={styles.btnGhost} activeOpacity={0.9}>
+            <TouchableOpacity
+              onPress={() =>
+                runGuardedPress('add-visit:cancel', () =>
+                  navigation.navigate('Visit'),
+                )
+              }
+              disabled={loading}
+              style={styles.btnGhost}
+              activeOpacity={0.9}
+            >
               <Text style={styles.btnGhostText}>Batal</Text>
             </TouchableOpacity>
           </View>
@@ -628,8 +872,18 @@ const styles = StyleSheet.create({
   },
 
   header: { alignItems: 'center', marginBottom: 12 },
-  title: { fontSize: 26, fontWeight: '900', color: THEME.ink, letterSpacing: 0.2 },
-  subtitle: { color: THEME.muted, fontSize: 12, marginTop: 6, fontWeight: '700' },
+  title: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: THEME.ink,
+    letterSpacing: 0.2,
+  },
+  subtitle: {
+    color: THEME.muted,
+    fontSize: 12,
+    marginTop: 6,
+    fontWeight: '700',
+  },
 
   card: {
     backgroundColor: THEME.card,
@@ -683,10 +937,27 @@ const styles = StyleSheet.create({
   input: { flex: 1, color: THEME.ink, fontSize: 15, fontWeight: '800' },
   selectText: { flex: 1, color: THEME.ink, fontSize: 14, fontWeight: '900' },
 
-  row: { flexDirection: 'row', gap: 10, alignItems: 'center', marginBottom: 10 },
+  row: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
 
-  helper: { color: THEME.muted, fontSize: 12, fontWeight: '800', marginTop: -4, marginLeft: 4 },
-  helperOk: { color: THEME.ok, fontSize: 11, fontWeight: '800', marginTop: 6, marginLeft: 4 },
+  helper: {
+    color: THEME.muted,
+    fontSize: 12,
+    fontWeight: '800',
+    marginTop: -4,
+    marginLeft: 4,
+  },
+  helperOk: {
+    color: THEME.ok,
+    fontSize: 11,
+    fontWeight: '800',
+    marginTop: 6,
+    marginLeft: 4,
+  },
 
   btnPrimary: {
     marginTop: 14,
@@ -708,7 +979,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  btnSoftText: { color: THEME.primary, fontWeight: '900', letterSpacing: 0.4, fontSize: 12 },
+  btnSoftText: {
+    color: THEME.primary,
+    fontWeight: '900',
+    letterSpacing: 0.4,
+    fontSize: 12,
+  },
 
   btnAccent: {
     marginTop: 4,
@@ -721,7 +997,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 8,
   },
-  btnAccentText: { color: THEME.ink, fontWeight: '900', letterSpacing: 0.3, fontSize: 12 },
+  btnAccentText: {
+    color: THEME.ink,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+    fontSize: 12,
+  },
 
   btnGhost: { marginTop: 10, alignItems: 'center', paddingVertical: 10 },
   btnGhostText: { color: THEME.muted, fontWeight: '900' },
@@ -734,7 +1015,12 @@ const styles = StyleSheet.create({
     borderColor: THEME.line,
     marginTop: 6,
   },
-  photoMeta: { color: THEME.muted, fontSize: 12, marginTop: 8, fontWeight: '800' },
+  photoMeta: {
+    color: THEME.muted,
+    fontSize: 12,
+    marginTop: 8,
+    fontWeight: '800',
+  },
 
   photoEmpty: {
     width: '100%',

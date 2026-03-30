@@ -16,6 +16,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Toast from 'react-native-toast-message';
 import DeviceInfo from 'react-native-device-info';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../../services/api';
 import { useAuth } from '../../context/authContext';
 
@@ -33,6 +34,7 @@ const THEME = {
 };
 
 export default function LoginScreen({ navigation }: any) {
+  const insets = useSafeAreaInsets();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
@@ -40,7 +42,7 @@ export default function LoginScreen({ navigation }: any) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [rememberMe, setRememberMe] = useState(false);
 
-  const { setUser, setToken  } = useAuth();
+  const { setUser, setToken } = useAuth();
 
   const canLogin = useMemo(() => {
     return username.trim().length > 0 && password.length > 0 && !loading;
@@ -54,13 +56,14 @@ export default function LoginScreen({ navigation }: any) {
         if (res.data?.success && res.data?.username) {
           setUsername(String(res.data.username));
         }
-      } catch {
-      }
+      } catch {}
     };
     checkDevice();
   }, []);
 
   const handleLogin = async () => {
+    if (loading) return;
+
     setLoading(true);
     try {
       const deviceId = await DeviceInfo.getAndroidId();
@@ -99,14 +102,21 @@ export default function LoginScreen({ navigation }: any) {
       end={{ x: 1, y: 1 }}
       style={styles.container}
     >
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="transparent"
+        translucent
+      />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: 24 + insets.bottom },
+          ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -171,7 +181,9 @@ export default function LoginScreen({ navigation }: any) {
                 activeOpacity={0.85}
                 disabled={loading}
               >
-                <Text style={styles.showBtnText}>{showPass ? 'HIDE' : 'SHOW'}</Text>
+                <Text style={styles.showBtnText}>
+                  {showPass ? 'HIDE' : 'SHOW'}
+                </Text>
               </TouchableOpacity>
             </View>
 
@@ -203,11 +215,11 @@ export default function LoginScreen({ navigation }: any) {
               activeOpacity={0.85}
             >
               <Text style={styles.footerText}>
-                Belum punya akun? <Text style={styles.footerLinkBold}>Register</Text>
+                Belum punya akun?{' '}
+                <Text style={styles.footerLinkBold}>Register</Text>
               </Text>
             </TouchableOpacity>
           </View>
-
         </ScrollView>
       </KeyboardAvoidingView>
     </LinearGradient>
@@ -301,7 +313,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: THEME.line,
   },
-  showBtnText: { color: THEME.muted, fontWeight: '900', fontSize: 12, letterSpacing: 0.4 },
+  showBtnText: {
+    color: THEME.muted,
+    fontWeight: '900',
+    fontSize: 12,
+    letterSpacing: 0.4,
+  },
 
   /* Primary button */
   loginButton: {
@@ -311,11 +328,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.25)',
   },
-  loginButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '900', letterSpacing: 0.3 },
+  loginButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '900',
+    letterSpacing: 0.3,
+  },
 
   footerLink: { marginTop: 14, alignItems: 'center' },
   footerText: { color: THEME.muted, fontSize: 13, fontWeight: '700' },
-  footerLinkBold: { fontWeight: '900', textDecorationLine: 'underline', color: THEME.ink },
+  footerLinkBold: {
+    fontWeight: '900',
+    textDecorationLine: 'underline',
+    color: THEME.ink,
+  },
 
   bottomNote: {
     marginTop: 18,

@@ -15,6 +15,8 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Toast from 'react-native-toast-message';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { usePressGuard } from '../../utils/usePressGuard';
 
 import api from '../../services/api';
 import { useAuth } from '../../context/authContext';
@@ -94,6 +96,8 @@ type PickerMode = 'inline' | 'modal';
 
 export default function AchievementOmsetScreen({ navigation }: any) {
   const { user, token } = useAuth();
+  const insets = useSafeAreaInsets();
+  const runGuardedPress = usePressGuard();
   const isManager = String(user?.jabatan || '').toUpperCase() === 'MANAGER';
 
   const now = new Date();
@@ -447,7 +451,10 @@ export default function AchievementOmsetScreen({ navigation }: any) {
       <FlatList
         data={filteredRows}
         keyExtractor={(it, idx) => `${it.kode || 'UNK'}-${idx}`}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingBottom: 60 + insets.bottom },
+        ]}
         showsVerticalScrollIndicator={false}
         onScroll={onScroll}
         scrollEventThrottle={16}
@@ -523,18 +530,22 @@ export default function AchievementOmsetScreen({ navigation }: any) {
               activeOpacity={0.9}
               style={styles.userCard}
               onPress={() =>
-                navigation.navigate('AchievementDetailUserRange', {
-                  kode: item.kode,
-                  nama: item.nama,
-                  jabatan: item.jabatan,
-                  fromYear,
-                  fromMonth,
-                  toYear,
-                  toMonth,
-                  target: item.target,
-                  realisasi: item.realisasi,
-                  ach: item.ach,
-                })
+                runGuardedPress(
+                  `achievement:detail:${item.kode || item.nama}`,
+                  () =>
+                    navigation.navigate('AchievementDetailUserRange', {
+                      kode: item.kode,
+                      nama: item.nama,
+                      jabatan: item.jabatan,
+                      fromYear,
+                      fromMonth,
+                      toYear,
+                      toMonth,
+                      target: item.target,
+                      realisasi: item.realisasi,
+                      ach: item.ach,
+                    }),
+                )
               }
             >
               <View style={styles.userTopRow}>
@@ -578,8 +589,10 @@ export default function AchievementOmsetScreen({ navigation }: any) {
       {showFab && (
         <TouchableOpacity
           activeOpacity={0.9}
-          onPress={openFilterModal}
-          style={styles.fab}
+          onPress={() =>
+            runGuardedPress('achievement:open-filter', openFilterModal, 250)
+          }
+          style={[styles.fab, { bottom: 24 + insets.bottom }]}
         >
           <View style={styles.fabInner}>
             <Text style={{ fontSize: 18 }}>🔍</Text>
@@ -597,7 +610,9 @@ export default function AchievementOmsetScreen({ navigation }: any) {
           closePickers();
         }}
       >
-        <View style={styles.modalBackdrop}>
+        <View
+          style={[styles.modalBackdrop, { paddingBottom: 18 + insets.bottom }]}
+        >
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Filter Periode</Text>
@@ -618,14 +633,16 @@ export default function AchievementOmsetScreen({ navigation }: any) {
               <TouchableOpacity
                 style={[styles.modalBtn, { backgroundColor: THEME.accent }]}
                 onPress={() => {
-                  setOpenFilter(false);
-                  closePickers();
-                  applyRange(
-                    draftFromYear,
-                    draftFromMonth,
-                    draftToYear,
-                    draftToMonth,
-                  );
+                  runGuardedPress('achievement:apply-filter', () => {
+                    setOpenFilter(false);
+                    closePickers();
+                    applyRange(
+                      draftFromYear,
+                      draftFromMonth,
+                      draftToYear,
+                      draftToMonth,
+                    );
+                  });
                 }}
                 disabled={loading}
                 activeOpacity={0.9}
@@ -643,13 +660,15 @@ export default function AchievementOmsetScreen({ navigation }: any) {
                   },
                 ]}
                 onPress={() => {
-                  setDraftFromYear(nowYear);
-                  setDraftFromMonth(nowMonth);
-                  setDraftToYear(nowYear);
-                  setDraftToMonth(nowMonth);
-                  setOpenFilter(false);
-                  closePickers();
-                  applyRange(nowYear, nowMonth, nowYear, nowMonth);
+                  runGuardedPress('achievement:reset-filter', () => {
+                    setDraftFromYear(nowYear);
+                    setDraftFromMonth(nowMonth);
+                    setDraftToYear(nowYear);
+                    setDraftToMonth(nowMonth);
+                    setOpenFilter(false);
+                    closePickers();
+                    applyRange(nowYear, nowMonth, nowYear, nowMonth);
+                  });
                 }}
                 disabled={loading}
                 activeOpacity={0.9}
