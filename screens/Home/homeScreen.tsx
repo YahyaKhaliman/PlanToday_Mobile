@@ -39,7 +39,12 @@ const menus: MenuItem[] = [
     icon: '🗓️',
   },
   { title: 'Visit', route: 'Visit', roles: ['SALES', 'MANAGER'], icon: '📍' },
-  // { title: 'Achievement', route: 'Achievement', roles: ['SALES', 'MANAGER'], icon: '🏅' },
+  {
+    title: 'Achievement',
+    route: 'Achievement',
+    roles: ['SALES', 'MANAGER'],
+    icon: '🏅',
+  },
 ];
 
 const THEME = {

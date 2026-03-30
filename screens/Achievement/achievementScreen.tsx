@@ -167,8 +167,9 @@ export default function AchievementOmsetScreen({ navigation }: any) {
         }));
 
         setRows(mapped);
-      } catch {
-        const msg = 'Gagal mengambil achievement';
+      } catch (err: any) {
+        const msg =
+          err?.response?.data?.message || 'Gagal mengambil achievement';
         Toast.show({ type: 'glassError', text1: 'Error', text2: msg });
         setRows([]);
       } finally {
