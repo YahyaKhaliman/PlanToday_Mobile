@@ -38,18 +38,11 @@ export default function RegisterScreen({ navigation }: any) {
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
 
-  const [jabatan, setJabatan] = useState<'MANAGER' | 'SALES'>('MANAGER');
+  const jabatanConst = 'SALES';
   const [cabang, setCabang] = useState('PUSAT');
 
   const [loading, setLoading] = useState(false);
-
-  const [openJabatan, setOpenJabatan] = useState(false);
   const [openCabang, setOpenCabang] = useState(false);
-
-  const jabatanOptions = [
-    { label: 'MANAGER', value: 'MANAGER' },
-    { label: 'SALES', value: 'SALES' },
-  ];
 
   const cabangOptions = [
     { label: 'PUSAT', value: 'PUSAT' },
@@ -90,7 +83,7 @@ export default function RegisterScreen({ navigation }: any) {
       const payload = {
         nama: nama.trim(),
         password,
-        jabatan,
+        jabatan: jabatanConst,
         cabang,
         deviceId,
       };
@@ -118,7 +111,6 @@ export default function RegisterScreen({ navigation }: any) {
 
       setNama('');
       setPassword('');
-      setJabatan('SALES');
       setCabang('PUSAT');
     } catch (err: any) {
       Toast.show({
@@ -184,15 +176,6 @@ export default function RegisterScreen({ navigation }: any) {
                 {/* Nama */}
                 <Text style={styles.label}>Nama</Text>
                 <View style={styles.inputContainer}>
-                  <LinearGradient
-                    colors={['rgba(79,70,229,0.18)', 'rgba(6,182,212,0.14)']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.inputIconWrap}
-                  >
-                    <Text style={styles.iconPlaceholder}>👤</Text>
-                  </LinearGradient>
-
                   <TextInput
                     placeholder="Nama"
                     placeholderTextColor={THEME.muted}
@@ -207,15 +190,6 @@ export default function RegisterScreen({ navigation }: any) {
                 {/* Password */}
                 <Text style={styles.label}>Password</Text>
                 <View style={styles.inputContainer}>
-                  <LinearGradient
-                    colors={['rgba(79,70,229,0.18)', 'rgba(6,182,212,0.14)']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.inputIconWrap}
-                  >
-                    <Text style={styles.iconPlaceholder}>🔒</Text>
-                  </LinearGradient>
-
                   <TextInput
                     placeholder="Password"
                     placeholderTextColor={THEME.muted}
@@ -239,16 +213,12 @@ export default function RegisterScreen({ navigation }: any) {
                   </TouchableOpacity>
                 </View>
 
-                {/* Jabatan */}
-                <GlassSelect
-                  label="Jabatan"
-                  value={jabatan}
-                  options={jabatanOptions}
-                  visible={openJabatan}
-                  onOpen={() => setOpenJabatan(true)}
-                  onClose={() => setOpenJabatan(false)}
-                  onSelect={v => setJabatan(v as any)}
-                />
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={styles.label}>Jabatan</Text>
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.staticText}>{jabatanConst}</Text>
+                  </View>
+                </View>
 
                 {/* Cabang */}
                 <GlassSelect
@@ -259,6 +229,7 @@ export default function RegisterScreen({ navigation }: any) {
                   onOpen={() => setOpenCabang(true)}
                   onClose={() => setOpenCabang(false)}
                   onSelect={v => setCabang(v)}
+                  icon="▾"
                 />
 
                 {/* Button Register */}
@@ -406,6 +377,12 @@ const styles = StyleSheet.create({
   iconPlaceholder: { fontSize: 16 },
 
   input: {
+    flex: 1,
+    color: THEME.ink,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  staticText: {
     flex: 1,
     color: THEME.ink,
     fontSize: 16,
