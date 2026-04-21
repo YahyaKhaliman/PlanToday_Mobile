@@ -38,11 +38,17 @@ export default function RegisterScreen({ navigation }: any) {
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
 
-  const jabatanConst = 'SALES';
+  const [jabatan, setJabatan] = useState<'SALES' | 'KURIR'>('SALES');
   const [cabang, setCabang] = useState('PUSAT');
 
   const [loading, setLoading] = useState(false);
+  const [openJabatan, setOpenJabatan] = useState(false);
   const [openCabang, setOpenCabang] = useState(false);
+
+  const jabatanOptions = [
+    { label: 'SALES', value: 'SALES' },
+    { label: 'KURIR', value: 'KURIR' },
+  ];
 
   const cabangOptions = [
     { label: 'PUSAT', value: 'PUSAT' },
@@ -83,7 +89,7 @@ export default function RegisterScreen({ navigation }: any) {
       const payload = {
         nama: nama.trim(),
         password,
-        jabatan: jabatanConst,
+        jabatan,
         cabang,
         deviceId,
       };
@@ -111,6 +117,7 @@ export default function RegisterScreen({ navigation }: any) {
 
       setNama('');
       setPassword('');
+      setJabatan('SALES');
       setCabang('PUSAT');
     } catch (err: any) {
       Toast.show({
@@ -213,12 +220,16 @@ export default function RegisterScreen({ navigation }: any) {
                   </TouchableOpacity>
                 </View>
 
-                <View style={{ marginBottom: 12 }}>
-                  <Text style={styles.label}>Jabatan</Text>
-                  <View style={styles.inputContainer}>
-                    <Text style={styles.staticText}>{jabatanConst}</Text>
-                  </View>
-                </View>
+                <GlassSelect
+                  label="Jabatan"
+                  value={jabatan}
+                  options={jabatanOptions}
+                  visible={openJabatan}
+                  onOpen={() => setOpenJabatan(true)}
+                  onClose={() => setOpenJabatan(false)}
+                  onSelect={v => setJabatan(v as 'SALES' | 'KURIR')}
+                  icon="▾"
+                />
 
                 {/* Cabang */}
                 <GlassSelect

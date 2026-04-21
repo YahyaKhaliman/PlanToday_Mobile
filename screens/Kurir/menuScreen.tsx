@@ -1,6 +1,5 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, { useCallback, useMemo, useRef, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+import React from 'react';
 import {
   Text,
   TouchableOpacity,
@@ -9,8 +8,6 @@ import {
   StatusBar,
   FlatList,
   Platform,
-  BackHandler,
-  ToastAndroid,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Modal from 'react-native-modal';
@@ -18,39 +15,31 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useAuth } from '../../context/authContext';
 import { usePressGuard } from '../../utils/usePressGuard';
 
-type Role = 'SALES' | 'MANAGER' | 'KURIR';
 type MenuItem = {
   title: string;
   route: string;
-  roles?: Role[];
   icon?: string;
+  subtitle?: string;
 };
 
 const menus: MenuItem[] = [
   {
-    title: 'Calon Customer',
-    route: 'RekapCalonCustomer',
-    roles: ['SALES', 'MANAGER'],
-    icon: '👥',
+    title: 'Jadwal Kirim',
+    route: 'KurirJadwalKirim',
+    icon: '📦',
+    subtitle: 'Rekap jadwal bulanan / beberapa hari ke depan',
   },
   {
-    title: 'Visit Plan',
-    route: 'VisitPlan',
-    roles: ['SALES', 'MANAGER'],
+    title: 'Rencana Kirim',
+    route: 'KurirRencanaKirim',
     icon: '🗓️',
-  },
-  { title: 'Visit', route: 'Visit', roles: ['SALES', 'MANAGER'], icon: '📍' },
-  {
-    title: 'Achievement',
-    route: 'Achievement',
-    roles: ['SALES', 'MANAGER'],
-    icon: '🏅',
+    subtitle: 'Rekap rencana dan tambah jadwal pengiriman',
   },
   {
-    title: 'Pengiriman Kurir',
-    route: 'KurirMenu',
-    roles: ['KURIR'],
+    title: 'Kirim',
+    route: 'KurirKirim',
     icon: '🚚',
+    subtitle: 'Rekap kiriman yang telah diselesaikan',
   },
 ];
 
@@ -60,84 +49,39 @@ const THEME = {
   ink: '#0F172A',
   muted: '#64748B',
   card: '#FFFFFF',
-  soft: '#F1F5F9',
   line: 'rgba(15,23,42,0.08)',
   danger: '#EF4444',
   bgTop: '#F7F9FF',
   bgBottom: '#FFFFFF',
 };
 
-export default function HomeScreen({ navigation }: any) {
+export default function KurirMenuScreen({ navigation }: any) {
   const { user, logout } = useAuth();
   const runGuardedPress = usePressGuard();
-  const [isModalVisible, setModalVisible] = useState(false);
-  const lastBackPressRef = useRef<number>(0);
+  const [isModalVisible, setModalVisible] = React.useState(false);
+
   const toggleModal = () => {
-    setModalVisible(v => !v);
+    runGuardedPress(
+      'kurir-menu:toggle-modal',
+      () => {
+        setModalVisible(v => !v);
+      },
+      250,
+    );
   };
 
-  useFocusEffect(
-    useCallback(() => {
-      // Auto-redirect KURIR to KurirMenu
-      if (user?.jabatan === 'KURIR') {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'KurirMenu' }],
-        });
-        return;
-      }
-
-      const onBackPress = () => {
-        const now = Date.now();
-        const isDoublePress = now - lastBackPressRef.current < 2000;
-
-        if (isDoublePress) {
-          BackHandler.exitApp();
-          return true;
-        }
-
-        lastBackPressRef.current = now;
-        if (Platform.OS === 'android') {
-          ToastAndroid.show(
-            'Tekan sekali lagi untuk keluar aplikasi',
-            ToastAndroid.SHORT,
-          );
-        }
-
-        return true;
-      };
-
-      const subscription = BackHandler.addEventListener(
-        'hardwareBackPress',
-        onBackPress,
-      );
-
-      return () => subscription.remove();
-    }, [user?.jabatan, navigation]),
-  );
+  const initials = React.useMemo(() => {
+    const name = (user?.nama || 'KURIR').trim();
+    if (!name) return 'K';
+    const parts = name.split(/\s+/).slice(0, 2);
+    return parts.map(p => p[0]?.toUpperCase()).join('') || 'K';
+  }, [user?.nama]);
 
   const handleNavigate = (route: string) => {
-    runGuardedPress(`home:navigate:${route}`, () => {
-      try {
-        navigation.navigate(route);
-      } catch {
-        console.log('Menu belum tersedia:', route);
-      }
+    runGuardedPress(`kurir-menu:navigate:${route}`, () => {
+      navigation.navigate(route);
     });
   };
-
-  const availableMenus = useMemo(() => {
-    return menus.filter(
-      m => !m.roles || m.roles.includes(user?.jabatan as Role),
-    );
-  }, [user?.jabatan]);
-
-  const initials = useMemo(() => {
-    const name = (user?.nama || '').trim();
-    if (!name) return 'U';
-    const parts = name.split(/\s+/).slice(0, 2);
-    return parts.map(p => p[0]?.toUpperCase()).join('') || 'U';
-  }, [user?.nama]);
 
   return (
     <LinearGradient
@@ -154,7 +98,6 @@ export default function HomeScreen({ navigation }: any) {
 
       <SafeAreaView style={styles.safe}>
         <View style={styles.pagePad}>
-          {/* HERO */}
           <LinearGradient
             colors={[
               'rgba(79,70,229,0.16)',
@@ -165,14 +108,12 @@ export default function HomeScreen({ navigation }: any) {
             end={{ x: 1, y: 1 }}
             style={styles.hero}
           >
-            {/* HEADER */}
             <View style={styles.headerRow}>
               <View style={styles.headerCenter}>
                 <Text style={styles.brandTextBig}>Plan Today</Text>
               </View>
             </View>
 
-            {/* Profile Card */}
             <View style={styles.profileCard}>
               <View style={styles.profileRow}>
                 <LinearGradient
@@ -186,13 +127,13 @@ export default function HomeScreen({ navigation }: any) {
 
                 <View style={{ flex: 1 }}>
                   <Text style={styles.userName} numberOfLines={1}>
-                    {user?.nama || '-'}
+                    {user?.nama || 'KURIR'}
                   </Text>
 
                   <View style={styles.userMetaRow}>
                     <View style={styles.badge}>
                       <Text style={styles.badgeText}>
-                        {user?.jabatan || '-'}
+                        {user?.jabatan || 'KURIR'}
                       </Text>
                     </View>
                     <Text style={styles.dot}>•</Text>
@@ -222,7 +163,6 @@ export default function HomeScreen({ navigation }: any) {
                 <TouchableOpacity
                   style={[styles.quickBtn, styles.quickBtnDanger]}
                   onPress={toggleModal}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   activeOpacity={0.9}
                 >
                   <Text style={styles.quickTextDanger}>Keluar</Text>
@@ -234,9 +174,8 @@ export default function HomeScreen({ navigation }: any) {
           <Text style={styles.sectionTitle}>Menu</Text>
         </View>
 
-        {/* MENU VERTIKAL MEMANJANG */}
         <FlatList
-          data={availableMenus}
+          data={menus}
           keyExtractor={(item, idx) => `${item.route}-${idx}`}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
@@ -259,14 +198,15 @@ export default function HomeScreen({ navigation }: any) {
                 <Text style={styles.menuRowTitle} numberOfLines={1}>
                   {item.title}
                 </Text>
-                <Text style={styles.menuRowHint}>Tap untuk buka</Text>
+                <Text style={styles.menuRowHint} numberOfLines={1}>
+                  {item.subtitle || 'Tap untuk buka'}
+                </Text>
               </View>
 
               <View style={styles.menuRowChevronWrap}>
                 <Text style={styles.menuRowChevron}>›</Text>
               </View>
 
-              {/* Accent kanan */}
               <LinearGradient
                 colors={['rgba(79,70,229,0.35)', 'rgba(6,182,212,0.35)']}
                 start={{ x: 0, y: 0 }}
@@ -277,7 +217,6 @@ export default function HomeScreen({ navigation }: any) {
           )}
         />
 
-        {/* Modal logout */}
         <Modal
           isVisible={isModalVisible}
           onBackdropPress={toggleModal}
@@ -305,8 +244,10 @@ export default function HomeScreen({ navigation }: any) {
               <TouchableOpacity
                 style={styles.btnLogoutConfirm}
                 onPress={() => {
-                  setModalVisible(false);
-                  logout();
+                  runGuardedPress('kurir-menu:logout', () => {
+                    setModalVisible(false);
+                    logout();
+                  });
                 }}
                 activeOpacity={0.9}
               >
@@ -323,12 +264,10 @@ export default function HomeScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   safe: { flex: 1 },
-
   pagePad: {
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'android' ? 44 : 8,
   },
-
   hero: {
     borderRadius: 26,
     padding: 14,
@@ -336,17 +275,11 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(79,70,229,0.12)',
     backgroundColor: 'rgba(255,255,255,0.50)',
   },
-
-  /* HEADER CENTERED */
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
-  },
-  headerSide: {
-    width: 92,
-    height: 36,
   },
   headerCenter: { flex: 1, alignItems: 'center' },
   brandTextBig: {
@@ -355,43 +288,19 @@ const styles = StyleSheet.create({
     color: THEME.ink,
     letterSpacing: 0.5,
   },
-  brandSubtitle: {
-    marginTop: 2,
-    fontSize: 11,
-    fontWeight: '800',
-    color: THEME.muted,
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-  },
-
-  logoutChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    backgroundColor: 'rgba(239,68,68,0.10)',
-    borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.18)',
-  },
-  logoutChipText: { color: THEME.danger, fontWeight: '900' },
-
   profileCard: {
     backgroundColor: THEME.card,
     borderRadius: 20,
-    padding: 16,
     borderWidth: 1,
     borderColor: THEME.line,
+    padding: 16,
     shadowColor: '#000',
     shadowOpacity: 0.06,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 10 },
     elevation: 3,
   },
-
   profileRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-
   avatar: {
     width: 56,
     height: 56,
@@ -399,14 +308,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: { color: '#FFFFFF', fontWeight: '900', letterSpacing: 0.6 },
-
-  /* USER INFO EMPHASIS */
-  userName: {
-    color: THEME.ink,
-    fontSize: 19,
-    fontWeight: '900',
-  },
+  avatarText: { color: '#fff', fontWeight: '900', letterSpacing: 0.6 },
+  userName: { color: THEME.ink, fontSize: 19, fontWeight: '900' },
   userMetaRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -433,16 +336,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
   },
-  userHint: {
-    marginTop: 6,
-    color: THEME.muted,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-
-  /* QUICK ACTIONS */
   quickActions: { flexDirection: 'row', gap: 10, marginTop: 14 },
-
   quickBtn: {
     flex: 1,
     flexDirection: 'row',
@@ -461,10 +355,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(239,68,68,0.18)',
   },
-
   quickTextPrimary: { color: '#FFFFFF', fontWeight: '900', fontSize: 13 },
   quickTextDanger: { color: THEME.danger, fontWeight: '900', fontSize: 13 },
-
   sectionTitle: {
     marginTop: 16,
     marginBottom: 10,
@@ -472,15 +364,12 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     fontSize: 16,
   },
-
-  /* LIST MENU */
   listContent: {
     paddingHorizontal: 20,
     paddingBottom: 18,
     paddingTop: 6,
     gap: 10,
   },
-
   menuRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -497,7 +386,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     elevation: 2,
   },
-
   menuRowIconWrap: {
     width: 44,
     height: 44,
@@ -508,7 +396,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(79,70,229,0.14)',
   },
   menuRowIcon: { fontSize: 18 },
-
   menuRowText: { flex: 1 },
   menuRowTitle: { color: THEME.ink, fontSize: 14, fontWeight: '900' },
   menuRowHint: {
@@ -517,7 +404,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
-
   menuRowChevronWrap: {
     width: 32,
     height: 32,
@@ -534,7 +420,6 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     marginTop: -2,
   },
-
   menuRowAccent: {
     position: 'absolute',
     right: 0,
@@ -543,7 +428,6 @@ const styles = StyleSheet.create({
     width: 6,
   },
 
-  /* MODAL */
   modalCard: {
     backgroundColor: '#FFF',
     borderRadius: 22,
