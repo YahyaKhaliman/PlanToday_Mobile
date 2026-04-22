@@ -103,8 +103,21 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           source: "deploy/out/*"
-          target: "${{ secrets.VPS_TARGET_PATH }}/releases"
-          strip_components: 2
+          target: "${{ secrets.VPS_TARGET_PATH }}/releases/incoming"
+
+      - name: Normalize release files on VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            cd "${{ secrets.VPS_TARGET_PATH }}/releases"
+
+            # Move every generated apk/latest.json from incoming tree to releases root.
+            find incoming -type f \( -name "PlanToday-v*.apk" -o -name "latest.json" \) -exec mv -f {} . \;
+            rm -rf incoming
 
       - name: Keep only latest 2 APKs on VPS
         uses: appleboy/ssh-action@v1.2.0
@@ -115,12 +128,6 @@ jobs:
           script: |
             set -e
             cd "${{ secrets.VPS_TARGET_PATH }}/releases"
-
-            # Guard for older runs that uploaded into releases/deploy/out.
-            if [ -d "deploy/out" ]; then
-              mv deploy/out/* .
-              rm -rf deploy
-            fi
 
             ls -1t PlanToday-v*.apk 2>/dev/null | tail -n +3 | xargs -r rm -f
 
