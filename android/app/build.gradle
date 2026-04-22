@@ -59,6 +59,10 @@ react {
  */
 def enableProguardInReleaseBuilds = false
 
+def getConfigValue(String key) {
+    return project.hasProperty(key) ? project.property(key) : System.getenv(key)
+}
+
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
  *
@@ -82,8 +86,8 @@ android {
         applicationId "com.plantoday"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode 2
+        versionName "1.0.1"
     }
     signingConfigs {
         debug {
@@ -92,15 +96,22 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            def storeFilePath = getConfigValue("MYAPP_UPLOAD_STORE_FILE")
+            if (storeFilePath) {
+                storeFile file(storeFilePath)
+                storePassword getConfigValue("MYAPP_UPLOAD_STORE_PASSWORD")
+                keyAlias getConfigValue("MYAPP_UPLOAD_KEY_ALIAS")
+                keyPassword getConfigValue("MYAPP_UPLOAD_KEY_PASSWORD")
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release.storeFile ? signingConfigs.release : signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }

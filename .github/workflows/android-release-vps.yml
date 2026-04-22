@@ -1,0 +1,122 @@
+name: Android Release to VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      mandatory:
+        description: "Set true for mandatory update"
+        required: false
+        default: "false"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-release-vps-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-latest
+    env:
+      APK_BASENAME: PlanToday
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test -- --ci
+
+      - name: Prepare Android keystore
+        shell: bash
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/upload-keystore.jks
+          test -s android/app/upload-keystore.jks
+
+      - name: Build release APK
+        working-directory: android
+        env:
+          MYAPP_UPLOAD_STORE_FILE: upload-keystore.jks
+          MYAPP_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          MYAPP_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          MYAPP_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew assembleRelease
+
+      - name: Prepare artifact and latest.json
+        id: meta
+        shell: bash
+        run: |
+          VERSION_NAME=$(sed -n 's/.*versionName "\([^"]*\)".*/\1/p' android/app/build.gradle | head -n 1)
+          VERSION_CODE=$(sed -n 's/.*versionCode \([0-9][0-9]*\).*/\1/p' android/app/build.gradle | head -n 1)
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          APK_FILE="${APK_BASENAME}-v${VERSION_NAME}+${VERSION_CODE}-${SHORT_SHA}.apk"
+          mkdir -p deploy/out
+          cp android/app/build/outputs/apk/release/app-release.apk "deploy/out/${APK_FILE}"
+
+          SHA256=$(sha256sum "deploy/out/${APK_FILE}" | awk '{print $1}')
+          MANDATORY_INPUT="${{ github.event.inputs.mandatory }}"
+          if [ -z "${MANDATORY_INPUT}" ]; then
+            MANDATORY_INPUT="false"
+          fi
+
+          cat > deploy/out/latest.json <<EOF
+          {
+            "versionCode": ${VERSION_CODE},
+            "versionName": "${VERSION_NAME}",
+            "mandatory": ${MANDATORY_INPUT},
+            "apkUrl": "${{ secrets.VPS_BASE_DOWNLOAD_URL }}/${APK_FILE}",
+            "sha256": "${SHA256}",
+            "releaseDate": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "notes": "Build ${GITHUB_RUN_NUMBER} (${SHORT_SHA})"
+          }
+          EOF
+
+          echo "apk_file=${APK_FILE}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload release files to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "deploy/out/*"
+          target: "${{ secrets.VPS_TARGET_PATH }}/releases"
+
+      - name: Keep only latest 2 APKs on VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -e
+            cd "${{ secrets.VPS_TARGET_PATH }}/releases"
+            ls -1t PlanToday-v*.apk 2>/dev/null | tail -n +3 | xargs -r rm -f
+
+      - name: Publish summary
+        shell: bash
+        run: |
+          echo "APK uploaded: ${{ steps.meta.outputs.apk_file }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Manifest updated: latest.json" >> "$GITHUB_STEP_SUMMARY"
