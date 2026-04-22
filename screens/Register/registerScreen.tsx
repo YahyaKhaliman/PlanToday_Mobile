@@ -176,9 +176,6 @@ export default function RegisterScreen({ navigation }: any) {
             <View style={styles.formWrap}>
               <View style={styles.formCard}>
                 <Text style={styles.formTitle}>Buat Akun</Text>
-                <Text style={styles.formDesc}>
-                  Lengkapi data berikut untuk mendaftar
-                </Text>
 
                 {/* Nama */}
                 <Text style={styles.label}>Nama</Text>
