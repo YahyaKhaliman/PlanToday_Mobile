@@ -104,6 +104,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           source: "deploy/out/*"
           target: "${{ secrets.VPS_TARGET_PATH }}/releases"
+          strip_components: 2
 
       - name: Keep only latest 2 APKs on VPS
         uses: appleboy/ssh-action@v1.2.0
@@ -114,6 +115,13 @@ jobs:
           script: |
             set -e
             cd "${{ secrets.VPS_TARGET_PATH }}/releases"
+
+            # Guard for older runs that uploaded into releases/deploy/out.
+            if [ -d "deploy/out" ]; then
+              mv deploy/out/* .
+              rm -rf deploy
+            fi
+
             ls -1t PlanToday-v*.apk 2>/dev/null | tail -n +3 | xargs -r rm -f
 
       - name: Publish summary
