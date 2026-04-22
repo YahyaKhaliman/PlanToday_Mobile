@@ -53,6 +53,9 @@ jobs:
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/upload-keystore.jks
           test -s android/app/upload-keystore.jks
 
+      - name: Make gradlew executable
+        run: chmod +x android/gradlew
+
       - name: Build release APK
         working-directory: android
         env:
