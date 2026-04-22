@@ -168,7 +168,7 @@ export default function HomeScreen({ navigation }: any) {
             {/* HEADER */}
             <View style={styles.headerRow}>
               <View style={styles.headerCenter}>
-                <Text style={styles.brandTextBig}>Plan Today</Text>
+                <Text style={styles.brandTextBig}>PlanToday</Text>
               </View>
             </View>
 
