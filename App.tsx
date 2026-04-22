@@ -4,7 +4,7 @@ import { AuthProvider } from './context/authContext';
 import AppNavigator from './navigation/appNavigator';
 import Toast from 'react-native-toast-message';
 import { toastConfig } from './components/toastCustomComponent';
-import { checkAppUpdate } from './services/appUpdate';
+import { checkAppUpdate, downloadUpdateApk } from './services/appUpdate';
 
 export default function App() {
   useEffect(() => {
@@ -19,14 +19,24 @@ export default function App() {
         ? [
             {
               text: 'Update',
-              onPress: () => Linking.openURL(update.apkUrl),
+              onPress: async () => {
+                const downloaded = await downloadUpdateApk(update);
+                if (!downloaded) {
+                  Linking.openURL(update.apkUrl);
+                }
+              },
             },
           ]
         : [
             { text: 'Nanti' },
             {
               text: 'Update',
-              onPress: () => Linking.openURL(update.apkUrl),
+              onPress: async () => {
+                const downloaded = await downloadUpdateApk(update);
+                if (!downloaded) {
+                  Linking.openURL(update.apkUrl);
+                }
+              },
             },
           ];
 

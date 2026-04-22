@@ -1,8 +1,10 @@
 import DeviceInfo from 'react-native-device-info';
+import { Platform } from 'react-native';
+import ReactNativeBlobUtil from 'react-native-blob-util';
 
 const UPDATE_MANIFEST_URL = 'http://103.94.238.252/releases/latest.json';
 
-type AppUpdateManifest = {
+export type AppUpdateManifest = {
   versionCode: number;
   versionName: string;
   mandatory: boolean;
@@ -53,5 +55,34 @@ export const checkAppUpdate = async (): Promise<AppUpdateManifest | null> => {
     };
   } catch {
     return null;
+  }
+};
+
+export const downloadUpdateApk = async (
+  manifest: AppUpdateManifest,
+): Promise<boolean> => {
+  if (Platform.OS !== 'android') {
+    return false;
+  }
+
+  try {
+    const fileName =
+      manifest.apkUrl.split('/').pop() ||
+      `PlanToday-v${manifest.versionName}.apk`;
+
+    await ReactNativeBlobUtil.config({
+      addAndroidDownloads: {
+        useDownloadManager: true,
+        notification: true,
+        mediaScannable: true,
+        title: fileName,
+        description: `Mengunduh update ${manifest.versionName}`,
+        mime: 'application/vnd.android.package-archive',
+      },
+    }).fetch('GET', manifest.apkUrl);
+
+    return true;
+  } catch {
+    return false;
   }
 };
