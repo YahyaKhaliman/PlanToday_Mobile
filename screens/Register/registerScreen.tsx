@@ -169,7 +169,7 @@ export default function RegisterScreen({ navigation }: any) {
             {/* Header */}
             <View style={styles.header}>
               <Text style={styles.welcomeText}>REGISTER</Text>
-              <Text style={styles.subWelcomeText}>PLAN TODAY</Text>
+              <Text style={styles.subWelcomeText}>PLANTODAY</Text>
             </View>
 
             {/* Form Card */}
