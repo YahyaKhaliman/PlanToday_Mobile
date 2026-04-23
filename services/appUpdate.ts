@@ -2,7 +2,7 @@ import DeviceInfo from 'react-native-device-info';
 import { Platform } from 'react-native';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 
-const UPDATE_MANIFEST_URL = 'http://103.94.238.252/releases/latest.json';
+const UPDATE_MANIFEST_URL = 'http://103.94.238.252:8182/releases/latest.json';
 
 export type AppUpdateManifest = {
   versionCode: number;

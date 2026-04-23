@@ -2,7 +2,7 @@
   "versionCode": 1,
   "versionName": "1.0.0",
   "mandatory": false,
-  "apkUrl": "http://YOUR_VPS_IP_OR_DOMAIN/releases/PlanToday-v1.0.0+1.apk",
+  "apkUrl": "http://103.94.238.252:8182/releases/PlanToday-v1.0.0+1.apk",
   "sha256": "PUT_SHA256_HERE",
   "releaseDate": "2026-04-22T00:00:00Z",
   "notes": "Initial release"
