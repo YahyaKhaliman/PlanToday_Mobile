@@ -175,7 +175,7 @@ export default function RegisterScreen({ navigation }: any) {
             {/* Form Card */}
             <View style={styles.formWrap}>
               <View style={styles.formCard}>
-                <Text style={styles.formTitle}>Buat Akun</Text>
+                <Text style={styles.formTitle}>Daftar Akun Baru</Text>
 
                 {/* Nama */}
                 <Text style={styles.label}>Nama</Text>
