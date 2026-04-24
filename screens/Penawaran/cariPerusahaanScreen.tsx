@@ -1,5 +1,5 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -13,23 +13,13 @@ import {
   FlatList,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import api from '../../services/api';
 import Toast from 'react-native-toast-message';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePressGuard } from '../../utils/usePressGuard';
-
-type Customer = {
-  cc_kode: string;
-  cc_nama: string;
-  cc_alamat: string;
-  cc_telp?: string;
-  cc_CP?: string;
-};
-
-const cleanText = (s: any) =>
-  String(s ?? '')
-    .replace(/\r?\n/g, ' ')
-    .trim();
+import {
+  getMasterPerusahaan,
+  PenawaranMasterOption,
+} from '../../services/penawaranApi';
 
 const THEME = {
   primary: '#4F46E5',
@@ -39,47 +29,50 @@ const THEME = {
   card: '#FFFFFF',
   soft: '#F1F5F9',
   line: 'rgba(15,23,42,0.08)',
-  danger: '#EF4444',
   bgTop: '#F7F9FF',
   bgBottom: '#FFFFFF',
 };
 
-export default function CariCustomerScreen({ navigation, route }: any) {
+const cleanText = (s: any) =>
+  String(s ?? '')
+    .replace(/\r?\n/g, ' ')
+    .trim();
+
+export default function CariPerusahaanScreen({ navigation, route }: any) {
   const insets = useSafeAreaInsets();
   const runGuardedPress = usePressGuard();
-  const from = route?.params?.from || 'VISITPLAN'; // VISITPLAN / VISIT / dll
   const keywordFromPrev = route?.params?.keyword || '';
 
   const [keyword, setKeyword] = useState(String(keywordFromPrev));
-  const [data, setData] = useState<Customer[]>([]);
+  const [data, setData] = useState<PenawaranMasterOption[]>([]);
   const [loading, setLoading] = useState(false);
 
   const canSearch = useMemo(
-    () => keyword.trim().length >= 2 && !loading,
+    () => keyword.trim().length >= 1 && !loading,
     [keyword, loading],
   );
 
   const cari = useCallback(async () => {
     const q = keyword.trim();
-    if (q.length < 2) {
+    if (q.length < 1) {
       Toast.show({
         type: 'glassError',
         text1: 'Validasi',
-        text2: 'Ketik minimal 2 huruf untuk mencari',
+        text2: 'Ketik minimal 1 huruf untuk mencari',
       });
       return;
     }
 
     setLoading(true);
     try {
-      const res = await api.get('/cari-customer', { params: { search: q } });
-      const rows: Customer[] = res.data?.data || [];
+      const rows = await getMasterPerusahaan(q);
       setData(rows);
     } catch (err: any) {
       Toast.show({
         type: 'glassError',
         text1: 'Error',
-        text2: err?.response?.data?.message || 'Gagal mengambil data customer',
+        text2:
+          err?.response?.data?.message || 'Gagal mengambil data perusahaan',
       });
       setData([]);
     } finally {
@@ -88,65 +81,41 @@ export default function CariCustomerScreen({ navigation, route }: any) {
   }, [keyword]);
 
   useEffect(() => {
-    if (String(keywordFromPrev || '').trim().length >= 2) {
-      // auto search
+    if (String(keywordFromPrev || '').trim().length >= 1) {
       cari();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [cari, keywordFromPrev]);
 
-  const pilihCustomer = (item: Customer) => {
-    runGuardedPress(`search-customer:pick:${item.cc_kode}`, () => {
-      const payload = {
-        kode: item.cc_kode,
-        nama: item.cc_nama,
-        alamat: cleanText(item.cc_alamat),
-        telepon: cleanText(item.cc_telp),
-        contactPerson: cleanText(item.cc_CP),
-      };
-
-      if (from === 'TAMBAHVISITPLAN') {
-        navigation.navigate({
-          name: 'TambahVisitPlan',
-          params: { selectedCustomer: payload },
-          merge: true,
-        });
-        return;
-      }
-      if (from === 'TAMBAHVISIT') {
-        navigation.navigate({
-          name: 'TambahVisit',
-          params: { selectedCustomer: payload },
-          merge: true,
-        });
-        return;
-      }
-      if (from === 'PENAWARAN_CREATE') {
-        navigation.navigate({
-          name: 'PenawaranCreate',
-          params: { selectedCustomer: payload },
-          merge: true,
-        });
-        return;
-      }
-      navigation.goBack();
+  const pilih = (item: PenawaranMasterOption) => {
+    runGuardedPress(`search-perusahaan:pick:${item.kode}`, () => {
+      navigation.navigate({
+        name: 'PenawaranCreate',
+        params: {
+          selectedPerusahaan: {
+            kode: item.kode,
+            nama: item.nama,
+            alamat: item.alamat || '',
+          },
+        },
+        merge: true,
+      });
     });
   };
 
-  const renderItem = ({ item }: { item: Customer }) => (
+  const renderItem = ({ item }: { item: PenawaranMasterOption }) => (
     <TouchableOpacity
       activeOpacity={0.9}
-      onPress={() => pilihCustomer(item)}
+      onPress={() => pilih(item)}
       style={styles.card}
     >
       <View style={styles.cardTopRow}>
         <View style={styles.avatar}>
-          <Text style={{ fontSize: 16 }}>🏢</Text>
+          <Text style={{ fontSize: 16 }}>🏭</Text>
         </View>
 
         <View style={{ flex: 1 }}>
-          <Text style={styles.cardTitle}>{cleanText(item.cc_nama)}</Text>
-          <Text style={styles.cardMeta}>Kode: {cleanText(item.cc_kode)}</Text>
+          <Text style={styles.cardTitle}>{cleanText(item.nama)}</Text>
+          <Text style={styles.cardMeta}>Kode: {cleanText(item.kode)}</Text>
         </View>
 
         <View style={styles.pill}>
@@ -154,22 +123,19 @@ export default function CariCustomerScreen({ navigation, route }: any) {
         </View>
       </View>
 
-      <Text style={styles.cardText}>{cleanText(item.cc_alamat)}</Text>
-
-      {!!item.cc_telp && (
-        <Text style={styles.cardText}>📞 {cleanText(item.cc_telp)}</Text>
-      )}
-      {!!item.cc_CP && (
-        <Text style={styles.cardText}>👤 {cleanText(item.cc_CP)}</Text>
+      {!!item.alamat && (
+        <Text style={styles.cardText}>{cleanText(item.alamat)}</Text>
       )}
     </TouchableOpacity>
   );
 
-  const ListHeader = (
+  const header = (
     <View style={styles.headerWrap}>
       <View style={styles.header}>
-        <Text style={styles.title}>Cari Customer</Text>
-        <Text style={styles.subtitle}>Ketik nama, lalu pilih customer</Text>
+        <Text style={styles.title}>Cari Perusahaan</Text>
+        <Text style={styles.subtitle}>
+          Ketik nama/kode, lalu pilih perusahaan
+        </Text>
       </View>
 
       <View style={styles.searchBox}>
@@ -177,13 +143,13 @@ export default function CariCustomerScreen({ navigation, route }: any) {
         <TextInput
           value={keyword}
           onChangeText={setKeyword}
-          placeholder="Nama customer..."
+          placeholder="Nama/kode perusahaan..."
           placeholderTextColor={THEME.muted}
           style={styles.searchInput}
           returnKeyType="search"
           onSubmitEditing={cari}
           autoCorrect={false}
-          autoCapitalize="none"
+          autoCapitalize="characters"
         />
       </View>
 
@@ -216,9 +182,9 @@ export default function CariCustomerScreen({ navigation, route }: any) {
       >
         <FlatList
           data={data}
-          keyExtractor={item => String(item.cc_kode)}
+          keyExtractor={item => String(item.kode)}
           renderItem={renderItem}
-          ListHeaderComponent={ListHeader}
+          ListHeaderComponent={header}
           stickyHeaderIndices={[0]}
           ListHeaderComponentStyle={styles.stickyHeader}
           keyboardShouldPersistTaps="handled"
@@ -232,15 +198,14 @@ export default function CariCustomerScreen({ navigation, route }: any) {
               <ActivityIndicator style={{ marginTop: 20 }} />
             ) : (
               <Text style={styles.empty}>
-                {keyword.trim().length >= 2
+                {keyword.trim().length >= 1
                   ? 'Data tidak ditemukan'
-                  : 'Ketik minimal 2 huruf untuk mulai mencari'}
+                  : 'Ketik minimal 1 huruf untuk mulai mencari'}
               </Text>
             )
           }
         />
 
-        {/* Bottom Action Bar */}
         <View
           style={[
             styles.bottomAction,
@@ -277,18 +242,15 @@ export default function CariCustomerScreen({ navigation, route }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-
   listContent: {
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'android' ? 54 : 18,
-    paddingBottom: 110, // ruang bottom bar
+    paddingBottom: 110,
   },
-
   headerWrap: {
     backgroundColor: THEME.bgBottom,
     paddingBottom: 10,
   },
-
   header: { alignItems: 'center', marginBottom: 10 },
   title: {
     fontSize: 25,
@@ -303,9 +265,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
   },
-
   divider: { marginTop: 10, height: 1, backgroundColor: THEME.line },
-
   smallHint: {
     marginTop: 8,
     color: THEME.muted,
@@ -313,8 +273,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '700',
   },
-
-  /* Search box */
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -332,8 +290,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-
-  /* Item card */
   card: {
     backgroundColor: THEME.card,
     borderRadius: 18,
@@ -348,7 +304,6 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   cardTopRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-
   avatar: {
     width: 34,
     height: 34,
@@ -359,7 +314,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-
   pill: {
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -374,7 +328,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 0.6,
   },
-
   cardTitle: { color: THEME.ink, fontSize: 15, fontWeight: '900' },
   cardMeta: {
     color: THEME.muted,
@@ -386,58 +339,50 @@ const styles = StyleSheet.create({
     color: THEME.muted,
     marginTop: 8,
     fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '700',
+    fontWeight: '600',
   },
-
+  stickyHeader: {
+    zIndex: 10,
+    elevation: 2,
+  },
   empty: {
     textAlign: 'center',
-    marginTop: 18,
     color: THEME.muted,
-    fontSize: 13,
+    marginTop: 18,
     fontWeight: '700',
   },
-
-  /* Bottom Action Bar */
   bottomAction: {
     position: 'absolute',
-    left: 0,
-    right: 0,
+    left: 12,
+    right: 12,
     bottom: 0,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: THEME.card,
-    borderTopWidth: 1,
-    borderTopColor: THEME.line,
     flexDirection: 'row',
     gap: 10,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderTopWidth: 1,
+    borderTopColor: THEME.line,
+    paddingTop: 10,
+    paddingHorizontal: 8,
   },
-
   actionBtn: {
     flex: 1,
-    borderRadius: 14,
-    paddingVertical: 14,
+    height: 48,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
   },
-
-  actionBtnPrimary: {
-    backgroundColor: THEME.accent,
-    borderColor: 'rgba(79,70,229,0.18)',
-  },
-
   actionBtnSoft: {
-    backgroundColor: 'rgba(79,70,229,0.08)',
-    borderColor: 'rgba(79,70,229,0.18)',
+    borderWidth: 1,
+    borderColor: THEME.line,
+    backgroundColor: '#fff',
   },
-
+  actionBtnPrimary: {
+    backgroundColor: THEME.primary,
+  },
   actionText: {
-    color: '#FFFFFF',
+    color: '#fff',
     fontWeight: '900',
-    fontSize: 13,
-    letterSpacing: 0.3,
+    fontSize: 14,
+    letterSpacing: 0.6,
   },
-
-  stickyHeader: { backgroundColor: THEME.bgBottom },
 });

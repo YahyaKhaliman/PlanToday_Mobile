@@ -26,8 +26,23 @@ import KurirKirimScreen from '../screens/Kurir/kirimScreen';
 import KurirJadwalKirimScreen from '../screens/Kurir/jadwalKirimScreen';
 import KurirTambahPengirimanScreen from '../screens/Kurir/tambahPengirimanScreen';
 import KurirProsesPengirimanScreen from '../screens/Kurir/prosesPengirimanScreen';
+import PenawaranListScreen from '../screens/Penawaran/penawaranListScreen';
+import PenawaranDetailScreen from '../screens/Penawaran/penawaranDetailScreen';
+import PenawaranCreateScreen from '../screens/Penawaran/penawaranCreateScreen';
+import PenawaranStatusScreen from '../screens/Penawaran/penawaranStatusScreen';
+import CariPerusahaanScreen from '../screens/Penawaran/cariPerusahaanScreen';
+import CariSalesScreen from '../screens/Penawaran/cariSalesScreen';
 
 const Stack = createNativeStackNavigator();
+
+export type PenawaranStackParamList = {
+  PenawaranList: undefined;
+  PenawaranDetail: { nomor: string };
+  PenawaranCreate: undefined;
+  PenawaranStatus: { nomor: string };
+  CariPerusahaanPenawaran: { from: string };
+  CariSalesPenawaran: { from: string };
+};
 
 export type RootStackParamList = {
   AchievementOmset: undefined;
@@ -46,6 +61,8 @@ export type RootStackParamList = {
 
 export default function AppNavigator() {
   const { user } = useAuth();
+  const jabatan = String(user?.jabatan || '').toUpperCase();
+  const canAccessPenawaran = jabatan === 'MANAGER' || jabatan === 'SALES';
 
   return (
     <NavigationContainer>
@@ -109,6 +126,34 @@ export default function AppNavigator() {
               name="KurirProsesPengiriman"
               component={KurirProsesPengirimanScreen}
             />
+            {canAccessPenawaran && (
+              <>
+                <Stack.Screen
+                  name="PenawaranList"
+                  component={PenawaranListScreen}
+                />
+                <Stack.Screen
+                  name="PenawaranDetail"
+                  component={PenawaranDetailScreen}
+                />
+                <Stack.Screen
+                  name="PenawaranCreate"
+                  component={PenawaranCreateScreen}
+                />
+                <Stack.Screen
+                  name="PenawaranStatus"
+                  component={PenawaranStatusScreen}
+                />
+                <Stack.Screen
+                  name="CariPerusahaanPenawaran"
+                  component={CariPerusahaanScreen}
+                />
+                <Stack.Screen
+                  name="CariSalesPenawaran"
+                  component={CariSalesScreen}
+                />
+              </>
+            )}
           </>
         ) : (
           <>

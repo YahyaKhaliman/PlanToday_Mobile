@@ -110,7 +110,7 @@ export default function KurirMenuScreen({ navigation }: any) {
           >
             <View style={styles.headerRow}>
               <View style={styles.headerCenter}>
-                <Text style={styles.brandTextBig}>Plan Today</Text>
+                <Text style={styles.brandTextBig}>PlanToday</Text>
               </View>
             </View>
 

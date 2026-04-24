@@ -47,6 +47,12 @@ const menus: MenuItem[] = [
     icon: '🏅',
   },
   {
+    title: 'Penawaran',
+    route: 'PenawaranList',
+    roles: ['SALES', 'MANAGER'],
+    icon: '🧾',
+  },
+  {
     title: 'Pengiriman Kurir',
     route: 'KurirMenu',
     roles: ['KURIR'],
