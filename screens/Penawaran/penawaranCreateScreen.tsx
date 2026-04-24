@@ -17,19 +17,9 @@ import Toast from 'react-native-toast-message';
 import { createPenawaran } from '../../services/penawaranApi';
 import { useAuth } from '../../context/authContext';
 import { usePressGuard } from '../../utils/usePressGuard';
+import { PENAWARAN_SHADOW, PENAWARAN_THEME } from './penawaranTheme';
 
-const THEME = {
-  primary: '#4F46E5',
-  accent: '#06B6D4',
-  ink: '#0F172A',
-  muted: '#64748B',
-  card: '#FFFFFF',
-  soft: '#F1F5F9',
-  line: 'rgba(15,23,42,0.08)',
-  bgTop: '#F7F9FF',
-  bgBottom: '#FFFFFF',
-  danger: '#EF4444',
-};
+const THEME = PENAWARAN_THEME;
 
 type DraftDetail = {
   nama_barang: string;
@@ -62,6 +52,18 @@ const toYmd = (d: Date) => {
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
+};
+
+const formatDateLabel = (ymd: string) => {
+  const [y, m, d] = String(ymd || '')
+    .split('-')
+    .map(Number);
+  if (!y || !m || !d) return ymd || '-';
+  return new Date(y, m - 1, d).toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
 };
 
 const parseNum = (value: string) => {
@@ -293,7 +295,9 @@ export default function PenawaranCreateScreen({ navigation, route }: any) {
             style={styles.inputButton}
             onPress={() => setShowDatePicker(true)}
           >
-            <Text style={styles.inputButtonText}>{tanggal}</Text>
+            <Text style={styles.inputButtonText}>
+              {formatDateLabel(tanggal)}
+            </Text>
           </TouchableOpacity>
 
           <Text style={styles.label}>Divisi</Text>
@@ -547,32 +551,35 @@ export default function PenawaranCreateScreen({ navigation, route }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   headerArea: {
-    paddingTop: 52,
-    paddingHorizontal: 16,
+    paddingTop: 44,
+    paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingBottom: 10,
+    paddingBottom: 8,
   },
   backBtn: {
-    backgroundColor: 'rgba(79,70,229,0.12)',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    backgroundColor: THEME.soft,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: THEME.line,
   },
   backBtnText: {
     color: THEME.primary,
-    fontWeight: '700',
+    fontWeight: '900',
     fontSize: 12,
+    letterSpacing: 0.2,
   },
   title: {
     flex: 1,
     color: THEME.ink,
-    fontWeight: '800',
-    fontSize: 17,
+    fontWeight: '900',
+    fontSize: 18,
   },
   content: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingBottom: 100,
     gap: 12,
   },
@@ -580,30 +587,34 @@ const styles = StyleSheet.create({
     backgroundColor: THEME.card,
     borderWidth: 1,
     borderColor: THEME.line,
-    borderRadius: 14,
-    padding: 12,
+    borderRadius: 18,
+    padding: 14,
+    ...PENAWARAN_SHADOW.softCard,
   },
   cardTitle: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '900',
     color: THEME.ink,
     marginBottom: 10,
   },
   label: {
     color: THEME.muted,
     fontSize: 12,
+    fontWeight: '800',
     marginTop: 8,
     marginBottom: 4,
+    letterSpacing: 0.2,
   },
   input: {
     borderWidth: 1,
     borderColor: THEME.line,
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: 10,
-    paddingVertical: 9,
+    paddingVertical: 10,
     color: THEME.ink,
-    fontSize: 13,
-    backgroundColor: '#FFF',
+    fontSize: 14,
+    fontWeight: '700',
+    backgroundColor: THEME.soft,
   },
   inputWrap: {
     marginBottom: 10,
@@ -611,14 +622,15 @@ const styles = StyleSheet.create({
   inputButton: {
     borderWidth: 1,
     borderColor: THEME.line,
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 11,
-    backgroundColor: '#FFF',
+    backgroundColor: THEME.soft,
   },
   inputButtonText: {
     color: THEME.ink,
-    fontSize: 13,
+    fontSize: 14,
+    fontWeight: '800',
   },
   rowBetween: {
     flexDirection: 'row',
@@ -640,7 +652,7 @@ const styles = StyleSheet.create({
   btnSoft: {
     minHeight: 42,
     paddingHorizontal: 12,
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: THEME.line,
     backgroundColor: THEME.soft,
@@ -654,21 +666,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   addBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: 'rgba(79,70,229,0.12)',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: 'rgba(79,70,229,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(79,70,229,0.28)',
   },
   addBtnText: {
     color: THEME.primary,
-    fontWeight: '700',
+    fontWeight: '900',
     fontSize: 12,
   },
   detailBox: {
-    padding: 10,
+    padding: 12,
     borderWidth: 1,
     borderColor: THEME.line,
-    borderRadius: 10,
+    borderRadius: 14,
+    backgroundColor: THEME.soft,
     gap: 8,
   },
   detailSeparator: {
@@ -676,7 +691,7 @@ const styles = StyleSheet.create({
   },
   detailTitle: {
     color: THEME.ink,
-    fontWeight: '700',
+    fontWeight: '800',
     fontSize: 12,
   },
   removeText: {
@@ -691,7 +706,7 @@ const styles = StyleSheet.create({
   totalText: {
     marginTop: 10,
     color: THEME.primary,
-    fontWeight: '800',
+    fontWeight: '900',
     fontSize: 13,
   },
   footer: {
@@ -699,21 +714,25 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    padding: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     backgroundColor: 'rgba(255,255,255,0.95)',
     borderTopWidth: 1,
     borderTopColor: THEME.line,
   },
   saveBtn: {
-    height: 44,
-    backgroundColor: THEME.primary,
-    borderRadius: 12,
+    height: 46,
+    borderRadius: 14,
+    overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: THEME.primary,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
   },
   saveBtnText: {
     color: '#FFF',
-    fontWeight: '800',
+    fontWeight: '900',
     fontSize: 14,
   },
 });

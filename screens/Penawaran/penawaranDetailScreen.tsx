@@ -23,17 +23,13 @@ import {
   PenawaranHeader,
 } from '../../services/penawaranApi';
 import PenawaranApprovalModal from './penawaranApprovalModal';
+import {
+  PENAWARAN_SHADOW,
+  PENAWARAN_STATUS_COLORS,
+  PENAWARAN_THEME,
+} from './penawaranTheme';
 
-const THEME = {
-  primary: '#4F46E5',
-  accent: '#06B6D4',
-  ink: '#0F172A',
-  muted: '#64748B',
-  card: '#FFFFFF',
-  line: 'rgba(15,23,42,0.08)',
-  bgTop: '#F7F9FF',
-  bgBottom: '#FFFFFF',
-};
+const THEME = PENAWARAN_THEME;
 
 const formatCurrency = (value: number) => {
   try {
@@ -55,12 +51,6 @@ const formatNumber = (value: number) => {
   } catch {
     return String(Number(value || 0));
   }
-};
-
-const APPROVAL_COLORS: Record<string, string> = {
-  WAIT: '#D97706',
-  ACC: '#16A34A',
-  TOLAK: '#DC2626',
 };
 
 const normalizeApprovalState = (value?: string) =>
@@ -199,7 +189,7 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
   );
 
   const approvalState = normalizeApprovalState(header?.approval_state);
-  const approvalColor = APPROVAL_COLORS[approvalState] || THEME.muted;
+  const approvalColor = PENAWARAN_STATUS_COLORS[approvalState] || THEME.muted;
   const approvalLabel = approvalState || '-';
   const isWaitingApproval = approvalState === 'WAIT';
 
@@ -573,19 +563,20 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
           <TouchableOpacity
             style={[
               styles.actionButton,
-              styles.pdfButton,
+              styles.actionButtonPrimary,
               exportingPdf && styles.actionButtonDisabled,
             ]}
             onPress={handleSaveAndShareToWhatsapp}
             disabled={exportingPdf}
           >
-            <Text style={styles.actionButtonText}>
+            <Text style={styles.actionButtonTextPrimary}>
               {exportingPdf ? 'Export PDF...' : 'Simpan + Share WA'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[
               styles.actionButton,
+              styles.actionButtonSoft,
               isWaitingApproval && styles.actionButtonDisabled,
             ]}
             onPress={() =>
@@ -593,18 +584,18 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
             }
             disabled={isWaitingApproval}
           >
-            <Text style={styles.actionButtonText}>Ubah Status</Text>
+            <Text style={styles.actionButtonTextSoft}>Ubah Status</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[
               styles.actionButton,
-              styles.approvalButton,
+              styles.actionButtonSoft,
               isWaitingApproval && styles.actionButtonDisabled,
             ]}
             onPress={() => setApprovalModalVisible(true)}
             disabled={isWaitingApproval}
           >
-            <Text style={styles.actionButtonText}>Ajukan Perubahan</Text>
+            <Text style={styles.actionButtonTextSoft}>Ajukan Perubahan</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -626,7 +617,7 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
           ListHeaderComponent={
             <View style={styles.sectionCard}>
               <Text style={styles.sectionTitle}>Informasi Header</Text>
-              <InfoRow label="Tanggal" value={header.tanggal} />
+              <InfoRow label="Tanggal" value={formatDate(header.tanggal)} />
               <InfoRow label="Customer" value={header.customer} />
               <InfoRow label="Perusahaan" value={header.perusahaan} />
               <InfoRow label="Sales" value={header.sales} />
@@ -659,7 +650,8 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
                 activityLogs.map((log, idx) => {
                   const rawState = normalizeApprovalState(log.approval_state);
                   const stateLabel = rawState || '-';
-                  const stateColor = APPROVAL_COLORS[rawState] || THEME.muted;
+                  const stateColor =
+                    PENAWARAN_STATUS_COLORS[rawState] || THEME.muted;
 
                   return (
                     <View
@@ -751,57 +743,68 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   headerArea: {
-    paddingTop: 52,
-    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? 44 : 8,
+    paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingBottom: 10,
+    paddingBottom: 8,
   },
   backBtn: {
-    backgroundColor: 'rgba(79,70,229,0.12)',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    backgroundColor: THEME.soft,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: THEME.line,
   },
   backBtnText: {
     color: THEME.primary,
-    fontWeight: '700',
+    fontWeight: '900',
     fontSize: 12,
+    letterSpacing: 0.2,
   },
   title: {
     flex: 1,
     color: THEME.ink,
-    fontWeight: '800',
-    fontSize: 17,
+    fontWeight: '900',
+    fontSize: 18,
   },
   actionBar: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
     gap: 8,
   },
   actionButton: {
     minWidth: 110,
     flexGrow: 1,
-    backgroundColor: THEME.primary,
-    borderRadius: 8,
-    paddingVertical: 10,
+    borderRadius: 14,
+    paddingVertical: 11,
     paddingHorizontal: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  pdfButton: {
-    backgroundColor: '#0F766E',
+  actionButtonPrimary: {
+    backgroundColor: THEME.primary,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
   },
-  approvalButton: {
-    backgroundColor: THEME.accent,
+  actionButtonSoft: {
+    backgroundColor: THEME.soft,
+    borderWidth: 1,
+    borderColor: THEME.line,
   },
-  actionButtonText: {
+  actionButtonTextPrimary: {
     color: '#fff',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '800',
+  },
+  actionButtonTextSoft: {
+    color: THEME.primary,
+    fontSize: 12,
+    fontWeight: '700',
   },
   actionButtonDisabled: {
     opacity: 0.55,
@@ -817,16 +820,18 @@ const styles = StyleSheet.create({
     color: THEME.muted,
   },
   listContainer: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingBottom: 24,
+    paddingTop: 2,
     gap: 10,
   },
   sectionCard: {
     backgroundColor: THEME.card,
-    borderRadius: 16,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: THEME.line,
-    padding: 12,
+    padding: 14,
+    ...PENAWARAN_SHADOW.softCard,
   },
   sectionTitle: {
     fontSize: 14,
@@ -843,12 +848,13 @@ const styles = StyleSheet.create({
   infoLabel: {
     color: THEME.muted,
     fontSize: 12,
+    fontWeight: '700',
     flex: 1,
   },
   infoValue: {
     color: THEME.ink,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '800',
     flex: 1,
     textAlign: 'right',
   },
@@ -856,6 +862,8 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.06)',
     alignSelf: 'flex-start',
   },
   approvalBadgeText: {
@@ -865,10 +873,11 @@ const styles = StyleSheet.create({
   },
   itemCard: {
     backgroundColor: THEME.card,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: THEME.line,
     padding: 12,
+    ...PENAWARAN_SHADOW.softCard,
   },
   itemTopRow: {
     flexDirection: 'row',
@@ -885,7 +894,7 @@ const styles = StyleSheet.create({
   itemStatus: {
     color: THEME.muted,
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   itemMeta: {
     marginTop: 4,

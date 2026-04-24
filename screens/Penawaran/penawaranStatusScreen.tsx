@@ -9,7 +9,9 @@ import {
   TouchableOpacity,
   Modal,
   FlatList,
+  StatusBar,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { PenawaranStackParamList } from '../../navigation/appNavigator';
 import {
@@ -21,6 +23,7 @@ import {
   PenawaranMasterOption,
   PenawaranStatusUpdate,
 } from '../../services/penawaranApi';
+import { PENAWARAN_SHADOW, PENAWARAN_THEME } from './penawaranTheme';
 
 type Props = NativeStackScreenProps<PenawaranStackParamList, 'PenawaranStatus'>;
 
@@ -35,6 +38,8 @@ interface PickerModalState {
   fieldName: 'status' | 'ket_batal' | 'ket_confirm';
   options: PickerOption[];
 }
+
+const THEME = PENAWARAN_THEME;
 
 export default function PenawaranStatusScreen({ route, navigation }: Props) {
   const { nomor } = route.params;
@@ -224,15 +229,37 @@ export default function PenawaranStatusScreen({ route, navigation }: Props) {
   if (loading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#0000ff" />
+        <ActivityIndicator size="large" color={THEME.primary} />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <LinearGradient
+      colors={[THEME.bgTop, THEME.bgBottom]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.container}
+    >
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor="transparent"
+        translucent
+      />
+
+      <View style={styles.headerArea}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => navigation.goBack()}
+          disabled={submitting}
+        >
+          <Text style={styles.backBtnText}>Kembali</Text>
+        </TouchableOpacity>
+        <Text style={styles.title}>Update Status</Text>
+      </View>
+
       <ScrollView style={styles.scrollView}>
-        <View style={styles.header}>
+        <View style={styles.headerCard}>
           <Text style={styles.headerTitle}>Update Status Detail</Text>
           <Text style={styles.headerSubtitle}>Penawaran: {nomor}</Text>
         </View>
@@ -367,7 +394,7 @@ export default function PenawaranStatusScreen({ route, navigation }: Props) {
           {submitting ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.buttonText}>Simpan</Text>
+            <Text style={styles.buttonTextPrimary}>Simpan</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -401,71 +428,102 @@ export default function PenawaranStatusScreen({ route, navigation }: Props) {
           </View>
         </View>
       </Modal>
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+  },
+  headerArea: {
+    paddingTop: 44,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingBottom: 8,
+  },
+  backBtn: {
+    backgroundColor: THEME.soft,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: THEME.line,
+  },
+  backBtnText: {
+    color: THEME.primary,
+    fontWeight: '900',
+    fontSize: 12,
+    letterSpacing: 0.2,
+  },
+  title: {
+    flex: 1,
+    color: THEME.ink,
+    fontWeight: '900',
+    fontSize: 18,
   },
   scrollView: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 20,
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  header: {
+  headerCard: {
+    backgroundColor: THEME.card,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: THEME.line,
+    padding: 14,
     marginBottom: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
+    ...PENAWARAN_SHADOW.softCard,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 16,
+    fontWeight: '800',
+    color: THEME.ink,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 12,
+    color: THEME.muted,
     marginTop: 4,
   },
   lockInfoWrap: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: THEME.warningBg,
     borderWidth: 1,
-    borderColor: '#FCD34D',
-    borderRadius: 8,
+    borderColor: THEME.warningBorder,
+    borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 8,
     marginBottom: 12,
   },
   lockInfoText: {
-    color: '#92400E',
+    color: THEME.warningText,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   itemCard: {
-    backgroundColor: '#fff',
+    backgroundColor: THEME.card,
     padding: 12,
     marginBottom: 12,
-    borderRadius: 8,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: THEME.line,
+    ...PENAWARAN_SHADOW.softCard,
   },
   itemTitle: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: '700',
+    color: THEME.ink,
     marginBottom: 4,
   },
   itemDetail: {
     fontSize: 12,
-    color: '#666',
+    color: THEME.muted,
     marginBottom: 12,
   },
   formGroup: {
@@ -473,56 +531,69 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: '800',
+    color: THEME.muted,
     marginBottom: 6,
+    letterSpacing: 0.2,
   },
   buttonContainer: {
     flexDirection: 'row',
-    padding: 16,
-    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    backgroundColor: 'rgba(255,255,255,0.95)',
     borderTopWidth: 1,
-    borderTopColor: '#ddd',
+    borderTopColor: THEME.line,
     gap: 8,
   },
   button: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 6,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: '#e0e0e0',
+    backgroundColor: THEME.soft,
+    borderWidth: 1,
+    borderColor: THEME.line,
   },
   submitButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: THEME.primary,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
   },
   buttonText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
+    color: THEME.muted,
+  },
+  buttonTextPrimary: {
+    fontSize: 14,
+    fontWeight: '800',
     color: '#fff',
   },
   pickerButton: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 6,
-    paddingVertical: 8,
+    borderColor: THEME.line,
+    borderRadius: 12,
+    paddingVertical: 10,
     paddingHorizontal: 10,
-    backgroundColor: '#fff',
+    backgroundColor: THEME.soft,
     justifyContent: 'center',
   },
   pickerButtonText: {
     fontSize: 14,
-    color: '#333',
+    fontWeight: '700',
+    color: THEME.ink,
   },
   pickerButtonDisabled: {
-    backgroundColor: '#f3f4f6',
+    backgroundColor: 'rgba(15,23,42,0.06)',
   },
   helperText: {
     fontSize: 11,
-    color: '#B45309',
+    color: THEME.warningText,
     marginTop: 4,
+    fontWeight: '700',
   },
   modalOverlay: {
     flex: 1,
@@ -530,9 +601,9 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    backgroundColor: THEME.card,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     maxHeight: '70%',
     paddingBottom: 20,
   },
@@ -543,25 +614,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: THEME.line,
   },
   modalTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: '900',
+    color: THEME.ink,
   },
   modalClose: {
     fontSize: 20,
-    color: '#666',
+    color: THEME.muted,
   },
   modalOption: {
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: THEME.line,
   },
   modalOptionText: {
     fontSize: 14,
-    color: '#333',
+    fontWeight: '700',
+    color: THEME.ink,
   },
 });

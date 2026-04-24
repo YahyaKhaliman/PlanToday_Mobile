@@ -56,6 +56,32 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x android/gradlew
 
+      - name: Validate versionCode bump
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          LOCAL_VERSION_CODE=$(sed -n 's/.*versionCode \([0-9][0-9]*\).*/\1/p' android/app/build.gradle | head -n 1)
+          if [ -z "${LOCAL_VERSION_CODE}" ]; then
+            echo "::error::Unable to read local versionCode from android/app/build.gradle"
+            exit 1
+          fi
+
+          REMOTE_LATEST_URL="${{ secrets.VPS_BASE_DOWNLOAD_URL }}/latest.json"
+          REMOTE_VERSION_CODE=0
+
+          if curl -fsSL "${REMOTE_LATEST_URL}" -o /tmp/latest.json; then
+            REMOTE_VERSION_CODE=$(node -e "const fs=require('fs');try{const j=JSON.parse(fs.readFileSync('/tmp/latest.json','utf8'));process.stdout.write(String(Number(j.versionCode||0)));}catch(e){process.stdout.write('0');}")
+          fi
+
+          echo "Local versionCode=${LOCAL_VERSION_CODE}"
+          echo "Remote versionCode=${REMOTE_VERSION_CODE}"
+
+          if [ "${REMOTE_VERSION_CODE}" -gt 0 ] && [ "${LOCAL_VERSION_CODE}" -le "${REMOTE_VERSION_CODE}" ]; then
+            echo "::error::versionCode must be greater than current latest.json (local=${LOCAL_VERSION_CODE}, remote=${REMOTE_VERSION_CODE})."
+            exit 1
+          fi
+
       - name: Build release APK
         working-directory: android
         env:
@@ -63,7 +89,7 @@ jobs:
           MYAPP_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           MYAPP_UPLOAD_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           MYAPP_UPLOAD_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew assembleRelease
+        run: ./gradlew assembleRelease -PreactNativeArchitectures=armeabi-v7a,arm64-v8a,x86,x86_64
 
       - name: Prepare artifact and latest.json
         id: meta

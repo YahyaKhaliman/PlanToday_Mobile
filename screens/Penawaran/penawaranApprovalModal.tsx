@@ -10,6 +10,9 @@ import {
   Modal,
 } from 'react-native';
 import { requestApprovalPerubahan } from '../../services/penawaranApi';
+import { PENAWARAN_THEME } from './penawaranTheme';
+
+const THEME = PENAWARAN_THEME;
 
 interface PenawaranApprovalModalProps {
   visible: boolean;
@@ -130,26 +133,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modal: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: THEME.card,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: THEME.line,
     width: '85%',
     maxHeight: '80%',
-    paddingTop: 16,
+    paddingTop: 18,
   },
   header: {
     paddingHorizontal: 16,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
+    borderBottomColor: THEME.line,
   },
   title: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#333',
+    fontSize: 18,
+    fontWeight: '900',
+    color: THEME.ink,
   },
   subtitle: {
     fontSize: 12,
-    color: '#666',
+    color: THEME.muted,
+    fontWeight: '700',
     marginTop: 4,
   },
   content: {
@@ -157,23 +163,26 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: '800',
+    color: THEME.muted,
+    letterSpacing: 0.2,
     marginBottom: 8,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 6,
-    padding: 10,
+    borderColor: THEME.line,
+    borderRadius: 12,
+    padding: 12,
     fontSize: 14,
-    color: '#333',
+    color: THEME.ink,
+    fontWeight: '700',
+    backgroundColor: THEME.soft,
     textAlignVertical: 'top',
     marginBottom: 8,
   },
   hint: {
     fontSize: 11,
-    color: '#999',
+    color: THEME.muted,
     fontStyle: 'italic',
   },
   buttonContainer: {
@@ -184,20 +193,24 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 6,
+    paddingVertical: 12,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: '#e0e0e0',
+    backgroundColor: THEME.soft,
+    borderWidth: 1,
+    borderColor: THEME.line,
   },
   submitButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: THEME.primary,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
   },
   buttonText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '900',
     color: '#fff',
   },
 });

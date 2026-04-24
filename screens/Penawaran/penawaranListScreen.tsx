@@ -19,17 +19,13 @@ import {
   getPenawaranList,
   PenawaranListItem,
 } from '../../services/penawaranApi';
+import {
+  PENAWARAN_SHADOW,
+  PENAWARAN_STATUS_COLORS,
+  PENAWARAN_THEME,
+} from './penawaranTheme';
 
-const THEME = {
-  primary: '#4F46E5',
-  accent: '#06B6D4',
-  ink: '#0F172A',
-  muted: '#64748B',
-  card: '#FFFFFF',
-  line: 'rgba(15,23,42,0.08)',
-  bgTop: '#F7F9FF',
-  bgBottom: '#FFFFFF',
-};
+const THEME = PENAWARAN_THEME;
 
 type FilterStatus = 'ALL' | 'OPEN' | 'BATAL' | 'CLOSE';
 
@@ -73,12 +69,6 @@ const getCurrentMonth = () => {
   return { startDate: toYmd(start), endDate: toYmd(end) };
 };
 
-const statusColors: Record<string, string> = {
-  WAIT: '#D97706',
-  ACC: '#16A34A',
-  TOLAK: '#DC2626',
-};
-
 const normalizeApprovalState = (value?: string) =>
   String(value || '')
     .trim()
@@ -95,6 +85,9 @@ export default function PenawaranListScreen({ navigation }: any) {
   const [endDate, setEndDate] = useState(initialRange.endDate);
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
+
+  const startDateLabel = useMemo(() => formatDate(startDate), [startDate]);
+  const endDateLabel = useMemo(() => formatDate(endDate), [endDate]);
 
   const loadData = useCallback(
     async (isRefresh = false) => {
@@ -184,7 +177,7 @@ export default function PenawaranListScreen({ navigation }: any) {
 
   const renderItem = ({ item }: { item: PenawaranListItem }) => {
     const approvalState = normalizeApprovalState(item.approval_state);
-    const approvalColor = statusColors[approvalState] || THEME.muted;
+    const approvalColor = PENAWARAN_STATUS_COLORS[approvalState] || THEME.muted;
     const approvalLabel = approvalState || '-';
 
     return (
@@ -240,79 +233,88 @@ export default function PenawaranListScreen({ navigation }: any) {
       />
 
       <View style={styles.headerWrap}>
-        <View style={styles.headerTopRow}>
-          <Text style={styles.title}>Penawaran</Text>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => navigation.navigate('PenawaranCreate')}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.addButtonText}>+ Buat</Text>
-          </TouchableOpacity>
-        </View>
-        <Text style={styles.subtitle}>
-          Periode {startDate} s.d. {endDate}
-        </Text>
-
-        <View style={styles.dateRow}>
-          <TouchableOpacity
-            style={styles.dateChip}
-            onPress={() => setShowStartPicker(true)}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.dateChipLabel}>Mulai</Text>
-            <Text style={styles.dateChipValue}>{startDate}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.dateChip}
-            onPress={() => setShowEndPicker(true)}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.dateChipLabel}>Sampai</Text>
-            <Text style={styles.dateChipValue}>{endDate}</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.searchBox}>
-          <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Cari nomor/customer/perusahaan"
-            placeholderTextColor={THEME.muted}
-            style={styles.searchInput}
-          />
-          {search.trim() ? (
+        <View style={styles.headerCard}>
+          <View style={styles.headerTopRow}>
+            <Text style={styles.title}>Penawaran</Text>
             <TouchableOpacity
-              style={styles.clearSearchButton}
-              onPress={() => setSearch('')}
-              activeOpacity={0.8}
+              style={styles.addButton}
+              onPress={() => navigation.navigate('PenawaranCreate')}
+              activeOpacity={0.9}
             >
-              <Text style={styles.clearSearchButtonText}>x</Text>
+              <LinearGradient
+                colors={[THEME.primary, THEME.accent]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.addButtonGradient}
+              >
+                <Text style={styles.addButtonText}>+ Buat</Text>
+              </LinearGradient>
             </TouchableOpacity>
-          ) : null}
-        </View>
+          </View>
+          <Text style={styles.subtitle}>
+            Periode {startDateLabel} s.d. {endDateLabel}
+          </Text>
 
-        <View style={styles.filterRow}>
-          {(['ALL', 'OPEN', 'BATAL', 'CLOSE'] as FilterStatus[]).map(s => (
+          <View style={styles.dateRow}>
             <TouchableOpacity
-              key={s}
-              style={[
-                styles.filterChip,
-                status === s && styles.filterChipActive,
-              ]}
-              onPress={() => setStatus(s)}
+              style={styles.dateChip}
+              onPress={() => setShowStartPicker(true)}
               activeOpacity={0.85}
             >
-              <Text
-                style={[
-                  styles.filterChipText,
-                  status === s && styles.filterChipTextActive,
-                ]}
-              >
-                {s}
-              </Text>
+              <Text style={styles.dateChipLabel}>Mulai</Text>
+              <Text style={styles.dateChipValue}>{startDateLabel}</Text>
             </TouchableOpacity>
-          ))}
+            <TouchableOpacity
+              style={styles.dateChip}
+              onPress={() => setShowEndPicker(true)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.dateChipLabel}>Sampai</Text>
+              <Text style={styles.dateChipValue}>{endDateLabel}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.searchBox}>
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Cari nomor/customer/perusahaan"
+              placeholderTextColor={THEME.muted}
+              style={styles.searchInput}
+            />
+            {search.trim() ? (
+              <TouchableOpacity
+                style={styles.clearSearchButton}
+                onPress={() => setSearch('')}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.clearSearchButtonText}>x</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          <View style={styles.filterRow}>
+            {(['ALL', 'OPEN', 'BATAL', 'CLOSE'] as FilterStatus[]).map(s => (
+              <TouchableOpacity
+                key={s}
+                style={[
+                  styles.filterChip,
+                  status === s && styles.filterChipActive,
+                ]}
+                onPress={() => setStatus(s)}
+                activeOpacity={0.85}
+              >
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    status === s && styles.filterChipTextActive,
+                  ]}
+                >
+                  {s}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
       </View>
 
@@ -371,9 +373,17 @@ export default function PenawaranListScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   headerWrap: {
-    paddingHorizontal: 16,
-    paddingTop: 52,
-    paddingBottom: 10,
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'android' ? 44 : 8,
+    paddingBottom: 8,
+  },
+  headerCard: {
+    backgroundColor: THEME.card,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: THEME.line,
+    padding: 14,
+    ...PENAWARAN_SHADOW.card,
   },
   headerTopRow: {
     flexDirection: 'row',
@@ -383,24 +393,30 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontWeight: '800',
+    fontWeight: '900',
     color: THEME.ink,
   },
   addButton: {
-    backgroundColor: THEME.primary,
     borderRadius: 999,
-    paddingHorizontal: 12,
+    overflow: 'hidden',
+  },
+  addButtonGradient: {
+    borderRadius: 999,
+    paddingHorizontal: 13,
     paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
   },
   addButtonText: {
     color: '#FFF',
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '900',
   },
   subtitle: {
     marginTop: 4,
     fontSize: 12,
     color: THEME.muted,
+    fontWeight: '700',
   },
   dateRow: {
     marginTop: 10,
@@ -409,12 +425,12 @@ const styles = StyleSheet.create({
   },
   dateChip: {
     flex: 1,
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: THEME.line,
-    backgroundColor: '#FFF',
+    backgroundColor: THEME.soft,
     paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingVertical: 9,
   },
   dateChipLabel: {
     color: THEME.muted,
@@ -424,17 +440,17 @@ const styles = StyleSheet.create({
   dateChipValue: {
     color: THEME.ink,
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '800',
     marginTop: 2,
   },
   searchBox: {
     marginTop: 12,
-    backgroundColor: THEME.card,
-    borderRadius: 14,
+    backgroundColor: THEME.soft,
+    borderRadius: 15,
     borderWidth: 1,
     borderColor: THEME.line,
     paddingHorizontal: 12,
-    height: 44,
+    height: 46,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -443,6 +459,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: THEME.ink,
     fontSize: 14,
+    fontWeight: '700',
     padding: 0,
   },
   clearSearchButton: {
@@ -469,9 +486,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: THEME.line,
     paddingHorizontal: 12,
-    paddingVertical: 7,
+    paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: THEME.soft,
   },
   filterChipActive: {
     backgroundColor: 'rgba(79,70,229,0.14)',
@@ -479,23 +496,25 @@ const styles = StyleSheet.create({
   },
   filterChipText: {
     color: THEME.muted,
-    fontWeight: '700',
+    fontWeight: '800',
     fontSize: 12,
   },
   filterChipTextActive: {
     color: THEME.primary,
   },
   listContainer: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingBottom: 24,
+    paddingTop: 4,
     gap: 10,
   },
   card: {
     backgroundColor: THEME.card,
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 14,
     borderWidth: 1,
     borderColor: THEME.line,
+    ...PENAWARAN_SHADOW.softCard,
   },
   cardTopRow: {
     flexDirection: 'row',
@@ -511,6 +530,8 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.06)',
   },
   approvalBadgeText: {
     fontSize: 11,
@@ -520,7 +541,7 @@ const styles = StyleSheet.create({
   customer: {
     marginTop: 6,
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '800',
     color: THEME.ink,
   },
   metaText: {
