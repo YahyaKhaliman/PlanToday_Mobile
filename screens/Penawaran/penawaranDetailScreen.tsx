@@ -3,6 +3,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   PermissionsAndroid,
   Platform,
   StatusBar,
@@ -13,6 +14,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import LinearGradient from 'react-native-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import RNFS from 'react-native-fs';
 import {
@@ -69,6 +71,21 @@ const formatDate = (value?: string) => {
   }
 };
 
+const formatDateTimeDDMMYYYY = (value?: string) => {
+  if (!value) return '-';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mi = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+
+  return `${dd}/${mm}/${yyyy} ${hh}:${mi}:${ss}`;
+};
+
 const escapeHtml = (value?: string | number) =>
   String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -88,10 +105,33 @@ const normalizePdfPath = (value?: string | null) =>
     .trim()
     .replace(/^file:\/\//, '');
 
-const toShareUri = (filePath: string) =>
-  /^content:\/\//i.test(filePath) || /^file:\/\//i.test(filePath)
-    ? filePath
-    : `file://${filePath}`;
+const resolveImageMimeType = (value?: string) => {
+  const cleaned = String(value || '')
+    .split('?')[0]
+    .toLowerCase();
+  if (cleaned.endsWith('.png')) return 'image/png';
+  if (cleaned.endsWith('.webp')) return 'image/webp';
+  if (cleaned.endsWith('.gif')) return 'image/gif';
+  return 'image/jpeg';
+};
+
+const normalizeAssetPath = (value?: string | null) =>
+  String(value || '')
+    .trim()
+    .replace(/^file:\/\//i, '')
+    .replace(/^bundle-assets:\/\//i, '')
+    .replace(/^asset:\/+/i, '')
+    .replace(/^\/+/, '');
+
+const sleep = (ms: number) =>
+  new Promise(resolve => {
+    setTimeout(() => resolve(undefined), ms);
+  });
+
+type PdfTemplateKey =
+  | 'KENCANA_PRINT'
+  | 'JAYA_ABADI_MULIA'
+  | 'MADANI_PRODUCTION';
 
 const ensureLegacyAndroidWritePermission = async () => {
   if (Platform.OS !== 'android') return true;
@@ -134,6 +174,18 @@ const InfoRow = ({
 
 export default function PenawaranDetailScreen({ navigation, route }: any) {
   const nomor = String(route?.params?.nomor || '');
+  const insets = useSafeAreaInsets();
+  const pdfHeaderAssetUri = useMemo(
+    () => ({
+      KENCANA_PRINT:
+        Image.resolveAssetSource(require('../../utils/kp.jpg'))?.uri || '',
+      JAYA_ABADI_MULIA:
+        Image.resolveAssetSource(require('../../utils/jaya.jpg'))?.uri || '',
+      MADANI_PRODUCTION:
+        Image.resolveAssetSource(require('../../utils/madani.jpg'))?.uri || '',
+    }),
+    [],
+  );
 
   const [loading, setLoading] = useState(true);
   const [header, setHeader] = useState<PenawaranHeader | null>(null);
@@ -155,13 +207,54 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
 
     setLoading(true);
     try {
-      const [data, logs] = await Promise.all([
-        getPenawaranDetail(nomor),
+      const fetchDetailWithRetry = async () => {
+        let lastError: any;
+
+        for (let attempt = 0; attempt < 4; attempt += 1) {
+          try {
+            return await getPenawaranDetail(nomor);
+          } catch (error: any) {
+            lastError = error;
+            const status = error?.response?.status;
+            const message = String(error?.response?.data?.message || '')
+              .trim()
+              .toLowerCase();
+            const shouldRetry =
+              status === 404 &&
+              message.includes('tidak ditemukan') &&
+              attempt < 3;
+
+            if (!shouldRetry) {
+              throw error;
+            }
+
+            await sleep(500);
+          }
+        }
+
+        throw lastError;
+      };
+
+      const [detailResult, logsResult] = await Promise.allSettled([
+        fetchDetailWithRetry(),
         getPenawaranActivityLogs(nomor),
       ]);
+
+      if (detailResult.status === 'rejected') {
+        throw detailResult.reason;
+      }
+
+      const data = detailResult.value;
       setHeader(data?.header || null);
       setDetails(data?.details || []);
-      setActivityLogs(Array.isArray(logs) ? logs : []);
+
+      if (logsResult.status === 'fulfilled') {
+        setActivityLogs(
+          Array.isArray(logsResult.value) ? logsResult.value : [],
+        );
+      } else {
+        setActivityLogs([]);
+      }
     } catch (err: any) {
       Toast.show({
         type: 'glassError',
@@ -183,22 +276,107 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
     }, [loadDetail]),
   );
 
-  const title = useMemo(
-    () => header?.nomor || nomor || 'Detail Penawaran',
+  const displayNomor = useMemo(
+    () => header?.nomor || nomor || '-',
     [header?.nomor, nomor],
   );
 
-  const approvalState = normalizeApprovalState(header?.approval_state);
-  const approvalColor = PENAWARAN_STATUS_COLORS[approvalState] || THEME.muted;
-  const approvalLabel = approvalState || '-';
-  const isWaitingApproval = approvalState === 'WAIT';
-
-  const buildPdfHtml = useCallback(() => {
+  const nomorPermintaan = useMemo(() => {
     if (!header) return '';
 
-    const rows = details
-      .map(
-        (item, idx) => `
+    const source = header as PenawaranHeader & {
+      no_permintaan?: string;
+      nomor_permintaan?: string;
+      permintaan_no?: string;
+      minta?: string;
+    };
+
+    const candidates = [
+      source.no_permintaan,
+      source.nomor_permintaan,
+      source.permintaan_no,
+      source.minta,
+    ];
+
+    const found = candidates
+      .map(value => String(value || '').trim())
+      .find(Boolean);
+
+    return found || '';
+  }, [header]);
+
+  const approvalState = normalizeApprovalState(header?.approval_state);
+  const isWaitingApproval = approvalState === 'WAIT';
+
+  const resolvePdfTemplateKey = useCallback((companyName?: string) => {
+    const normalized = String(companyName || '')
+      .trim()
+      .toLowerCase();
+
+    if (
+      normalized.includes('jaya abadi') ||
+      normalized.includes('pt. jaya abadi mulia')
+    ) {
+      return 'JAYA_ABADI_MULIA' as PdfTemplateKey;
+    }
+
+    if (normalized.includes('madani')) {
+      return 'MADANI_PRODUCTION' as PdfTemplateKey;
+    }
+
+    if (normalized.includes('kencana')) {
+      return 'KENCANA_PRINT' as PdfTemplateKey;
+    }
+
+    return 'KENCANA_PRINT' as PdfTemplateKey;
+  }, []);
+
+  const resolvePdfImageSrc = useCallback(async (assetUri?: string) => {
+    const rawUri = String(assetUri || '').trim();
+    if (!rawUri) return '';
+
+    if (rawUri.startsWith('data:') || /^https?:\/\//i.test(rawUri)) {
+      return rawUri;
+    }
+
+    const normalizedPath = normalizePdfPath(rawUri);
+    const mimeType = resolveImageMimeType(rawUri);
+
+    try {
+      if (normalizedPath && (await RNFS.exists(normalizedPath))) {
+        const base64 = await RNFS.readFile(normalizedPath, 'base64');
+        if (base64) {
+          return `data:${mimeType};base64,${base64}`;
+        }
+      }
+    } catch {
+      // fallback to raw uri when local file cannot be converted.
+    }
+
+    if (Platform.OS === 'android') {
+      const assetPath = normalizeAssetPath(rawUri);
+      if (assetPath) {
+        try {
+          const base64 = await RNFS.readFileAssets(assetPath, 'base64');
+          if (base64) {
+            return `data:${mimeType};base64,${base64}`;
+          }
+        } catch {
+          // fallback to raw uri when bundled asset cannot be converted.
+        }
+      }
+    }
+
+    return rawUri;
+  }, []);
+
+  const buildKencanaPrintPdfHtml = useCallback(
+    (headerImageSrc?: string) => {
+      if (!header) return '';
+
+      const rows = details
+        .map(
+          (item, idx) => `
           <tr>
             <td class="num">${idx + 1}.</td>
             <td>${escapeHtml(item.nama_barang || '-')}</td>
@@ -210,21 +388,22 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
             <td class="num">${escapeHtml(formatNumber(item.total || 0))}</td>
           </tr>
         `,
-      )
-      .join('');
+        )
+        .join('');
 
-    const totalNominal = details.reduce(
-      (sum, item) => sum + Number(item.total || 0),
-      0,
-    );
+      const totalNominal = details.reduce(
+        (sum, item) => sum + Number(item.total || 0),
+        0,
+      );
 
-    const upLabel = String(header.up || '').trim() || header.customer || '-';
-    const ttdName = String(header.ttd || '').trim() || 'Marketing';
-    const ttdJabatan =
-      String(header.ttd_jabatan || '').trim() || 'Supervisor Office Marketing';
-    const note = String(header.note || header.keterangan || '').trim() || '-';
+      const upLabel = String(header.up || '').trim() || header.customer || '-';
+      const ttdName = String(header.ttd || '').trim() || 'Marketing';
+      const ttdJabatan =
+        String(header.ttd_jabatan || '').trim() ||
+        'Supervisor Office Marketing';
+      const note = String(header.note || header.note || '').trim() || '-';
 
-    return `
+      return `
       <html>
         <head>
           <meta charset="utf-8" />
@@ -236,6 +415,16 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
             .top-left, .top-right { display: table-cell; vertical-align: top; }
             .top-left { width: 46%; }
             .top-right { width: 54%; padding-left: 10px; }
+            .logo-wrap { width: 100%; padding-top: 2px; }
+            .logo-img {
+              width: 96%;
+              max-width: 280px;
+              max-height: 92px;
+              height: auto;
+              object-fit: contain;
+              object-position: left top;
+              display: block;
+            }
             .brand { font-size: 46px; font-weight: 700; color: #D90429; line-height: 1; letter-spacing: 0.5px; }
             .tagline { margin-top: 2px; font-style: italic; font-size: 15px; font-weight: 600; }
             .svc-title { font-size: 12px; font-weight: 700; margin-bottom: 4px; }
@@ -292,9 +481,14 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
         <body>
           <div class="wrap">
             <div class="top">
-              <div class="top-left">
-                <div class="brand">Kencana Print</div>
-                <div class="tagline">Semakin Nyala Semakin Nyata</div>
+                <div class="top-left">
+                  ${
+                    headerImageSrc
+                      ? `<div class="logo-wrap"><img class="logo-img" src="${escapeHtml(
+                          headerImageSrc,
+                        )}" alt="Kencana Print" /></div>`
+                      : '<div class="brand">Kencana Print</div><div class="tagline">Semakin Nyala Semakin Nyata</div>'
+                  }
               </div>
               <div class="top-right">
                 <div class="svc-title">OUR SERVICES :</div>
@@ -328,8 +522,8 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
                   <tr><td class="label">No</td><td class="sep">:</td><td>${escapeHtml(
                     header.nomor || nomor,
                   )}</td></tr>
-                  <tr><td class="label">Keterangan</td><td class="sep">:</td><td>${escapeHtml(
-                    header.keterangan || '-',
+                  <tr><td class="label">note</td><td class="sep">:</td><td>${escapeHtml(
+                    header.note || '-',
                   )}</td></tr>
                 </table>
               </div>
@@ -391,9 +585,354 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
         </body>
       </html>
     `;
-  }, [details, header, nomor]);
+    },
+    [details, header, nomor],
+  );
 
-  const handleSaveAndShareToWhatsapp = useCallback(async () => {
+  const buildJayaAbadiPdfHtml = useCallback(
+    (headerImageSrc?: string) => {
+      if (!header) return '';
+
+      const rows = details
+        .map(
+          (item, idx) => `
+          <tr>
+            <td>${idx + 1}.</td>
+            <td>${escapeHtml(item.nama_barang || '-')}</td>
+            <td>${escapeHtml(item.bahan || '-')}</td>
+            <td>${escapeHtml(item.ukuran || '-')}</td>
+            <td>${escapeHtml(item.satuan || '-')}</td>
+            <td class="num">${escapeHtml(formatNumber(item.qty || 0))}</td>
+            <td class="num">${escapeHtml(formatNumber(item.harga || 0))}</td>
+            <td class="num">${escapeHtml(formatNumber(item.total || 0))}</td>
+          </tr>
+        `,
+        )
+        .join('');
+
+      const totalNominal = details.reduce(
+        (sum, item) => sum + Number(item.total || 0),
+        0,
+      );
+
+      const dateLine = `Surakarta, ${escapeHtml(formatDate(header.tanggal))}`;
+      const upLabel = String(header.up || '').trim() || '-';
+      const ttdName = String(header.ttd || '').trim() || '-';
+      const ttdJabatan = String(header.ttd_jabatan || '').trim() || '-';
+      const note = String(header.note || '').trim() || '-';
+
+      return `
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <style>
+            @page { size: A4; margin: 14mm; }
+            body { font-family: Arial, sans-serif; color: #111; font-size: 11px; }
+            .head { text-align: center; margin-bottom: 8px; }
+            .logo-wrap { text-align: center; margin-bottom: 4px; }
+            .logo-img { width: 100%; max-width: 360px; max-height: 95px; object-fit: contain; display: inline-block; }
+            .brand { font-size: 42px; font-weight: 800; }
+            .brand-red { color: #d80f16; }
+            .tagline { font-size: 12px; color: #b11f1f; font-style: italic; margin-top: 2px; }
+            .date { text-align: right; margin: 12px 0 8px; font-size: 12px; font-weight: 700; }
+            .to { margin-top: 2px; font-size: 12px; line-height: 1.5; }
+            .meta { margin-top: 10px; }
+            .meta-row { font-size: 12px; margin-bottom: 2px; }
+            .label { display: inline-block; width: 116px; font-weight: 700; }
+            .intro { margin-top: 10px; font-size: 12px; text-align: justify; line-height: 1.45; }
+            table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+            th, td { border: 1px solid #333; padding: 4px; font-size: 11px; vertical-align: top; }
+            th { text-align: left; }
+            .num { text-align: right; }
+            .note-tax { margin-top: 6px; font-style: italic; font-size: 12px; }
+            .closing { margin-top: 10px; font-size: 12px; text-align: justify; }
+            .note-title { margin-top: 8px; font-size: 12px; }
+            .note-box { background: #fff200; min-height: 30px; padding: 6px; font-size: 11px; }
+            .sign { margin-top: 10px; width: 100%; display: table; }
+            .sign-left, .sign-right { display: table-cell; vertical-align: top; }
+            .sign-left { width: 70%; }
+            .sign-right { width: 30%; text-align: center; }
+            .sign-title { font-size: 12px; margin-bottom: 68px; }
+            .sign-name { font-size: 12px; border-bottom: 1px solid #111; display: inline-block; padding: 0 8px 2px; }
+            .sign-role { font-size: 11px; margin-top: 2px; }
+          </style>
+        </head>
+        <body>
+          <div class="head">
+            ${
+              headerImageSrc
+                ? `<div class="logo-wrap"><img class="logo-img" src="${escapeHtml(
+                    headerImageSrc,
+                  )}" alt="PT. Jaya Abadi Mulia" /></div>`
+                : '<div class="brand"><span class="brand-red">PT.</span> Jaya Abadi Mulia</div><div class="tagline">Your Best Solutions Partner</div>'
+            }
+          </div>
+          <div class="date">${dateLine}</div>
+
+          <div class="to">
+            <div>Kepada Yth.</div>
+            <div><b>${escapeHtml(upLabel)}</b></div>
+            <div><b>${escapeHtml(header.customer || '-')}</b></div>
+            <div>${escapeHtml(header.customer_alamat || '-')}</div>
+            <div>${escapeHtml(header.customer_kota || '-')}</div>
+          </div>
+
+          <div class="meta">
+            <div class="meta-row"><span class="label">Nomor</span>: ${escapeHtml(
+              header.nomor || nomor,
+            )}</div>
+            <div class="meta-row"><span class="label">Perihal</span>: Surat Penawaran Harga</div>
+            <div class="meta-row"><span class="label">Keterangan</span>: </div>
+          </div>
+
+          <div class="intro">
+            Dengan Hormat,<br/>
+            Bersama dengan surat ini kami mengajukan penawaran harga untuk item-item barang tersebut di bawah ini.
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>No</th><th>Nama</th><th>Bahan</th><th>Ukuran</th><th>Satuan</th><th class="num">Qty</th><th class="num">Harga</th><th class="num">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${
+                rows ||
+                '<tr><td colspan="8" style="text-align:center;">Tidak ada detail item.</td></tr>'
+              }
+              <tr>
+                <td colspan="7" class="num"><b>Grand Total</b></td>
+                <td class="num"><b>${escapeHtml(
+                  formatNumber(totalNominal || header.nominal || 0),
+                )}</b></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="note-tax">* Note : Harga belum termasuk PPn 11%</div>
+          <div class="closing">Demikian surat penawaran ini kami sampaikan. Atas perhatian dan kerja samanya kami ucapkan terima kasih.</div>
+          <div class="note-title">Note :</div>
+          <div class="note-box">${escapeHtml(note)}</div>
+
+          <div class="sign">
+            <div class="sign-left"></div>
+            <div class="sign-right">
+              <div class="sign-title">Hormat Kami,</div>
+              <div class="sign-name">${escapeHtml(ttdName)}</div>
+              <div class="sign-role">${escapeHtml(ttdJabatan)}</div>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+    },
+    [details, header, nomor],
+  );
+
+  const buildMadaniPdfHtml = useCallback(
+    (headerImageSrc?: string) => {
+      if (!header) return '';
+
+      const rows = details
+        .map(
+          (item, idx) => `
+          <tr>
+            <td>${idx + 1}.</td>
+            <td>${escapeHtml(item.nama_barang || '-')}</td>
+            <td>${escapeHtml(item.bahan || '-')}</td>
+            <td>${escapeHtml(item.ukuran || '-')}</td>
+            <td>${escapeHtml(item.satuan || '-')}</td>
+            <td class="num">${escapeHtml(formatNumber(item.qty || 0))}</td>
+            <td class="num">${escapeHtml(formatNumber(item.harga || 0))}</td>
+            <td class="num">${escapeHtml(formatNumber(item.total || 0))}</td>
+          </tr>
+        `,
+        )
+        .join('');
+
+      const totalNominal = details.reduce(
+        (sum, item) => sum + Number(item.total || 0),
+        0,
+      );
+
+      const upLabel = String(header.up || '').trim() || '-';
+      const ttdName = String(header.ttd || '').trim() || '-';
+      const ttdJabatan = String(header.ttd_jabatan || '').trim() || '-';
+      const note = String(header.note || '').trim() || '-';
+
+      return `
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <style>
+            @page { size: A4; margin: 14mm; }
+            body { font-family: Arial, sans-serif; color: #111; font-size: 11px; }
+            .top { display: table; width: 100%; margin-bottom: 8px; }
+            .top-left, .top-right { display: table-cell; vertical-align: top; }
+            .top-left { width: 46%; }
+            .top-right { width: 54%; padding-left: 10px; }
+            .logo { width: 100%; max-width: 320px; max-height: 90px; object-fit: contain; border: 1px solid #999; }
+            .brand { font-size: 17px; font-weight: 700; margin-top: 4px; }
+            .svc-title { font-size: 12px; font-weight: 700; }
+            .svc-list { margin: 4px 0 0; padding-left: 0; list-style: none; }
+            .svc-list li { margin: 2px 0; font-size: 11px; }
+            .svc-list li::before { content: '- '; }
+            .company-line { font-size: 12px; margin-top: 2px; }
+            .meta-wrap { display: table; width: 100%; margin-top: 8px; }
+            .meta-left, .meta-right { display: table-cell; vertical-align: top; }
+            .meta-left { width: 58%; border: 1px solid #333; padding: 6px; }
+            .meta-right { width: 42%; padding-left: 12px; }
+            .meta-right-row { font-size: 12px; margin-bottom: 3px; }
+            .label { display: inline-block; width: 72px; }
+            .intro { margin-top: 10px; font-size: 12px; text-align: justify; }
+            table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+            th, td { border: 1px solid #333; padding: 4px; font-size: 11px; }
+            th { text-align: left; }
+            .num { text-align: right; }
+            .note-tax { margin-top: 6px; font-style: italic; font-size: 12px; }
+            .closing { margin-top: 10px; font-size: 12px; text-align: justify; }
+            .note-title { margin-top: 8px; font-size: 12px; }
+            .note-box { background: #fff200; min-height: 30px; padding: 6px; font-size: 11px; }
+            .sign { margin-top: 10px; width: 100%; display: table; }
+            .sign-left, .sign-right { display: table-cell; vertical-align: top; }
+            .sign-left { width: 70%; }
+            .sign-right { width: 30%; text-align: center; }
+            .sign-title { font-size: 12px; margin-bottom: 68px; }
+            .sign-name { font-size: 12px; border-bottom: 1px solid #111; display: inline-block; padding: 0 8px 2px; }
+            .sign-role { font-size: 11px; margin-top: 2px; }
+          </style>
+        </head>
+        <body>
+          <div class="top">
+            <div class="top-left">
+              ${
+                headerImageSrc
+                  ? `<img class="logo" src="${escapeHtml(
+                      headerImageSrc,
+                    )}" alt="Company logo" />`
+                  : '<div class="brand">PT. Madani Production</div>'
+              }
+              <div class="brand">PT.Madani Production</div>
+              <div class="company-line">${escapeHtml(
+                header.perusahaan || '-',
+              )}</div>
+              <div class="company-line">${escapeHtml(
+                header.customer_alamat || '-',
+              )}</div>
+            </div>
+            <div class="top-right">
+              <div class="svc-title">OUR SERVICES :</div>
+              <ul class="svc-list">
+                <li>GARMENT (T-SHIRT, POLO SHIRT, KEMEJA, WEARPACK, Etc).</li>
+                <li>MANUAL PRINTING (SPANDUK/UMBUL KAIN).</li>
+                <li>DIGITAL PRINTING (X BANNER, ROLL BANNER, FLEXI, ALBATROS, TENDA, STICKER, Etc).</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="meta-wrap">
+            <div class="meta-left">
+              <div>Kepada YTH</div>
+              <div><b>${escapeHtml(header.customer || '-')}</b></div>
+              <div>${escapeHtml(header.customer_alamat || '-')}</div>
+              <div>${escapeHtml(header.customer_kota || '-')}</div>
+              <div style="margin-top:4px;">Up. <b>${escapeHtml(
+                upLabel,
+              )}</b></div>
+            </div>
+            <div class="meta-right">
+              <div class="meta-right-row"><span class="label">Tanggal</span>: ${escapeHtml(
+                formatDate(header.tanggal),
+              )}</div>
+              <div class="meta-right-row"><span class="label">Perihal</span>: Penawaran Harga</div>
+              <div class="meta-right-row"><span class="label">No</span>: ${escapeHtml(
+                header.nomor || nomor,
+              )}</div>
+              <div class="meta-right-row"><span class="label">Keterangan</span>: </div>
+            </div>
+          </div>
+
+          <div class="intro">
+            Dengan Hormat,<br/>
+            Bersama dengan surat ini kami perusahaan yang bergerak di garment, manual printing dan digital printing akan mengajukan penawaran harga untuk item-item barang tersebut di bawah ini.
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>No</th><th>Nama</th><th>Bahan</th><th>Ukuran</th><th>Satuan</th><th class="num">Qty</th><th class="num">Harga</th><th class="num">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${
+                rows ||
+                '<tr><td colspan="8" style="text-align:center;">Tidak ada detail item.</td></tr>'
+              }
+              <tr>
+                <td colspan="7" class="num"><b>Grand Total</b></td>
+                <td class="num"><b>${escapeHtml(
+                  formatNumber(totalNominal || header.nominal || 0),
+                )}</b></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="note-tax">* Note : Harga belum termasuk PPN 11%</div>
+          <div class="closing">Demikian penawaran ini kami ajukan. Atas perhatian dan kerja samanya kami ucapkan terima kasih.</div>
+          <div class="note-title">Note :</div>
+          <div class="note-box">${escapeHtml(note)}</div>
+
+          <div class="sign">
+            <div class="sign-left"></div>
+            <div class="sign-right">
+              <div class="sign-title">Hormat Kami,</div>
+              <div class="sign-name">${escapeHtml(ttdName)}</div>
+              <div class="sign-role">${escapeHtml(ttdJabatan)}</div>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+    },
+    [details, header, nomor],
+  );
+
+  const buildPdfHtml = useCallback(
+    (headerImageByTemplate: Record<PdfTemplateKey, string>) => {
+      if (!header) return '';
+
+      const templateKey = resolvePdfTemplateKey(header.perusahaan);
+
+      switch (templateKey) {
+        case 'KENCANA_PRINT':
+          return buildKencanaPrintPdfHtml(
+            headerImageByTemplate.KENCANA_PRINT || '',
+          );
+        case 'JAYA_ABADI_MULIA':
+          return buildJayaAbadiPdfHtml(
+            headerImageByTemplate.JAYA_ABADI_MULIA || '',
+          );
+        case 'MADANI_PRODUCTION':
+          return buildMadaniPdfHtml(
+            headerImageByTemplate.MADANI_PRODUCTION || '',
+          );
+        default:
+          return buildKencanaPrintPdfHtml(
+            headerImageByTemplate.KENCANA_PRINT || '',
+          );
+      }
+    },
+    [
+      buildJayaAbadiPdfHtml,
+      buildKencanaPrintPdfHtml,
+      buildMadaniPdfHtml,
+      header,
+      resolvePdfTemplateKey,
+    ],
+  );
+
+  const handleExportPdf = useCallback(async () => {
     if (!header) return;
 
     setExportingPdf(true);
@@ -402,11 +941,24 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
 
       const safeNomor = toSafeFileName(header.nomor || nomor);
       const fileName = `Penawaran_${safeNomor}_${Date.now()}`;
-      const html = buildPdfHtml();
+      const [kencanaHeaderSrc, jayaHeaderSrc, madaniHeaderSrc] =
+        await Promise.all([
+          resolvePdfImageSrc(pdfHeaderAssetUri.KENCANA_PRINT),
+          resolvePdfImageSrc(pdfHeaderAssetUri.JAYA_ABADI_MULIA),
+          resolvePdfImageSrc(pdfHeaderAssetUri.MADANI_PRODUCTION),
+        ]);
 
-      // Android: use logical directory name (not absolute path) to avoid invalid mixed paths
+      const html = buildPdfHtml({
+        KENCANA_PRINT: kencanaHeaderSrc,
+        JAYA_ABADI_MULIA: jayaHeaderSrc,
+        MADANI_PRODUCTION: madaniHeaderSrc,
+      });
+
+      // Android: use logical folder name. iOS: absolute path is supported.
       const directory =
-        Platform.OS === 'android' ? 'PlanTodayPDF' : RNFS.DocumentDirectoryPath;
+        Platform.OS === 'android'
+          ? 'PlanTodayTempPDF'
+          : RNFS.TemporaryDirectoryPath;
 
       console.log('[PDF] Generate start:', { os: Platform.OS, directory });
 
@@ -439,12 +991,13 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
       }
 
       let finalFilePath = filePath;
+      let savedLocationLabel = 'penyimpanan perangkat';
 
       if (Platform.OS === 'android') {
         const hasLegacyPermission = await ensureLegacyAndroidWritePermission();
         if (!hasLegacyPermission) {
           throw new Error(
-            'Izin penyimpanan ditolak. PDF tidak bisa disimpan ke Download.',
+            'Izin penyimpanan ditolak. PDF tidak bisa disimpan ke folder Download.',
           );
         }
 
@@ -466,6 +1019,7 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
             typeof mediaUri === 'string' && mediaUri.trim()
               ? mediaUri
               : filePath;
+          savedLocationLabel = 'Download/PlanTodayPDF';
         } else {
           const downloadDir = RNFS.DownloadDirectoryPath;
           const targetDir = `${downloadDir}/PlanTodayPDF`;
@@ -474,64 +1028,42 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
           await RNFS.mkdir(targetDir);
           await RNFS.copyFile(filePath, targetPath);
           finalFilePath = targetPath;
+          savedLocationLabel = targetDir;
         }
 
         console.log('[PDF] Android final saved path:', finalFilePath);
+      } else {
+        const targetDir = `${RNFS.DocumentDirectoryPath}/PlanTodayPDF`;
+        const targetPath = `${targetDir}/${fileName}.pdf`;
+        await RNFS.mkdir(targetDir);
+        await RNFS.copyFile(filePath, targetPath);
+        finalFilePath = targetPath;
+        savedLocationLabel = targetDir;
       }
 
-      const fileUrl = toShareUri(finalFilePath);
-      console.log('[PDF] File ready:', { filePath: finalFilePath, fileUrl });
-
-      const RNShare = require('react-native-share');
-      const shareInstance =
-        typeof RNShare.default?.open === 'function' ? RNShare.default : RNShare;
-
-      try {
-        await shareInstance.open({
-          url: fileUrl,
-          filename: `${fileName}.pdf`,
-          type: 'application/pdf',
-          failOnCancel: false,
-          showAppsToView: true,
-        });
-      } catch (primaryShareError: any) {
-        console.warn('[PDF] Share primary failed, trying fallback:', {
-          message: primaryShareError?.message,
-        });
-
-        try {
-          await shareInstance.open({
-            urls: [fileUrl],
-            type: 'application/pdf',
-            failOnCancel: false,
-          });
-        } catch (fallbackShareError: any) {
-          console.warn('[PDF] Share fallback failed:', {
-            message: fallbackShareError?.message,
-          });
-          throw fallbackShareError;
-        }
-      }
+      console.log('[PDF] File ready:', {
+        filePath: finalFilePath,
+        savedLocationLabel,
+      });
 
       Toast.show({
         type: 'glassSuccess',
         text1: 'Berhasil',
-        text2:
-          Platform.OS === 'android'
-            ? 'PDF tersimpan di Download dan siap dibagikan.'
-            : 'PDF siap dibagikan.',
+        text2: `PDF tersimpan di ${savedLocationLabel}`,
       });
     } catch (err: any) {
       console.error('[PDF] Error:', err);
       Toast.show({
         type: 'glassError',
         text1: 'Gagal export PDF',
-        text2: err?.message || 'Coba lagi atau hubungi support.',
+        text2:
+          err?.message ||
+          'Terjadi kesalahan saat menyimpan PDF ke penyimpanan perangkat.',
       });
     } finally {
       setExportingPdf(false);
     }
-  }, [buildPdfHtml, header, nomor]);
+  }, [buildPdfHtml, header, nomor, pdfHeaderAssetUri, resolvePdfImageSrc]);
 
   return (
     <LinearGradient
@@ -553,52 +1085,14 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
         >
           <Text style={styles.backBtnText}>Kembali</Text>
         </TouchableOpacity>
-        <Text style={styles.title} numberOfLines={1}>
-          {title}
-        </Text>
-      </View>
-
-      {!loading && header && (
-        <View style={styles.actionBar}>
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              styles.actionButtonPrimary,
-              exportingPdf && styles.actionButtonDisabled,
-            ]}
-            onPress={handleSaveAndShareToWhatsapp}
-            disabled={exportingPdf}
-          >
-            <Text style={styles.actionButtonTextPrimary}>
-              {exportingPdf ? 'Export PDF...' : 'Simpan + Share WA'}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              styles.actionButtonSoft,
-              isWaitingApproval && styles.actionButtonDisabled,
-            ]}
-            onPress={() =>
-              navigation.navigate('PenawaranStatus', { nomor: header.nomor })
-            }
-            disabled={isWaitingApproval}
-          >
-            <Text style={styles.actionButtonTextSoft}>Ubah Status</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.actionButton,
-              styles.actionButtonSoft,
-              isWaitingApproval && styles.actionButtonDisabled,
-            ]}
-            onPress={() => setApprovalModalVisible(true)}
-            disabled={isWaitingApproval}
-          >
-            <Text style={styles.actionButtonTextSoft}>Ajukan Perubahan</Text>
-          </TouchableOpacity>
+        <View style={styles.titleWrap}>
+          <Text style={styles.title}>Detail Penawaran</Text>
+          <Text style={styles.subtitle} numberOfLines={1}>
+            {displayNomor}
+          </Text>
         </View>
-      )}
+        <View style={styles.headerSpacer} />
+      </View>
 
       {loading ? (
         <View style={styles.loadingWrap}>
@@ -613,41 +1107,35 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
         <FlatList
           data={details}
           keyExtractor={(item, idx) => `${item.id}-${idx}`}
-          contentContainerStyle={styles.listContainer}
+          contentContainerStyle={[
+            styles.listContainer,
+            { paddingBottom: 120 + insets.bottom },
+          ]}
           ListHeaderComponent={
             <View style={styles.sectionCard}>
               <Text style={styles.sectionTitle}>Informasi Header</Text>
               <InfoRow label="Tanggal" value={formatDate(header.tanggal)} />
+              {!!nomorPermintaan && (
+                <InfoRow label="No. Permintaan" value={nomorPermintaan} />
+              )}
               <InfoRow label="Customer" value={header.customer} />
               <InfoRow label="Perusahaan" value={header.perusahaan} />
               <InfoRow label="Sales" value={header.sales} />
               <InfoRow label="Tipe" value={header.tipe} />
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Status Approval</Text>
-                <View
-                  style={[
-                    styles.approvalBadge,
-                    { backgroundColor: `${approvalColor}1A` },
-                  ]}
-                >
-                  <Text
-                    style={[styles.approvalBadgeText, { color: approvalColor }]}
-                  >
-                    {approvalLabel}
-                  </Text>
-                </View>
+              <InfoRow label="UP" value={header.up} />
+              <InfoRow label="TTD" value={header.ttd} />
+              <View style={styles.noteBlock}>
+                <Text style={styles.noteLabel}>Note</Text>
+                <Text style={styles.noteText}>{header.note || '-'}</Text>
               </View>
               <InfoRow label="Nominal" value={formatCurrency(header.nominal)} />
-              <InfoRow label="Keterangan" value={header.keterangan} />
             </View>
           }
           ListFooterComponent={
-            <View style={styles.sectionCard}>
-              <Text style={styles.sectionTitle}>Activity Log</Text>
-              {activityLogs.length === 0 ? (
-                <Text style={styles.emptyText}>Belum ada activity log.</Text>
-              ) : (
-                activityLogs.map((log, idx) => {
+            activityLogs.length > 0 ? (
+              <View style={styles.sectionCard}>
+                <Text style={styles.sectionTitle}>Activity Log</Text>
+                {activityLogs.map((log, idx) => {
                   const rawState = normalizeApprovalState(log.approval_state);
                   const stateLabel = rawState || '-';
                   const stateColor =
@@ -683,16 +1171,17 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
                         )}
                       </View>
                       <Text style={styles.logMeta}>
-                        {log.created_at || '-'} • {log.user || '-'}
+                        {formatDateTimeDDMMYYYY(log.created_at)} •{' '}
+                        {log.user || '-'}
                       </Text>
-                      {!!log.keterangan && (
-                        <Text style={styles.logText}>{log.keterangan}</Text>
+                      {!!log.note && (
+                        <Text style={styles.logText}>{log.note}</Text>
                       )}
                     </View>
                   );
-                })
-              )}
-            </View>
+                })}
+              </View>
+            ) : null
           }
           renderItem={({ item, index }) => (
             <View style={styles.itemCard}>
@@ -736,6 +1225,65 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
         onClose={() => setApprovalModalVisible(false)}
         onSuccess={() => loadDetail()}
       />
+
+      {!loading && header && (
+        <View
+          style={[
+            styles.bottomAction,
+            { paddingBottom: Math.max(insets.bottom, 12) },
+          ]}
+        >
+          <TouchableOpacity
+            style={[
+              styles.actionBtn,
+              styles.actionBtnFull,
+              styles.actionBtnPrimary,
+              exportingPdf && styles.actionButtonDisabled,
+            ]}
+            onPress={handleExportPdf}
+            disabled={exportingPdf}
+            activeOpacity={0.9}
+          >
+            <Text style={styles.bottomActionText}>
+              {exportingPdf ? 'Export PDF...' : 'Eksport PDF'}
+            </Text>
+          </TouchableOpacity>
+
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={[
+                styles.actionBtn,
+                styles.actionBtnSoft,
+                isWaitingApproval && styles.actionButtonDisabled,
+              ]}
+              onPress={() =>
+                navigation.navigate('PenawaranStatus', { nomor: header.nomor })
+              }
+              disabled={isWaitingApproval}
+              activeOpacity={0.9}
+            >
+              <Text style={[styles.bottomActionText, { color: THEME.primary }]}>
+                Ubah Status
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.actionBtn,
+                styles.actionBtnSoft,
+                isWaitingApproval && styles.actionButtonDisabled,
+              ]}
+              onPress={() => setApprovalModalVisible(true)}
+              disabled={isWaitingApproval}
+              activeOpacity={0.9}
+            >
+              <Text style={[styles.bottomActionText, { color: THEME.primary }]}>
+                Ajukan Perubahan
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </LinearGradient>
   );
 }
@@ -747,6 +1295,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 12,
     paddingBottom: 8,
   },
@@ -765,46 +1314,25 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   title: {
-    flex: 1,
     color: THEME.ink,
     fontWeight: '900',
-    fontSize: 18,
+    fontSize: 17,
+    textAlign: 'center',
   },
-  actionBar: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  actionButton: {
-    minWidth: 110,
-    flexGrow: 1,
-    borderRadius: 14,
-    paddingVertical: 11,
-    paddingHorizontal: 12,
-    justifyContent: 'center',
+  titleWrap: {
+    flex: 1,
+    paddingTop: 2,
     alignItems: 'center',
   },
-  actionButtonPrimary: {
-    backgroundColor: THEME.primary,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
-  },
-  actionButtonSoft: {
-    backgroundColor: THEME.soft,
-    borderWidth: 1,
-    borderColor: THEME.line,
-  },
-  actionButtonTextPrimary: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  actionButtonTextSoft: {
-    color: THEME.primary,
-    fontSize: 12,
+  subtitle: {
+    marginTop: 1,
+    color: THEME.muted,
     fontWeight: '700',
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  headerSpacer: {
+    width: 74,
   },
   actionButtonDisabled: {
     opacity: 0.55,
@@ -821,7 +1349,7 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     paddingHorizontal: 20,
-    paddingBottom: 24,
+    paddingBottom: 120,
     paddingTop: 2,
     gap: 10,
   },
@@ -857,6 +1385,27 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     flex: 1,
     textAlign: 'right',
+  },
+  noteBlock: {
+    marginTop: 4,
+    marginBottom: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(79,70,229,0.22)',
+    backgroundColor: 'rgba(79,70,229,0.06)',
+    padding: 10,
+  },
+  noteLabel: {
+    color: THEME.primary,
+    fontSize: 11,
+    fontWeight: '900',
+    marginBottom: 4,
+  },
+  noteText: {
+    color: THEME.ink,
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '700',
   },
   approvalBadge: {
     borderRadius: 999,
@@ -898,7 +1447,7 @@ const styles = StyleSheet.create({
   },
   itemMeta: {
     marginTop: 4,
-    color: THEME.muted,
+    color: THEME.ink,
     fontSize: 12,
   },
   itemTotal: {
@@ -940,11 +1489,57 @@ const styles = StyleSheet.create({
   logMeta: {
     marginTop: 2,
     fontSize: 11,
-    color: THEME.muted,
+    color: THEME.ink,
+    fontWeight: 500,
   },
   logText: {
     marginTop: 4,
     fontSize: 12,
     color: THEME.ink,
+  },
+  bottomAction: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 10,
+    backgroundColor: THEME.card,
+    borderTopWidth: 1,
+    borderTopColor: THEME.line,
+    gap: 8,
+  },
+  actionRow: {
+    width: '100%',
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionBtn: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  actionBtnFull: {
+    width: '100%',
+    flex: 0,
+  },
+  actionBtnPrimary: {
+    backgroundColor: THEME.primary,
+    borderColor: 'rgba(79,70,229,0.18)',
+  },
+  actionBtnSoft: {
+    backgroundColor: 'rgba(79,70,229,0.08)',
+    borderColor: 'rgba(79,70,229,0.18)',
+  },
+  bottomActionText: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontSize: 11,
+    letterSpacing: 0.1,
   },
 });

@@ -60,17 +60,20 @@ export const checkAppUpdate = async (): Promise<AppUpdateManifest | null> => {
 
 export const downloadUpdateApk = async (
   manifest: AppUpdateManifest,
+  onProgress?: (percent: number) => void,
 ): Promise<boolean> => {
   if (Platform.OS !== 'android') {
     return false;
   }
 
   try {
+    onProgress?.(0);
+
     const fileName =
       manifest.apkUrl.split('/').pop() ||
       `PlanToday-v${manifest.versionName}.apk`;
 
-    await ReactNativeBlobUtil.config({
+    const task = ReactNativeBlobUtil.config({
       addAndroidDownloads: {
         useDownloadManager: true,
         notification: true,
@@ -81,7 +84,30 @@ export const downloadUpdateApk = async (
       },
     }).fetch('GET', manifest.apkUrl);
 
-    return true;
+    task.progress({ interval: 150 }, (received, total) => {
+      if (!total || total <= 0) {
+        return;
+      }
+
+      const percent = Math.min(100, Math.max(0, Math.round((received / total) * 100)));
+      onProgress?.(percent);
+    });
+
+    const response = await task;
+    onProgress?.(100);
+
+    const downloadedPath =
+      typeof response?.path === 'function' ? response.path() : '';
+
+    if (downloadedPath) {
+      await ReactNativeBlobUtil.android.actionViewIntent(
+        downloadedPath,
+        'application/vnd.android.package-archive',
+      );
+      return true;
+    }
+
+    return false;
   } catch {
     return false;
   }

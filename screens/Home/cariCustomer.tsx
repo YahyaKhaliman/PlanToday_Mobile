@@ -24,6 +24,7 @@ type Customer = {
   cc_alamat: string;
   cc_telp?: string;
   cc_CP?: string;
+  cc_cp?: string;
 };
 
 const cleanText = (s: any) =>
@@ -49,6 +50,7 @@ export default function CariCustomerScreen({ navigation, route }: any) {
   const runGuardedPress = usePressGuard();
   const from = route?.params?.from || 'VISITPLAN'; // VISITPLAN / VISIT / dll
   const keywordFromPrev = route?.params?.keyword || '';
+  const draft = route?.params?.draft;
 
   const [keyword, setKeyword] = useState(String(keywordFromPrev));
   const [data, setData] = useState<Customer[]>([]);
@@ -72,8 +74,19 @@ export default function CariCustomerScreen({ navigation, route }: any) {
 
     setLoading(true);
     try {
-      const res = await api.get('/cari-customer', { params: { search: q } });
-      const rows: Customer[] = res.data?.data || [];
+      const endpoint =
+        from === 'PENAWARAN_CREATE'
+          ? '/penawaran/master/customer'
+          : '/cari-customer';
+      const res = await api.get(endpoint, { params: { search: q } });
+      const rows: Customer[] = (res.data?.data || []).map((row: any) => ({
+        cc_kode: String(row?.cc_kode || ''),
+        cc_nama: String(row?.cc_nama || ''),
+        cc_alamat: String(row?.cc_alamat || ''),
+        cc_telp: String(row?.cc_telp || ''),
+        cc_CP: String(row?.cc_CP || row?.cc_cp || ''),
+        cc_cp: String(row?.cc_cp || row?.cc_CP || ''),
+      }));
       setData(rows);
     } catch (err: any) {
       Toast.show({
@@ -85,7 +98,7 @@ export default function CariCustomerScreen({ navigation, route }: any) {
     } finally {
       setLoading(false);
     }
-  }, [keyword]);
+  }, [from, keyword]);
 
   useEffect(() => {
     if (String(keywordFromPrev || '').trim().length >= 2) {
@@ -102,7 +115,7 @@ export default function CariCustomerScreen({ navigation, route }: any) {
         nama: item.cc_nama,
         alamat: cleanText(item.cc_alamat),
         telepon: cleanText(item.cc_telp),
-        contactPerson: cleanText(item.cc_CP),
+        contactPerson: cleanText(item.cc_CP || item.cc_cp),
       };
 
       if (from === 'TAMBAHVISITPLAN') {
@@ -124,7 +137,7 @@ export default function CariCustomerScreen({ navigation, route }: any) {
       if (from === 'PENAWARAN_CREATE') {
         navigation.navigate({
           name: 'PenawaranCreate',
-          params: { selectedCustomer: payload },
+          params: { draft, selectedCustomer: payload },
           merge: true,
         });
         return;
@@ -159,8 +172,10 @@ export default function CariCustomerScreen({ navigation, route }: any) {
       {!!item.cc_telp && (
         <Text style={styles.cardText}>📞 {cleanText(item.cc_telp)}</Text>
       )}
-      {!!item.cc_CP && (
-        <Text style={styles.cardText}>👤 {cleanText(item.cc_CP)}</Text>
+      {!!(item.cc_CP || item.cc_cp) && (
+        <Text style={styles.cardText}>
+          👤 {cleanText(item.cc_CP || item.cc_cp)}
+        </Text>
       )}
     </TouchableOpacity>
   );

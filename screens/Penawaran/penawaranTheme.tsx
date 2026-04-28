@@ -12,6 +12,7 @@ export const PENAWARAN_THEME = {
   warningBg: '#FEF3C7',
   warningBorder: '#FCD34D',
   warningText: '#92400E',
+  sub: '#4f46e5',
 };
 
 export const PENAWARAN_STATUS_COLORS: Record<string, string> = {
@@ -36,4 +37,3 @@ export const PENAWARAN_SHADOW = {
     elevation: 2,
   },
 };
-

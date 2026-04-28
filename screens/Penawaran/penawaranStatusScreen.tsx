@@ -4,14 +4,15 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   ActivityIndicator,
   TouchableOpacity,
   Modal,
   FlatList,
   StatusBar,
 } from 'react-native';
+import ModalConfirm from 'react-native-modal';
 import LinearGradient from 'react-native-linear-gradient';
+import Toast from 'react-native-toast-message';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { PenawaranStackParamList } from '../../navigation/appNavigator';
 import {
@@ -23,6 +24,7 @@ import {
   PenawaranMasterOption,
   PenawaranStatusUpdate,
 } from '../../services/penawaranApi';
+import { useAuth } from '../../context/authContext';
 import { PENAWARAN_SHADOW, PENAWARAN_THEME } from './penawaranTheme';
 
 type Props = NativeStackScreenProps<PenawaranStackParamList, 'PenawaranStatus'>;
@@ -42,6 +44,7 @@ interface PickerModalState {
 const THEME = PENAWARAN_THEME;
 
 export default function PenawaranStatusScreen({ route, navigation }: Props) {
+  const { token } = useAuth();
   const { nomor } = route.params;
   const [loading, setLoading] = useState(true);
   const [details, setDetails] = useState<PenawaranDetailItem[]>([]);
@@ -54,6 +57,7 @@ export default function PenawaranStatusScreen({ route, navigation }: Props) {
     [],
   );
   const [submitting, setSubmitting] = useState(false);
+  const [confirmVisible, setConfirmVisible] = useState(false);
   const [pickerModal, setPickerModal] = useState<PickerModalState>({
     visible: false,
     itemId: '',
@@ -74,10 +78,12 @@ export default function PenawaranStatusScreen({ route, navigation }: Props) {
     if (submitting) return;
 
     if (approvalState === 'WAIT') {
-      Alert.alert(
-        'Info',
-        'Penawaran sedang proses approval (WAIT), perubahan status detail dikunci.',
-      );
+      Toast.show({
+        type: 'glassInfo',
+        text1: 'Info',
+        text2:
+          'Penawaran sedang proses approval (WAIT), perubahan status detail dikunci.',
+      });
       return;
     }
 
@@ -88,7 +94,11 @@ export default function PenawaranStatusScreen({ route, navigation }: Props) {
           : fieldName === 'ket_confirm'
           ? 'konfirmasi'
           : 'status';
-      Alert.alert('Info', `Master ${fieldLabel} belum tersedia.`);
+      Toast.show({
+        type: 'glassInfo',
+        text1: 'Info',
+        text2: `Master ${fieldLabel} belum tersedia.`,
+      });
       return;
     }
 
@@ -144,7 +154,11 @@ export default function PenawaranStatusScreen({ route, navigation }: Props) {
       });
       setStatusUpdates(initialUpdates);
     } catch (error) {
-      Alert.alert('Error', `Gagal load data: ${error}`);
+      Toast.show({
+        type: 'glassError',
+        text1: 'Error',
+        text2: `Gagal load data: ${error}`,
+      });
     } finally {
       setLoading(false);
     }
@@ -183,10 +197,12 @@ export default function PenawaranStatusScreen({ route, navigation }: Props) {
 
   const validateAndSave = async () => {
     if (approvalState === 'WAIT') {
-      Alert.alert(
-        'Info',
-        'Penawaran sedang proses approval (WAIT), perubahan status detail dikunci.',
-      );
+      Toast.show({
+        type: 'glassInfo',
+        text1: 'Info',
+        text2:
+          'Penawaran sedang proses approval (WAIT), perubahan status detail dikunci.',
+      });
       return;
     }
 
@@ -194,36 +210,39 @@ export default function PenawaranStatusScreen({ route, navigation }: Props) {
 
     for (const upd of updates) {
       if (upd.status === 'BATAL' && !upd.ket_batal) {
-        Alert.alert(
-          'Validasi',
-          `Item ${upd.id}: Status BATAL wajib diisi alasannya`,
-        );
+        Toast.show({
+          type: 'glassError',
+          text1: 'Validasi',
+          text2: `Item ${upd.id}: Status BATAL wajib diisi alasannya`,
+        });
         return;
       }
     }
 
-    Alert.alert('Confirm', 'Simpan perubahan status detail?', [
-      { text: 'Cancel' },
-      {
-        text: 'OK',
-        onPress: async () => {
-          try {
-            setSubmitting(true);
-            await updatePenawaranStatusDetail(nomor, { updates });
-            Alert.alert('Sukses', 'Status detail berhasil diubah', [
-              {
-                text: 'OK',
-                onPress: () => navigation.goBack(),
-              },
-            ]);
-          } catch (error) {
-            Alert.alert('Error', `Gagal simpan: ${error}`);
-          } finally {
-            setSubmitting(false);
-          }
-        },
-      },
-    ]);
+    setConfirmVisible(true);
+  };
+
+  const submitStatusUpdates = async () => {
+    const updates = Object.values(statusUpdates);
+    setConfirmVisible(false);
+    try {
+      setSubmitting(true);
+      await updatePenawaranStatusDetail(nomor, { updates }, token);
+      Toast.show({
+        type: 'glassSuccess',
+        text1: 'Sukses',
+        text2: 'Status detail berhasil diubah',
+      });
+      navigation.goBack();
+    } catch (error) {
+      Toast.show({
+        type: 'glassError',
+        text1: 'Error',
+        text2: `Gagal simpan: ${error}`,
+      });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (loading) {
@@ -255,13 +274,12 @@ export default function PenawaranStatusScreen({ route, navigation }: Props) {
         >
           <Text style={styles.backBtnText}>Kembali</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Update Status</Text>
+        <Text style={styles.title}>Update Status Detail</Text>
       </View>
 
       <ScrollView style={styles.scrollView}>
         <View style={styles.headerCard}>
-          <Text style={styles.headerTitle}>Update Status Detail</Text>
-          <Text style={styles.headerSubtitle}>Penawaran: {nomor}</Text>
+          <Text style={styles.headerTitle}>Penawaran: {nomor}</Text>
         </View>
 
         {approvalState === 'WAIT' && (
@@ -428,6 +446,40 @@ export default function PenawaranStatusScreen({ route, navigation }: Props) {
           </View>
         </View>
       </Modal>
+
+      <ModalConfirm
+        isVisible={confirmVisible}
+        onBackdropPress={() => setConfirmVisible(false)}
+        backdropOpacity={0.45}
+        animationIn="zoomIn"
+        animationOut="zoomOut"
+      >
+        <View style={styles.confirmModalCard}>
+          <View style={styles.confirmModalIndicator} />
+          <Text style={styles.confirmModalTitle}>Konfirmasi</Text>
+          <Text style={styles.confirmModalSubtitle}>
+            Yakin ingin menyimpan perubahan status detail?
+          </Text>
+
+          <View style={styles.confirmModalActionRow}>
+            <TouchableOpacity
+              style={styles.confirmBtnCancel}
+              onPress={() => setConfirmVisible(false)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.confirmTextCancel}>Batal</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.confirmBtnSubmit}
+              onPress={submitStatusUpdates}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.confirmTextSubmit}>Simpan</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ModalConfirm>
     </LinearGradient>
   );
 }
@@ -483,8 +535,8 @@ const styles = StyleSheet.create({
     ...PENAWARAN_SHADOW.softCard,
   },
   headerTitle: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: '600',
     color: THEME.ink,
   },
   headerSubtitle: {
@@ -553,7 +605,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: THEME.soft,
+    backgroundColor: THEME.danger,
     borderWidth: 1,
     borderColor: THEME.line,
   },
@@ -565,7 +617,7 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 14,
     fontWeight: '700',
-    color: THEME.muted,
+    color: '#fff',
   },
   buttonTextPrimary: {
     fontSize: 14,
@@ -635,5 +687,64 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: THEME.ink,
+  },
+  confirmModalCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(79,70,229,0.16)',
+  },
+  confirmModalIndicator: {
+    width: 44,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(79,70,229,0.24)',
+    alignSelf: 'center',
+    marginBottom: 10,
+  },
+  confirmModalTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: THEME.ink,
+    textAlign: 'center',
+  },
+  confirmModalSubtitle: {
+    marginTop: 8,
+    textAlign: 'center',
+    color: THEME.muted,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  confirmModalActionRow: {
+    marginTop: 16,
+    flexDirection: 'row',
+    gap: 10,
+  },
+  confirmBtnCancel: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: THEME.danger,
+    backgroundColor: THEME.danger,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  confirmBtnSubmit: {
+    flex: 1,
+    borderRadius: 12,
+    backgroundColor: THEME.primary,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  confirmTextCancel: {
+    color: '#fff',
+    fontWeight: '800',
+  },
+  confirmTextSubmit: {
+    color: '#fff',
+    fontWeight: '900',
   },
 });

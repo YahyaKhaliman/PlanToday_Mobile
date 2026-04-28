@@ -17,8 +17,8 @@ import Toast from 'react-native-toast-message';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePressGuard } from '../../utils/usePressGuard';
 import {
-  getMasterSales,
-  PenawaranMasterOption,
+  getMasterPenawaranNomor,
+  PenawaranMasterNomorOption,
 } from '../../services/penawaranApi';
 
 const THEME = {
@@ -38,14 +38,14 @@ const cleanText = (s: any) =>
     .replace(/\r?\n/g, ' ')
     .trim();
 
-export default function CariSalesScreen({ navigation, route }: any) {
+export default function CariNomorPenawaranScreen({ navigation, route }: any) {
   const insets = useSafeAreaInsets();
   const runGuardedPress = usePressGuard();
   const keywordFromPrev = route?.params?.keyword || '';
   const draft = route?.params?.draft;
 
   const [keyword, setKeyword] = useState(String(keywordFromPrev));
-  const [data, setData] = useState<PenawaranMasterOption[]>([]);
+  const [data, setData] = useState<PenawaranMasterNomorOption[]>([]);
   const [loading, setLoading] = useState(false);
 
   const canSearch = useMemo(
@@ -66,13 +66,15 @@ export default function CariSalesScreen({ navigation, route }: any) {
 
     setLoading(true);
     try {
-      const rows = await getMasterSales(q);
+      const rows = await getMasterPenawaranNomor(q);
       setData(rows);
     } catch (err: any) {
       Toast.show({
         type: 'glassError',
         text1: 'Error',
-        text2: err?.response?.data?.message || 'Gagal mengambil data sales',
+        text2:
+          err?.response?.data?.message ||
+          'Gagal mengambil master nomor penawaran',
       });
       setData([]);
     } finally {
@@ -86,16 +88,17 @@ export default function CariSalesScreen({ navigation, route }: any) {
     }
   }, [cari, keywordFromPrev]);
 
-  const pilih = (item: PenawaranMasterOption) => {
-    runGuardedPress(`search-sales:pick:${item.kode}`, () => {
+  const pilih = (item: PenawaranMasterNomorOption) => {
+    runGuardedPress(`search-nomor-penawaran:pick:${item.kode}`, () => {
       navigation.navigate({
         name: 'PenawaranCreate',
         params: {
           draft,
-          selectedSales: {
+          selectedNomorPenawaran: {
             kode: item.kode,
             nama: item.nama,
-            alamat: item.alamat || '',
+            customer: item.customer || '',
+            perusahaan: item.perusahaan || '',
           },
         },
         merge: true,
@@ -103,7 +106,7 @@ export default function CariSalesScreen({ navigation, route }: any) {
     });
   };
 
-  const renderItem = ({ item }: { item: PenawaranMasterOption }) => (
+  const renderItem = ({ item }: { item: PenawaranMasterNomorOption }) => (
     <TouchableOpacity
       activeOpacity={0.9}
       onPress={() => pilih(item)}
@@ -111,11 +114,13 @@ export default function CariSalesScreen({ navigation, route }: any) {
     >
       <View style={styles.cardTopRow}>
         <View style={styles.avatar}>
-          <Text style={{ fontSize: 16 }}>👤</Text>
+          <Text style={{ fontSize: 16 }}>📄</Text>
         </View>
 
         <View style={{ flex: 1 }}>
-          <Text style={styles.cardTitle}>{cleanText(item.nama)}</Text>
+          <Text style={styles.cardTitle}>
+            {cleanText(item.nama || item.kode)}
+          </Text>
           <Text style={styles.cardMeta}>Kode: {cleanText(item.kode)}</Text>
         </View>
 
@@ -124,17 +129,19 @@ export default function CariSalesScreen({ navigation, route }: any) {
         </View>
       </View>
 
-      {!!item.alamat && (
-        <Text style={styles.cardText}>{cleanText(item.alamat)}</Text>
-      )}
+      <Text style={styles.cardText} numberOfLines={1}>
+        {cleanText(item.customer || '-')} • {cleanText(item.perusahaan || '-')}
+      </Text>
     </TouchableOpacity>
   );
 
   const header = (
     <View style={styles.headerWrap}>
       <View style={styles.header}>
-        <Text style={styles.title}>Cari Sales</Text>
-        <Text style={styles.subtitle}>Ketik nama/kode, lalu pilih sales</Text>
+        <Text style={styles.title}>Cari No. Penawaran</Text>
+        <Text style={styles.subtitle}>
+          Ketik nomor/customer/perusahaan, lalu pilih nomor penawaran
+        </Text>
       </View>
 
       <View style={styles.searchBox}>
@@ -142,7 +149,7 @@ export default function CariSalesScreen({ navigation, route }: any) {
         <TextInput
           value={keyword}
           onChangeText={setKeyword}
-          placeholder="Nama/kode sales..."
+          placeholder="Nomor/customer/perusahaan..."
           placeholderTextColor={THEME.muted}
           style={styles.searchInput}
           returnKeyType="search"
@@ -315,73 +322,75 @@ const styles = StyleSheet.create({
   },
   pill: {
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 5,
     borderRadius: 999,
-    backgroundColor: 'rgba(6,182,212,0.10)',
+    backgroundColor: 'rgba(79,70,229,0.12)',
     borderWidth: 1,
-    borderColor: 'rgba(6,182,212,0.20)',
+    borderColor: 'rgba(79,70,229,0.28)',
   },
   pillText: {
-    color: THEME.ink,
+    color: THEME.primary,
     fontWeight: '900',
-    fontSize: 11,
-    letterSpacing: 0.6,
+    fontSize: 10,
+    letterSpacing: 0.4,
   },
-  cardTitle: { color: THEME.ink, fontSize: 15, fontWeight: '900' },
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: THEME.ink,
+  },
   cardMeta: {
-    color: THEME.muted,
     marginTop: 2,
-    fontSize: 12,
+    color: THEME.muted,
+    fontSize: 11,
     fontWeight: '700',
   },
   cardText: {
-    color: THEME.muted,
     marginTop: 8,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  stickyHeader: {
-    zIndex: 10,
-    elevation: 2,
+    color: THEME.muted,
+    fontSize: 12,
   },
   empty: {
     textAlign: 'center',
     color: THEME.muted,
-    marginTop: 18,
-    fontWeight: '700',
+    fontSize: 13,
+    marginTop: 24,
+  },
+  stickyHeader: {
+    zIndex: 10,
   },
   bottomAction: {
     position: 'absolute',
-    left: 12,
-    right: 12,
+    left: 0,
+    right: 0,
     bottom: 0,
     flexDirection: 'row',
     gap: 10,
-    backgroundColor: 'rgba(255,255,255,0.95)',
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    backgroundColor: 'rgba(255,255,255,0.94)',
     borderTopWidth: 1,
     borderTopColor: THEME.line,
-    paddingTop: 10,
-    paddingHorizontal: 8,
   },
   actionBtn: {
     flex: 1,
-    height: 48,
-    borderRadius: 12,
+    minHeight: 46,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  actionBtnSoft: {
     borderWidth: 1,
-    borderColor: THEME.line,
-    backgroundColor: '#fff',
   },
   actionBtnPrimary: {
     backgroundColor: THEME.primary,
+    borderColor: 'rgba(79,70,229,0.25)',
+  },
+  actionBtnSoft: {
+    backgroundColor: THEME.soft,
+    borderColor: THEME.line,
   },
   actionText: {
     color: '#fff',
-    fontWeight: '900',
     fontSize: 14,
-    letterSpacing: 0.6,
+    fontWeight: '900',
   },
 });

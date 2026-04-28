@@ -18,6 +18,7 @@ import { useAuth } from '../../context/authContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import Modal from 'react-native-modal';
+import { usePressGuard } from '../../utils/usePressGuard';
 
 const THEME = {
   primary: '#4F46E5',
@@ -35,6 +36,7 @@ const THEME = {
 export default function CalonCustomerScreen({ navigation }: any) {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+  const runGuardedPress = usePressGuard();
   const cabang = user?.cabang || '';
 
   const [nama, setNama] = useState('');
@@ -126,13 +128,26 @@ export default function CalonCustomerScreen({ navigation }: any) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* HERO */}
-          <View style={styles.header}>
-            <Text style={styles.title}>Calon Customer</Text>
-            <Text style={styles.subtitle}>Isi data calon customer baru</Text>
+          <View style={styles.headerArea}>
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={() =>
+                runGuardedPress('add-calon-customer:header-back', () =>
+                  navigation.navigate('Home'),
+                )
+              }
+            >
+              <Text style={styles.backBtnText}>Kembali</Text>
+            </TouchableOpacity>
 
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{cabang || '-'}</Text>
+            {/* HERO */}
+            <View style={styles.header}>
+              <Text style={styles.title}>Calon Customer</Text>
+              <Text style={styles.subtitle}>Isi data calon customer baru</Text>
+
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{cabang || '-'}</Text>
+              </View>
             </View>
           </View>
 
@@ -266,8 +281,37 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { padding: 22, paddingBottom: 30 },
 
-  header: { alignItems: 'center', marginBottom: 16 },
-  title: { fontSize: 24, fontWeight: '900', color: THEME.ink },
+  headerArea: {
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 48,
+    marginBottom: 16,
+  },
+  backBtn: {
+    position: 'absolute',
+    left: 0,
+    backgroundColor: THEME.soft,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: THEME.line,
+  },
+  backBtnText: {
+    color: THEME.primary,
+    fontWeight: '900',
+    fontSize: 12,
+    letterSpacing: 0.2,
+  },
+
+  header: { alignItems: 'center' },
+  title: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: THEME.ink,
+    alignItems: 'center',
+  },
   subtitle: {
     marginTop: 6,
     color: THEME.muted,

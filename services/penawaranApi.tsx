@@ -89,11 +89,22 @@ export type PenawaranMasterOption = {
   alamat?: string;
 };
 
+export type PenawaranMasterNomorOption = {
+  kode: string;
+  nama: string;
+  tanggal?: string;
+  customer?: string;
+  perusahaan?: string;
+};
+
 export type PenawaranCreatePayload = {
   tanggal: string;
   divisi: string;
   tipe: string;
   perusahaan_kode: string;
+  up?: string;
+  ttd?: string;
+  ttd_jabatan?: string;
   customer_kode: string;
   sales_kode: string;
   keterangan?: string;
@@ -133,7 +144,7 @@ export type PenawaranActivityLog = {
   type: 'APPROVAL' | 'STATUS_UPDATE' | string;
   created_at: string;
   user: string;
-  keterangan: string;
+  note: string;
   approval_state?: '' | 'WAIT' | 'ACC' | 'TOLAK' | string;
   changes?: Array<{
     id: string;
@@ -163,8 +174,13 @@ export const getPenawaranDetail = async (nomor: string) => {
   };
 };
 
-export const createPenawaran = async (payload: PenawaranCreatePayload) => {
-  const response = await api.post('/penawaran', payload);
+export const createPenawaran = async (
+  payload: PenawaranCreatePayload,
+  token?: string | null,
+) => {
+  const response = await api.post('/penawaran', payload, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
   return response.data?.data as { nomor: string };
 };
 
@@ -182,13 +198,24 @@ export const getMasterSales = async (search?: string) => {
   return (response.data?.data || []) as PenawaranMasterOption[];
 };
 
+export const getMasterPenawaranNomor = async (search?: string) => {
+  const response = await api.get('/penawaran/master/nomor', {
+    params: { search: search || '' },
+  });
+  return (response.data?.data || []) as PenawaranMasterNomorOption[];
+};
+
 export const updatePenawaranStatusDetail = async (
   nomor: string,
   payload: PenawaranStatusUpdatePayload,
+  token?: string | null,
 ) => {
   const response = await api.put(
     `/penawaran/${encodeURIComponent(nomor)}/status`,
     payload,
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    },
   );
   return response.data as { success: boolean; message: string };
 };
@@ -206,12 +233,20 @@ export const getMasterPenawaranConfirm = async () => {
 export const requestApprovalPerubahan = async (
   nomor: string,
   payload: ApprovalRequestPayload,
+  token?: string | null,
 ) => {
   const response = await api.post(
     `/penawaran/${encodeURIComponent(nomor)}/pengajuan-perubahan`,
     payload,
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    },
   );
-  return response.data as { success: boolean; message: string; approval_state: string };
+  return response.data as {
+    success: boolean;
+    message: string;
+    approval_state: string;
+  };
 };
 
 export const getPenawaranActivityLogs = async (nomor: string) => {

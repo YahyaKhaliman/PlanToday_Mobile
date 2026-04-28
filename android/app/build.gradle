@@ -76,6 +76,14 @@ def getConfigValue(String key) {
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+project.ext.vectoricons = [
+    iconFontNames: [
+        'MaterialIcons.ttf',
+    ],
+]
+
+apply from: '../../node_modules/react-native-vector-icons/fonts.gradle'
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -86,8 +94,8 @@ android {
         applicationId "com.plantoday"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 16  // selalu naikkan ketika mau build
-        versionName "1.2.2" // selalu naikkan ketika mau build
+        versionCode 17  // selalu naikkan ketika mau build
+        versionName "1.2.3" // selalu naikkan ketika mau build
     }
     signingConfigs {
         debug {

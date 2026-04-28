@@ -612,9 +612,22 @@ export default function VisitScreen({ navigation, route }: any) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.header}>
-            <Text style={styles.title}>Visit</Text>
-            <Text style={styles.subtitle}>Input Kunjungan</Text>
+          <View style={styles.headerArea}>
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={() =>
+                runGuardedPress('add-visit:header-back', () =>
+                  navigation.navigate('Visit'),
+                )
+              }
+            >
+              <Text style={styles.backBtnText}>Kembali</Text>
+            </TouchableOpacity>
+
+            <View style={styles.header}>
+              <Text style={styles.title}>Visit</Text>
+              <Text style={styles.subtitle}>Input Kunjungan</Text>
+            </View>
           </View>
 
           <View style={styles.card}>
@@ -871,9 +884,33 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
   },
 
-  header: { alignItems: 'center', marginBottom: 12 },
+  headerArea: {
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 48,
+    marginBottom: 12,
+  },
+  backBtn: {
+    position: 'absolute',
+    left: 0,
+    backgroundColor: THEME.soft,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: THEME.line,
+  },
+  backBtnText: {
+    color: THEME.primary,
+    fontWeight: '900',
+    fontSize: 12,
+    letterSpacing: 0.2,
+  },
+
+  header: { alignItems: 'center' },
   title: {
-    fontSize: 26,
+    fontSize: 20,
     fontWeight: '900',
     color: THEME.ink,
     letterSpacing: 0.2,

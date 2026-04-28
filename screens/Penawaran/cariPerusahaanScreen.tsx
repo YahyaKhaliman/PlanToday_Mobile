@@ -42,6 +42,7 @@ export default function CariPerusahaanScreen({ navigation, route }: any) {
   const insets = useSafeAreaInsets();
   const runGuardedPress = usePressGuard();
   const keywordFromPrev = route?.params?.keyword || '';
+  const draft = route?.params?.draft;
 
   const [keyword, setKeyword] = useState(String(keywordFromPrev));
   const [data, setData] = useState<PenawaranMasterOption[]>([]);
@@ -91,6 +92,7 @@ export default function CariPerusahaanScreen({ navigation, route }: any) {
       navigation.navigate({
         name: 'PenawaranCreate',
         params: {
+          draft,
           selectedPerusahaan: {
             kode: item.kode,
             nama: item.nama,

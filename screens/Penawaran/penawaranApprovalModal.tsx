@@ -9,7 +9,10 @@ import {
   TextInput,
   Modal,
 } from 'react-native';
+import ModalConfirm from 'react-native-modal';
+import Toast from 'react-native-toast-message';
 import { requestApprovalPerubahan } from '../../services/penawaranApi';
+import { useAuth } from '../../context/authContext';
 import { PENAWARAN_THEME } from './penawaranTheme';
 
 const THEME = PENAWARAN_THEME;
@@ -27,8 +30,10 @@ export default function PenawaranApprovalModal({
   onClose,
   onSuccess,
 }: PenawaranApprovalModalProps) {
+  const { token } = useAuth();
   const [alasan, setAlasan] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [confirmVisible, setConfirmVisible] = useState(false);
 
   const handleSubmit = async () => {
     if (!alasan.trim()) {
@@ -36,35 +41,30 @@ export default function PenawaranApprovalModal({
       return;
     }
 
-    Alert.alert('Confirm', 'Ajukan perubahan untuk penawaran ini?', [
-      { text: 'Cancel' },
-      {
-        text: 'OK',
-        onPress: async () => {
-          try {
-            setSubmitting(true);
-            await requestApprovalPerubahan(nomor, { alasan: alasan.trim() });
-            Alert.alert('Sukses', 'Pengajuan perubahan berhasil dibuat', [
-              {
-                text: 'OK',
-                onPress: () => {
-                  setAlasan('');
-                  onSuccess?.();
-                  onClose();
-                },
-              },
-            ]);
-          } catch (error) {
-            const message =
-              (error as any)?.response?.data?.message ||
-              `Gagal buat pengajuan: ${error}`;
-            Alert.alert('Error', message);
-          } finally {
-            setSubmitting(false);
-          }
-        },
-      },
-    ]);
+    setConfirmVisible(true);
+  };
+
+  const handleConfirmSubmit = async () => {
+    setConfirmVisible(false);
+    try {
+      setSubmitting(true);
+      await requestApprovalPerubahan(nomor, { alasan: alasan.trim() }, token);
+      Toast.show({
+        type: 'glassSuccess',
+        text1: 'Sukses',
+        text2: 'Pengajuan perubahan berhasil dibuat',
+      });
+      setAlasan('');
+      onSuccess?.();
+      onClose();
+    } catch (error) {
+      const message =
+        (error as any)?.response?.data?.message ||
+        `Gagal buat pengajuan: ${error}`;
+      Alert.alert('Error', message);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleClose = () => {
@@ -121,6 +121,40 @@ export default function PenawaranApprovalModal({
           </View>
         </View>
       </View>
+
+      <ModalConfirm
+        isVisible={confirmVisible}
+        onBackdropPress={() => setConfirmVisible(false)}
+        backdropOpacity={0.45}
+        animationIn="zoomIn"
+        animationOut="zoomOut"
+      >
+        <View style={styles.confirmModalCard}>
+          <View style={styles.confirmModalIndicator} />
+          <Text style={styles.confirmModalTitle}>Konfirmasi</Text>
+          <Text style={styles.confirmModalSubtitle}>
+            Ajukan perubahan untuk penawaran ini?
+          </Text>
+
+          <View style={styles.confirmModalActionRow}>
+            <TouchableOpacity
+              style={styles.confirmBtnCancel}
+              onPress={() => setConfirmVisible(false)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.confirmTextCancel}>Batal</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.confirmBtnSubmit}
+              onPress={handleConfirmSubmit}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.confirmTextSubmit}>Ya, Ajukan</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ModalConfirm>
     </Modal>
   );
 }
@@ -199,7 +233,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: THEME.soft,
+    backgroundColor: THEME.danger,
     borderWidth: 1,
     borderColor: THEME.line,
   },
@@ -212,5 +246,64 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '900',
     color: '#fff',
+  },
+  confirmModalCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(79,70,229,0.16)',
+  },
+  confirmModalIndicator: {
+    width: 44,
+    height: 5,
+    borderRadius: 999,
+    backgroundColor: 'rgba(79,70,229,0.24)',
+    alignSelf: 'center',
+    marginBottom: 10,
+  },
+  confirmModalTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: THEME.ink,
+    textAlign: 'center',
+  },
+  confirmModalSubtitle: {
+    marginTop: 8,
+    textAlign: 'center',
+    color: THEME.muted,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  confirmModalActionRow: {
+    marginTop: 16,
+    flexDirection: 'row',
+    gap: 10,
+  },
+  confirmBtnCancel: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: THEME.line,
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  confirmBtnSubmit: {
+    flex: 1,
+    borderRadius: 12,
+    backgroundColor: THEME.primary,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  confirmTextCancel: {
+    color: THEME.muted,
+    fontWeight: '800',
+  },
+  confirmTextSubmit: {
+    color: '#fff',
+    fontWeight: '900',
   },
 });

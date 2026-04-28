@@ -12,6 +12,7 @@ import {
   TextInput,
   Platform,
   Modal,
+  BackHandler,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import api from '../../services/api';
@@ -172,6 +173,36 @@ export default function RekapCalonCustomerScreen({ navigation }: any) {
       refreshRekap();
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []),
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      const goHome = () => {
+        navigation.navigate('Home');
+        return true;
+      };
+
+      const backHandler = BackHandler.addEventListener(
+        'hardwareBackPress',
+        goHome,
+      );
+
+      const unsubscribeBeforeRemove = navigation.addListener(
+        'beforeRemove',
+        (e: any) => {
+          if (e?.data?.action?.type === 'NAVIGATE') {
+            return;
+          }
+          e.preventDefault();
+          navigation.navigate('Home');
+        },
+      );
+
+      return () => {
+        backHandler.remove();
+        unsubscribeBeforeRemove();
+      };
+    }, [navigation]),
   );
 
   const openWA = async (text: string, mode: 'app' | 'business') => {

@@ -1,7 +1,16 @@
 /* eslint-disable react-native/no-inline-styles */
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { BaseToastProps } from 'react-native-toast-message';
+
+type ConfirmToastProps = BaseToastProps & {
+  props?: {
+    onConfirm?: () => void;
+    onCancel?: () => void;
+    cancelText?: string;
+    confirmText?: string;
+  };
+};
 
 const THEME = {
   primary: '#4F46E5',
@@ -57,6 +66,34 @@ export const toastConfig = {
       </View>
     </View>
   ),
+
+  glassConfirm: ({ text1, text2, props }: ConfirmToastProps) => (
+    <View style={[styles.container, styles.confirmContainer]}>
+      <View style={styles.modalIndicator} />
+      <Text style={styles.confirmTitle}>{text1 || 'Konfirmasi'}</Text>
+      {text2 ? <Text style={styles.confirmSubtitle}>{text2}</Text> : null}
+
+      <View style={styles.confirmActions}>
+        <TouchableOpacity
+          style={styles.btnCancel}
+          onPress={props?.onCancel}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.textCancel}>{props?.cancelText || 'Batal'}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.btnConfirm}
+          onPress={props?.onConfirm}
+          activeOpacity={0.9}
+        >
+          <Text style={styles.textConfirm}>
+            {props?.confirmText || 'Ya, Simpan'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  ),
 };
 
 const styles = StyleSheet.create({
@@ -92,6 +129,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  confirmContainer: {
+    borderLeftWidth: 1,
+    borderColor: THEME.line,
+  },
+  modalIndicator: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#E2E8F0',
+    marginBottom: 10,
   },
 
   /* ICON */
@@ -129,5 +178,53 @@ const styles = StyleSheet.create({
     color: THEME.muted,
     fontSize: 12,
     fontWeight: '700',
+  },
+  confirmTitle: {
+    color: THEME.ink,
+    fontSize: 16,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  confirmSubtitle: {
+    marginTop: 6,
+    color: THEME.muted,
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  confirmActions: {
+    marginTop: 12,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  btnCancel: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: THEME.line,
+    backgroundColor: '#fff',
+  },
+  textCancel: {
+    color: THEME.ink,
+    fontWeight: '800',
+    fontSize: 12,
+  },
+  btnConfirm: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(79,70,229,0.24)',
+    backgroundColor: 'rgba(79,70,229,0.12)',
+  },
+  textConfirm: {
+    color: THEME.primary,
+    fontWeight: '900',
+    fontSize: 12,
   },
 });

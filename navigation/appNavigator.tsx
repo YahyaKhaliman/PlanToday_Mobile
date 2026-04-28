@@ -32,19 +32,23 @@ import PenawaranCreateScreen from '../screens/Penawaran/penawaranCreateScreen';
 import PenawaranStatusScreen from '../screens/Penawaran/penawaranStatusScreen';
 import CariPerusahaanScreen from '../screens/Penawaran/cariPerusahaanScreen';
 import CariSalesScreen from '../screens/Penawaran/cariSalesScreen';
-
-const Stack = createNativeStackNavigator();
-
-export type PenawaranStackParamList = {
-  PenawaranList: undefined;
-  PenawaranDetail: { nomor: string };
-  PenawaranCreate: undefined;
-  PenawaranStatus: { nomor: string };
-  CariPerusahaanPenawaran: { from: string };
-  CariSalesPenawaran: { from: string };
-};
+import CariNomorPenawaranScreen from '../screens/Penawaran/cariNomorPenawaranScreen';
 
 export type RootStackParamList = {
+  Home: undefined;
+  CalonCustomer: undefined;
+  EditCalonCustomer: undefined;
+  VisitPlan: undefined;
+  CariCustomer: any;
+  Visit: undefined;
+  TambahVisit: undefined;
+  EditVisit: undefined;
+  TambahVisitPlan: undefined;
+  EditVisitPlan: undefined;
+  RekapVisitPlanDetail: any;
+  RekapCalonCustomer: undefined;
+  GantiPassword: undefined;
+  Achievement: undefined;
   AchievementOmset: undefined;
   AchievementDetailUserRange: {
     kode: string;
@@ -57,7 +61,35 @@ export type RootStackParamList = {
     target?: number;
     realisasi?: number;
   };
+  KurirMenu: undefined;
+  KurirRencanaKirim: undefined;
+  KurirKirim: undefined;
+  KurirJadwalKirim: undefined;
+  KurirTambahPengiriman: undefined;
+  KurirProsesPengiriman: undefined;
+  PenawaranList: undefined;
+  PenawaranDetail: { nomor: string };
+  PenawaranCreate: undefined;
+  PenawaranStatus: { nomor: string };
+  CariPerusahaanPenawaran: { from: string };
+  CariSalesPenawaran: { from: string };
+  CariNomorPenawaran: { from: string };
+  Login: undefined;
+  Register: undefined;
 };
+
+export type PenawaranStackParamList = Pick<
+  RootStackParamList,
+  | 'PenawaranList'
+  | 'PenawaranDetail'
+  | 'PenawaranCreate'
+  | 'PenawaranStatus'
+  | 'CariPerusahaanPenawaran'
+  | 'CariSalesPenawaran'
+  | 'CariNomorPenawaran'
+>;
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function AppNavigator() {
   const { user } = useAuth();
@@ -151,6 +183,10 @@ export default function AppNavigator() {
                 <Stack.Screen
                   name="CariSalesPenawaran"
                   component={CariSalesScreen}
+                />
+                <Stack.Screen
+                  name="CariNomorPenawaran"
+                  component={CariNomorPenawaranScreen}
                 />
               </>
             )}

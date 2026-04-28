@@ -11,6 +11,7 @@ import {
   StatusBar,
   Platform,
   Modal,
+  BackHandler,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -313,6 +314,36 @@ export default function VisitGabunganScreen({ navigation }: any) {
     }, [tanggalAwal, tanggalAkhir, userParam]),
   );
 
+  useFocusEffect(
+    useCallback(() => {
+      const goHome = () => {
+        navigation.navigate('Home');
+        return true;
+      };
+
+      const backHandler = BackHandler.addEventListener(
+        'hardwareBackPress',
+        goHome,
+      );
+
+      const unsubscribeBeforeRemove = navigation.addListener(
+        'beforeRemove',
+        (e: any) => {
+          if (e?.data?.action?.type === 'NAVIGATE') {
+            return;
+          }
+          e.preventDefault();
+          navigation.navigate('Home');
+        },
+      );
+
+      return () => {
+        backHandler.remove();
+        unsubscribeBeforeRemove();
+      };
+    }, [navigation]),
+  );
+
   const openWA = async (text: string, mode: 'app' | 'business') => {
     const encoded = encodeURIComponent(text);
 
@@ -470,7 +501,7 @@ export default function VisitGabunganScreen({ navigation }: any) {
     <View style={styles.headerWrap}>
       <View style={styles.header}>
         <Text style={styles.title}>Visit</Text>
-        <Text style={styles.subtitle}>Kunjungan</Text>
+        <Text style={styles.subtitle}>Rekap Kunjungan</Text>
       </View>
 
       <View style={styles.row2}>

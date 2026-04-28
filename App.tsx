@@ -37,6 +37,7 @@ export default function App() {
     null,
   );
   const [isUpdating, setIsUpdating] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState(0);
   const modalTranslateY = useRef(new Animated.Value(28)).current;
   const modalOpacity = useRef(new Animated.Value(0)).current;
 
@@ -84,13 +85,28 @@ export default function App() {
     }
 
     setIsUpdating(true);
-    const downloaded = await downloadUpdateApk(pendingUpdate);
+    setDownloadProgress(0);
+    const downloaded = await downloadUpdateApk(pendingUpdate, percent => {
+      setDownloadProgress(percent);
+    });
 
-    if (!downloaded) {
+    if (downloaded) {
+      Toast.show({
+        type: 'glassSuccess',
+        text1: 'Download Selesai',
+        text2: 'Installer update sedang dibuka.',
+      });
+    } else {
       await Linking.openURL(pendingUpdate.apkUrl);
+      Toast.show({
+        type: 'glassSuccess',
+        text1: 'Download Selesai',
+        text2: 'Silakan lanjutkan instalasi update dari file yang diunduh.',
+      });
     }
 
     setIsUpdating(false);
+    setDownloadProgress(0);
     setPendingUpdate(null);
   };
 
@@ -124,6 +140,15 @@ export default function App() {
         transparent
         animationType="fade"
         onRequestClose={() => {
+          if (isUpdating) {
+            Toast.show({
+              type: 'glassError',
+              text1: 'Update Sedang Berjalan',
+              text2: 'Jangan tutup aplikasi sampai proses selesai.',
+            });
+            return;
+          }
+
           if (showSkipButton) {
             setPendingUpdate(null);
           }
@@ -169,6 +194,32 @@ export default function App() {
                 {pendingUpdate?.notes ||
                   'Performa dan stabilitas aplikasi ditingkatkan.'}
               </Text>
+
+              {isUpdating && (
+                <View style={styles.progressSection}>
+                  <View style={styles.progressMetaRow}>
+                    <Text style={styles.progressLabel}>
+                      Mengunduh update...
+                    </Text>
+                    <Text style={styles.progressPercent}>
+                      {downloadProgress}%
+                    </Text>
+                  </View>
+                  <View style={styles.progressTrack}>
+                    <View
+                      style={[
+                        styles.progressFill,
+                        {
+                          width: `${Math.max(
+                            0,
+                            Math.min(100, downloadProgress),
+                          )}%`,
+                        },
+                      ]}
+                    />
+                  </View>
+                </View>
+              )}
             </View>
 
             <View style={styles.actions}>
@@ -195,7 +246,15 @@ export default function App() {
                 ]}
               >
                 {isUpdating ? (
-                  <ActivityIndicator color="#FFFFFF" />
+                  <View style={styles.updatingWrap}>
+                    <View style={styles.warningBox}>
+                      <Text style={styles.warningText}>
+                        Jangan tutup aplikasi saat update berlangsung.
+                      </Text>
+                    </View>
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                    <Text style={styles.primaryButtonText}>Mengunduh...</Text>
+                  </View>
                 ) : (
                   <Text style={styles.primaryButtonText}>Update Sekarang</Text>
                 )}
@@ -304,6 +363,50 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     lineHeight: 21,
   },
+  progressSection: {
+    marginTop: 14,
+  },
+  warningBox: {
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 8,
+  },
+  warningText: {
+    color: '#92400E',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  progressMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  progressLabel: {
+    color: THEME.muted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  progressPercent: {
+    color: THEME.ink,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  progressTrack: {
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: '#E2E8F0',
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 999,
+    backgroundColor: THEME.primary,
+  },
   actions: {
     flexDirection: 'row',
     gap: 10,
@@ -341,6 +444,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '900',
     letterSpacing: 0.2,
+  },
+  updatingWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
   buttonPressed: {
     opacity: 0.9,

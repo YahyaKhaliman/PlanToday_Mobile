@@ -11,6 +11,7 @@ import {
   StatusBar,
   Platform,
   Modal,
+  BackHandler,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -305,6 +306,36 @@ export default function VisitPlanGabunganScreen({ navigation }: any) {
       refresh();
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tanggalAwal, tanggalAkhir, namaUser]),
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      const goHome = () => {
+        navigation.navigate('Home');
+        return true;
+      };
+
+      const backHandler = BackHandler.addEventListener(
+        'hardwareBackPress',
+        goHome,
+      );
+
+      const unsubscribeBeforeRemove = navigation.addListener(
+        'beforeRemove',
+        (e: any) => {
+          if (e?.data?.action?.type === 'NAVIGATE') {
+            return;
+          }
+          e.preventDefault();
+          navigation.navigate('Home');
+        },
+      );
+
+      return () => {
+        backHandler.remove();
+        unsubscribeBeforeRemove();
+      };
+    }, [navigation]),
   );
 
   const openWA = async (text: string, mode: 'app' | 'business') => {

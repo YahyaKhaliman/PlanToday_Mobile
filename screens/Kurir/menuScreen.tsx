@@ -1,6 +1,8 @@
 /* eslint-disable react-native/no-inline-styles */
 import React from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
+  BackHandler,
   Text,
   TouchableOpacity,
   StyleSheet,
@@ -82,6 +84,36 @@ export default function KurirMenuScreen({ navigation }: any) {
       navigation.navigate(route);
     });
   };
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const goHome = () => {
+        navigation.navigate('Home');
+        return true;
+      };
+
+      const backHandler = BackHandler.addEventListener(
+        'hardwareBackPress',
+        goHome,
+      );
+
+      const unsubscribeBeforeRemove = navigation.addListener(
+        'beforeRemove',
+        (e: any) => {
+          if (e?.data?.action?.type === 'NAVIGATE') {
+            return;
+          }
+          e.preventDefault();
+          navigation.navigate('Home');
+        },
+      );
+
+      return () => {
+        backHandler.remove();
+        unsubscribeBeforeRemove();
+      };
+    }, [navigation]),
+  );
 
   return (
     <LinearGradient
