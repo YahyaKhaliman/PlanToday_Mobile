@@ -811,8 +811,8 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
         <head>
           <meta charset="utf-8" />
           <style>
-            @page { size: A4; margin: 16mm; }
-            body { font-family: Arial, sans-serif; color: #111; font-size: 11px; line-height: 1.28; }
+            @page { size: A4; margin: 10mm; }
+            body { font-family: Arial, sans-serif; color: #111; font-size: 12px; line-height: 1.28; }
             .wrap { width: 100%; }
             .top { display: table; width: 100%; margin-bottom: 6px; }
             .top-left, .top-right { display: table-cell; vertical-align: top; }
@@ -1045,8 +1045,8 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
         <head>
           <meta charset="utf-8" />
           <style>
-            @page { size: A4; margin: 14mm; }
-            body { font-family: Arial, sans-serif; color: #111; font-size: 11px; }
+            @page { size: A4; margin: 10mm; }
+            body { font-family: Arial, sans-serif; color: #111; font-size: 12px; }
             .head { text-align: right; margin-bottom: 4px; }
             .logo-wrap { text-align: right; margin-bottom: 2px; }
             .logo-img { width: 100%; max-width: 320px; max-height: 76px; object-fit: contain; display: inline-block; }
@@ -1213,8 +1213,8 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
         <head>
           <meta charset="utf-8" />
           <style>
-            @page { size: A4; margin: 14mm; }
-            body { font-family: Arial, sans-serif; color: #111; font-size: 11px; }
+            @page { size: A4; margin: 10mm; }
+            body { font-family: Arial, sans-serif; color: #111; font-size: 12px; }
             .top { display: table; width: 100%; margin-bottom: 6px; }
             .top-left, .top-right { display: table-cell; vertical-align: top; }
             .top-left { width: 46%; }
