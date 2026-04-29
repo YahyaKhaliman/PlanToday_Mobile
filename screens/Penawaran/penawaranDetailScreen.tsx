@@ -124,6 +124,14 @@ const normalizeAssetPath = (value?: string | null) =>
     .replace(/^asset:\/+/i, '')
     .replace(/^\/+/, '');
 
+const toAndroidResourceName = (value?: string | null) => {
+  const assetPath = normalizeAssetPath(value);
+  if (!assetPath) return '';
+  const fileName = assetPath.split('/').pop() || '';
+  const withoutExt = fileName.replace(/\.[^.]+$/, '');
+  return withoutExt.trim().toLowerCase();
+};
+
 const isRenderablePdfImgSrc = (value?: string) => {
   const src = String(value || '').trim();
   if (!src) return false;
@@ -556,6 +564,32 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
             console.warn('[PDF][Logo] Failed readFileAssets from assetPath:', {
               assetPath,
             });
+
+            // Release-safe fallback: read from Android drawable/raw resource name.
+            try {
+              const resourceName = toAndroidResourceName(assetPath);
+              if (resourceName) {
+                const base64 = await RNFS.readFileRes(resourceName, 'base64');
+                const src = await resolveBase64ForPdfSrc(base64, 'android-res');
+                if (src) {
+                  console.log(
+                    '[PDF][Logo] Loaded from Android resource fallback:',
+                    {
+                      assetPath,
+                      resourceName,
+                      base64Length: String(base64 || '').length,
+                    },
+                  );
+                  return src;
+                }
+              }
+            } catch {
+              console.warn('[PDF][Logo] Failed readFileRes fallback:', {
+                assetPath,
+                resourceName: toAndroidResourceName(assetPath),
+              });
+            }
+
             // fallback to raw uri when bundled asset cannot be converted.
           }
         }

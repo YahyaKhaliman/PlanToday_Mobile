@@ -247,13 +247,10 @@ export default function App() {
               >
                 {isUpdating ? (
                   <View style={styles.updatingWrap}>
-                    <View style={styles.warningBox}>
-                      <Text style={styles.warningText}>
-                        Jangan tutup aplikasi saat update berlangsung.
-                      </Text>
-                    </View>
                     <ActivityIndicator color="#FFFFFF" size="small" />
-                    <Text style={styles.primaryButtonText}>Mengunduh...</Text>
+                    <Text style={styles.primaryButtonText}>
+                      Mengunduh update...
+                    </Text>
                   </View>
                 ) : (
                   <Text style={styles.primaryButtonText}>Update Sekarang</Text>
@@ -418,7 +415,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: THEME.line,
     borderRadius: 14,
-    minHeight: 48,
+    minHeight: 44,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
@@ -431,10 +428,11 @@ const styles = StyleSheet.create({
   primaryButton: {
     flex: 1.25,
     borderRadius: 14,
-    minHeight: 48,
+    minHeight: 44,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: THEME.primary,
+    paddingHorizontal: 12,
   },
   primaryButtonDisabled: {
     opacity: 0.8,
@@ -449,7 +447,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
   },
   buttonPressed: {
     opacity: 0.9,
