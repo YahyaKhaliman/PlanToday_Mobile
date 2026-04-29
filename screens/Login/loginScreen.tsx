@@ -19,6 +19,7 @@ import DeviceInfo from 'react-native-device-info';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../../services/api';
 import { useAuth } from '../../context/authContext';
+import { checkAppUpdate } from '../../services/appUpdate';
 
 const THEME = {
   primary: '#4F46E5',
@@ -39,6 +40,13 @@ export default function LoginScreen({ navigation }: any) {
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [appVersion, setAppVersion] = useState('Versi -');
+  const [updateStatus, setUpdateStatus] = useState<
+    'checking' | 'latest' | 'update_available' | 'failed_check'
+  >('checking');
+  const [latestVersionLabel, setLatestVersionLabel] = useState<string | null>(
+    null,
+  );
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [rememberMe, setRememberMe] = useState(false);
 
@@ -60,6 +68,57 @@ export default function LoginScreen({ navigation }: any) {
     };
     checkDevice();
   }, []);
+
+  useEffect(() => {
+    const localVersion = DeviceInfo.getVersion();
+    const localBuild = DeviceInfo.getBuildNumber();
+    setAppVersion(`Versi ${localVersion} (build ${localBuild})`);
+
+    const checkUpdateStatus = async () => {
+      setUpdateStatus('checking');
+      setLatestVersionLabel(null);
+
+      try {
+        const updateManifest = await checkAppUpdate();
+
+        if (updateManifest) {
+          setUpdateStatus('update_available');
+          setLatestVersionLabel(
+            `Versi terbaru ${updateManifest.versionName} (build ${updateManifest.versionCode})`,
+          );
+          return;
+        }
+
+        setUpdateStatus('latest');
+      } catch {
+        setUpdateStatus('failed_check');
+      }
+    };
+
+    checkUpdateStatus();
+
+    const unsubscribeFocus = navigation.addListener('focus', () => {
+      checkUpdateStatus();
+    });
+
+    return unsubscribeFocus;
+  }, [navigation]);
+
+  const updateStatusText = useMemo(() => {
+    switch (updateStatus) {
+      case 'checking':
+        return 'Memeriksa pembaruan aplikasi...';
+      case 'latest':
+        return 'Aplikasi sudah versi terbaru';
+      case 'update_available':
+        return latestVersionLabel
+          ? `Update tersedia • ${latestVersionLabel}`
+          : 'Update tersedia';
+      case 'failed_check':
+      default:
+        return 'Gagal memeriksa pembaruan';
+    }
+  }, [latestVersionLabel, updateStatus]);
 
   const handleLogin = async () => {
     if (loading) return;
@@ -219,6 +278,18 @@ export default function LoginScreen({ navigation }: any) {
                 <Text style={styles.footerLinkBold}>Register</Text>
               </Text>
             </TouchableOpacity>
+
+            <Text style={styles.bottomNote}>{appVersion}</Text>
+            <Text
+              style={[
+                styles.updateStatusNote,
+                updateStatus === 'update_available' &&
+                  styles.updateStatusAvailable,
+                updateStatus === 'failed_check' && styles.updateStatusFailed,
+              ]}
+            >
+              {updateStatusText}
+            </Text>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -349,5 +420,21 @@ const styles = StyleSheet.create({
     color: 'rgba(100,116,139,0.75)',
     fontSize: 12,
     fontWeight: '700',
+  },
+
+  updateStatusNote: {
+    marginTop: 6,
+    textAlign: 'center',
+    color: THEME.muted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+
+  updateStatusAvailable: {
+    color: '#B45309',
+  },
+
+  updateStatusFailed: {
+    color: THEME.danger,
   },
 });
