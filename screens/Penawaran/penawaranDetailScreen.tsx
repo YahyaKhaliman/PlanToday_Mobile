@@ -32,6 +32,7 @@ import {
   PENAWARAN_STATUS_COLORS,
   PENAWARAN_THEME,
 } from './penawaranTheme';
+import { PDF_STATIC_BASE64 } from '../../utils/pdfAssetBase64';
 
 const THEME = PENAWARAN_THEME;
 
@@ -209,6 +210,8 @@ type PdfTemplateKey =
 type PdfStaticAssetConfig = {
   moduleId: number;
   assetPath: string;
+  staticBase64?: string;
+  staticKey?: string;
 };
 
 type PdfResolvedImageSource = {
@@ -272,14 +275,20 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
       KENCANA_PRINT: {
         moduleId: require('../../utils/kp.jpg'),
         assetPath: 'utils/kp.jpg',
+        staticBase64: PDF_STATIC_BASE64.KENCANA_PRINT_HEADER,
+        staticKey: 'KENCANA_PRINT_HEADER',
       },
       JAYA_ABADI_MULIA: {
         moduleId: require('../../utils/jaya.jpg'),
         assetPath: 'utils/jaya.jpg',
+        staticBase64: PDF_STATIC_BASE64.JAYA_ABADI_MULIA_HEADER,
+        staticKey: 'JAYA_ABADI_MULIA_HEADER',
       },
       MADANI_PRODUCTION: {
         moduleId: require('../../utils/madani.jpg'),
         assetPath: 'utils/madani.jpg',
+        staticBase64: PDF_STATIC_BASE64.MADANI_PRODUCTION_HEADER,
+        staticKey: 'MADANI_PRODUCTION_HEADER',
       },
     }),
     [],
@@ -290,14 +299,20 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
       KENCANA_PRINT: {
         moduleId: require('../../utils/pen_kp.jpg'),
         assetPath: 'utils/pen_kp.jpg',
+        staticBase64: PDF_STATIC_BASE64.KENCANA_PRINT_SIGN,
+        staticKey: 'KENCANA_PRINT_SIGN',
       },
       JAYA_ABADI_MULIA: {
         moduleId: require('../../utils/pen_ja.jpg'),
         assetPath: 'utils/pen_ja.jpg',
+        staticBase64: PDF_STATIC_BASE64.JAYA_ABADI_MULIA_SIGN,
+        staticKey: 'JAYA_ABADI_MULIA_SIGN',
       },
       MADANI_PRODUCTION: {
         moduleId: require('../../utils/pen_md.jpg'),
         assetPath: 'utils/pen_md.jpg',
+        staticBase64: PDF_STATIC_BASE64.MADANI_PRODUCTION_SIGN,
+        staticKey: 'MADANI_PRODUCTION_SIGN',
       },
     }),
     [],
@@ -453,6 +468,8 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
     ): Promise<PdfResolvedImageSource> => {
       const moduleId = assetConfig?.moduleId;
       const forcedAssetPath = assetConfig?.assetPath;
+      const staticBase64 = String(assetConfig?.staticBase64 || '').trim();
+      const staticKey = String(assetConfig?.staticKey || '').trim();
       const resolvedAsset =
         typeof moduleId === 'number'
           ? Image.resolveAssetSource(moduleId)
@@ -489,6 +506,24 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
         return ensureResolved('', 'empty', 'base64-data-uri-not-renderable');
       };
 
+      const resolveByStaticBase64Fallback = async (source: string) => {
+        if (!staticBase64)
+          return ensureResolved('', 'empty', `${source}:no-static`);
+        const byStatic = await resolveByBase64DataUri(
+          staticBase64,
+          'require-data-uri',
+          `${source}:${staticKey || 'static-base64'}`,
+        );
+        if (byStatic.src) {
+          return ensureResolved(
+            byStatic.src,
+            'require-data-uri',
+            byStatic.debug,
+          );
+        }
+        return ensureResolved('', 'empty', `${source}:static-not-renderable`);
+      };
+
       // Release-safe deterministic path: require(...) -> assetPath/assets/res -> base64 data URI.
       if (Platform.OS === 'android' && forcedAssetPath) {
         try {
@@ -500,7 +535,11 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
           );
           if (byAsset.src) return byAsset;
         } catch {
-          // continue to res fallback
+          const fallback = await resolveByStaticBase64Fallback(
+            'readFileAssets-failed',
+          );
+          if (fallback.src) return fallback;
+          // continue to res fallback / chain
         }
 
         try {
@@ -515,12 +554,18 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
             if (byRes.src) return byRes;
           }
         } catch {
+          const fallback = await resolveByStaticBase64Fallback(
+            'readFileRes-failed',
+          );
+          if (fallback.src) return fallback;
           // continue to generic fallback chain
         }
       }
 
       const rawUri = String(assetUri || '').trim();
       if (!rawUri) {
+        const fallback = await resolveByStaticBase64Fallback('empty-asset-uri');
+        if (fallback.src) return fallback;
         return ensureResolved('', 'empty', 'empty-asset-uri');
       }
 
@@ -1442,9 +1487,63 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
         },
       };
 
+      const releaseTemplateStatus = {
+        header: {
+          KENCANA_PRINT: {
+            sourceType: kencanaHeaderResolved.sourceType,
+            debug: kencanaHeaderResolved.debug,
+            finalSrcLength: kencanaHeaderSrc.length,
+            isValidDataUri: /^data:image\//i.test(kencanaHeaderSrc),
+            isRenderable: isRenderablePdfImgSrc(kencanaHeaderSrc),
+          },
+          JAYA_ABADI_MULIA: {
+            sourceType: jayaHeaderResolved.sourceType,
+            debug: jayaHeaderResolved.debug,
+            finalSrcLength: jayaHeaderSrc.length,
+            isValidDataUri: /^data:image\//i.test(jayaHeaderSrc),
+            isRenderable: isRenderablePdfImgSrc(jayaHeaderSrc),
+          },
+          MADANI_PRODUCTION: {
+            sourceType: madaniHeaderResolved.sourceType,
+            debug: madaniHeaderResolved.debug,
+            finalSrcLength: madaniHeaderSrc.length,
+            isValidDataUri: /^data:image\//i.test(madaniHeaderSrc),
+            isRenderable: isRenderablePdfImgSrc(madaniHeaderSrc),
+          },
+        },
+        sign: {
+          KENCANA_PRINT: {
+            sourceType: kencanaSignResolved.sourceType,
+            debug: kencanaSignResolved.debug,
+            finalSrcLength: kencanaSignSrc.length,
+            isValidDataUri: /^data:image\//i.test(kencanaSignSrc),
+            isRenderable: isRenderablePdfImgSrc(kencanaSignSrc),
+          },
+          JAYA_ABADI_MULIA: {
+            sourceType: jayaSignResolved.sourceType,
+            debug: jayaSignResolved.debug,
+            finalSrcLength: jayaSignSrc.length,
+            isValidDataUri: /^data:image\//i.test(jayaSignSrc),
+            isRenderable: isRenderablePdfImgSrc(jayaSignSrc),
+          },
+          MADANI_PRODUCTION: {
+            sourceType: madaniSignResolved.sourceType,
+            debug: madaniSignResolved.debug,
+            finalSrcLength: madaniSignSrc.length,
+            isValidDataUri: /^data:image\//i.test(madaniSignSrc),
+            isRenderable: isRenderablePdfImgSrc(madaniSignSrc),
+          },
+        },
+      };
+
       console.log(
         '[PDF][Release] Final source summary:',
         JSON.stringify(finalReleaseSourceSummary),
+      );
+
+      console.log(
+        '[PDF][ReleaseAsset] Template status:',
+        JSON.stringify(releaseTemplateStatus),
       );
 
       console.log(

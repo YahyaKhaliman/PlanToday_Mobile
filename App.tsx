@@ -211,9 +211,7 @@ export default function App() {
               {isUpdating && (
                 <View style={styles.progressSection}>
                   <View style={styles.progressMetaRow}>
-                    <Text style={styles.progressLabel}>
-                      Mengunduh update...
-                    </Text>
+                    <Text style={styles.progressLabel}>Downloading...</Text>
                     <Text style={styles.progressPercent}>
                       {downloadProgress}%
                     </Text>
@@ -261,9 +259,7 @@ export default function App() {
                 {isUpdating ? (
                   <View style={styles.updatingWrap}>
                     <ActivityIndicator color="#FFFFFF" size="small" />
-                    <Text style={styles.primaryButtonText}>
-                      Mengunduh update...
-                    </Text>
+                    <Text style={styles.primaryButtonText}>Downloading...</Text>
                   </View>
                 ) : (
                   <Text style={styles.primaryButtonText}>Update Sekarang</Text>
