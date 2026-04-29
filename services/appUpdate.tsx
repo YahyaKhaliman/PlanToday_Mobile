@@ -19,6 +19,12 @@ export type AppUpdateCheckResult = {
   failed: boolean;
 };
 
+export type DownloadUpdateResult =
+  | { status: 'opened-installer' }
+  | { status: 'downloaded-no-installer' }
+  | { status: 'failed-network' }
+  | { status: 'failed-other' };
+
 const toNumber = (value: string | number | undefined) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -109,9 +115,9 @@ export const checkAppUpdateWithStatus =
 export const downloadUpdateApk = async (
   manifest: AppUpdateManifest,
   onProgress?: (percent: number) => void,
-): Promise<boolean> => {
+): Promise<DownloadUpdateResult> => {
   if (Platform.OS !== 'android') {
-    return false;
+    return { status: 'failed-other' };
   }
 
   try {
@@ -151,15 +157,28 @@ export const downloadUpdateApk = async (
       typeof response?.path === 'function' ? response.path() : '';
 
     if (downloadedPath) {
-      await ReactNativeBlobUtil.android.actionViewIntent(
-        downloadedPath,
-        'application/vnd.android.package-archive',
-      );
-      return true;
+      try {
+        await ReactNativeBlobUtil.android.actionViewIntent(
+          downloadedPath,
+          'application/vnd.android.package-archive',
+        );
+        return { status: 'opened-installer' };
+      } catch {
+        return { status: 'downloaded-no-installer' };
+      }
     }
 
-    return false;
-  } catch {
-    return false;
+    // Download manager may finish without a resolvable path on some devices.
+    return { status: 'downloaded-no-installer' };
+  } catch (error: any) {
+    const message = String(error?.message || '').toLowerCase();
+    const isNetworkError =
+      message.includes('network') ||
+      message.includes('timeout') ||
+      message.includes('unable to resolve host') ||
+      message.includes('failed to connect') ||
+      message.includes('connection');
+
+    return { status: isNetworkError ? 'failed-network' : 'failed-other' };
   }
 };

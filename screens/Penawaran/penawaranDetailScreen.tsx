@@ -1,3 +1,4 @@
+/* eslint-disable no-bitwise */
 // eslint-disable react-native/no-inline-styles */
 import React, { useCallback, useMemo, useState } from 'react';
 import {
@@ -155,6 +156,15 @@ const ensureFileUri = (value?: string) => {
 
 const summarizePdfImgSrc = (value?: string) => {
   const src = String(value || '').trim();
+  const payload = src.includes(',') ? src.split(',')[1] || '' : '';
+  const payloadPrefix = payload.slice(0, 16);
+  const payloadSuffix = payload.slice(-12);
+
+  let fingerprint = 0;
+  for (let i = 0; i < payload.length; i += 1) {
+    fingerprint = (fingerprint * 33 + payload.charCodeAt(i)) >>> 0;
+  }
+
   return {
     hasSrc: Boolean(src),
     isDataUri: /^data:image\//i.test(src),
@@ -162,6 +172,12 @@ const summarizePdfImgSrc = (value?: string) => {
     isHttpUri: /^https?:\/\//i.test(src),
     length: src.length,
     preview: src.slice(0, 80),
+    payloadLength: payload.length,
+    payloadPrefix,
+    payloadSuffix,
+    jpegMagic: payloadPrefix.startsWith('/9j/'),
+    pngMagic: payloadPrefix.startsWith('iVBORw0KGgo'),
+    fingerprint,
   };
 };
 
@@ -189,6 +205,25 @@ type PdfTemplateKey =
   | 'KENCANA_PRINT'
   | 'JAYA_ABADI_MULIA'
   | 'MADANI_PRODUCTION';
+
+type PdfStaticAssetConfig = {
+  moduleId: number;
+  assetPath: string;
+};
+
+type PdfResolvedImageSource = {
+  src: string;
+  sourceType:
+    | 'require-data-uri'
+    | 'file-path'
+    | 'bundled-asset'
+    | 'android-res'
+    | 'http-fetch'
+    | 'file-uri-fallback'
+    | 'raw-data-uri'
+    | 'empty';
+  debug?: string;
+};
 
 const ensureLegacyAndroidWritePermission = async () => {
   if (Platform.OS !== 'android') return true;
@@ -232,45 +267,36 @@ const InfoRow = ({
 export default function PenawaranDetailScreen({ navigation, route }: any) {
   const nomor = String(route?.params?.nomor || '');
   const insets = useSafeAreaInsets();
-  const pdfHeaderAssetUri = useMemo(
+  const pdfHeaderAssetConfig = useMemo(
     () => ({
       KENCANA_PRINT: {
-        uri: Image.resolveAssetSource(require('../../utils/kp.jpg'))?.uri || '',
+        moduleId: require('../../utils/kp.jpg'),
         assetPath: 'utils/kp.jpg',
       },
       JAYA_ABADI_MULIA: {
-        uri:
-          Image.resolveAssetSource(require('../../utils/jaya.jpg'))?.uri || '',
+        moduleId: require('../../utils/jaya.jpg'),
         assetPath: 'utils/jaya.jpg',
       },
       MADANI_PRODUCTION: {
-        uri:
-          Image.resolveAssetSource(require('../../utils/madani.jpg'))?.uri ||
-          '',
+        moduleId: require('../../utils/madani.jpg'),
         assetPath: 'utils/madani.jpg',
       },
     }),
     [],
   );
 
-  const pdfDigitalSignAssetUri = useMemo(
+  const pdfDigitalSignAssetConfig = useMemo(
     () => ({
       KENCANA_PRINT: {
-        uri:
-          Image.resolveAssetSource(require('../../utils/pen_kp.jpg'))?.uri ||
-          '',
+        moduleId: require('../../utils/pen_kp.jpg'),
         assetPath: 'utils/pen_kp.jpg',
       },
       JAYA_ABADI_MULIA: {
-        uri:
-          Image.resolveAssetSource(require('../../utils/pen_ja.jpg'))?.uri ||
-          '',
+        moduleId: require('../../utils/pen_ja.jpg'),
         assetPath: 'utils/pen_ja.jpg',
       },
       MADANI_PRODUCTION: {
-        uri:
-          Image.resolveAssetSource(require('../../utils/pen_md.jpg'))?.uri ||
-          '',
+        moduleId: require('../../utils/pen_md.jpg'),
         assetPath: 'utils/pen_md.jpg',
       },
     }),
@@ -422,30 +448,90 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
   }, []);
 
   const resolvePdfImageSrc = useCallback(
-    async (assetUri?: string, forcedAssetPath?: string) => {
-      const rawUri = String(assetUri || '').trim();
-      if (!rawUri) {
-        console.warn('[PDF][Logo] Empty assetUri received');
-        return '';
+    async (
+      assetConfig?: PdfStaticAssetConfig,
+    ): Promise<PdfResolvedImageSource> => {
+      const moduleId = assetConfig?.moduleId;
+      const forcedAssetPath = assetConfig?.assetPath;
+      const resolvedAsset =
+        typeof moduleId === 'number'
+          ? Image.resolveAssetSource(moduleId)
+          : null;
+      const assetUri = String(resolvedAsset?.uri || '').trim();
+
+      const ensureResolved = (
+        src: string,
+        sourceType: PdfResolvedImageSource['sourceType'],
+        debug?: string,
+      ): PdfResolvedImageSource => ({ src, sourceType, debug });
+
+      const baseMimeType = resolveImageMimeType(forcedAssetPath || assetUri);
+
+      const buildDataUri = (base64?: string) => {
+        const cleaned = String(base64 || '').trim();
+        if (!cleaned) return '';
+        return `data:${baseMimeType};base64,${cleaned}`;
+      };
+
+      const resolveByBase64DataUri = async (
+        base64?: string,
+        sourceType?: PdfResolvedImageSource['sourceType'],
+        debug?: string,
+      ): Promise<PdfResolvedImageSource> => {
+        const dataUri = buildDataUri(base64);
+        if (isRenderablePdfImgSrc(dataUri)) {
+          return ensureResolved(
+            dataUri,
+            sourceType || 'require-data-uri',
+            debug || sourceType,
+          );
+        }
+        return ensureResolved('', 'empty', 'base64-data-uri-not-renderable');
+      };
+
+      // Release-safe deterministic path: require(...) -> assetPath/assets/res -> base64 data URI.
+      if (Platform.OS === 'android' && forcedAssetPath) {
+        try {
+          const base64 = await RNFS.readFileAssets(forcedAssetPath, 'base64');
+          const byAsset = await resolveByBase64DataUri(
+            base64,
+            'require-data-uri',
+            `readFileAssets:${forcedAssetPath}`,
+          );
+          if (byAsset.src) return byAsset;
+        } catch {
+          // continue to res fallback
+        }
+
+        try {
+          const resourceName = toAndroidResourceName(forcedAssetPath);
+          if (resourceName) {
+            const base64 = await RNFS.readFileRes(resourceName, 'base64');
+            const byRes = await resolveByBase64DataUri(
+              base64,
+              'require-data-uri',
+              `readFileRes:${resourceName}`,
+            );
+            if (byRes.src) return byRes;
+          }
+        } catch {
+          // continue to generic fallback chain
+        }
       }
 
-      console.log('[PDF][Logo] Resolve start:', { rawUri });
+      const rawUri = String(assetUri || '').trim();
+      if (!rawUri) {
+        return ensureResolved('', 'empty', 'empty-asset-uri');
+      }
 
       const isHttpLikeUri = /^https?:\/\//i.test(rawUri);
 
       if (rawUri.startsWith('data:')) {
-        console.log('[PDF][Logo] Using direct URI/data source:', {
-          rawUriPreview: rawUri.slice(0, 80),
-        });
-        return rawUri;
+        return ensureResolved(rawUri, 'raw-data-uri', 'raw-uri-data');
       }
 
       const normalizedPath = normalizePdfPath(rawUri);
-      const mimeType = resolveImageMimeType(rawUri);
-      console.log('[PDF][Logo] Normalized path candidate:', {
-        normalizedPath,
-        mimeType,
-      });
+      const mimeType = baseMimeType;
 
       const buildTempLogoFilePath = (extension: string) => {
         const baseDir =
@@ -498,96 +584,86 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
 
       const resolveBase64ForPdfSrc = async (
         base64?: string,
-        source?: string,
+        source?: PdfResolvedImageSource['sourceType'],
+        debug?: string,
       ) => {
         const cleaned = String(base64 || '').trim();
-        if (!cleaned) return '';
+        if (!cleaned) {
+          return ensureResolved('', 'empty', debug || source || 'empty-base64');
+        }
 
         const dataUri = ensureDataUri(cleaned);
         if (isRenderablePdfImgSrc(dataUri)) {
-          console.log('[PDF][Logo] Using base64 data URI src (preferred):', {
-            source,
-            length: dataUri.length,
-            preview: dataUri.slice(0, 64),
-          });
-          return dataUri;
+          return ensureResolved(
+            dataUri,
+            source || 'require-data-uri',
+            debug || source,
+          );
         }
 
-        const tempFileSrc = await materializeBase64ToTempFile(cleaned, source);
+        const tempFileSrc = await materializeBase64ToTempFile(cleaned, debug);
         if (isRenderablePdfImgSrc(tempFileSrc)) {
           const normalizedTempFileSrc = ensureFileUri(tempFileSrc);
-          console.log('[PDF][Logo] Falling back to temp file src:', {
-            source,
-            length: normalizedTempFileSrc.length,
-            preview: normalizedTempFileSrc.slice(0, 80),
-          });
-          return normalizedTempFileSrc;
+          return ensureResolved(
+            normalizedTempFileSrc,
+            'file-uri-fallback',
+            `temp-file:${debug || source || ''}`,
+          );
         }
 
-        return '';
+        return ensureResolved(
+          '',
+          'empty',
+          debug || source || 'no-renderable-src',
+        );
       };
 
       try {
         if (normalizedPath && (await RNFS.exists(normalizedPath))) {
           const base64 = await RNFS.readFile(normalizedPath, 'base64');
-          const src = await resolveBase64ForPdfSrc(base64, 'file-path');
-          if (src) {
-            console.log('[PDF][Logo] Loaded from file path:', {
-              normalizedPath,
-              base64Length: String(base64 || '').length,
-            });
-            return src;
+          const resolved = await resolveBase64ForPdfSrc(
+            base64,
+            'file-path',
+            `readFile:${normalizedPath}`,
+          );
+          if (resolved.src) {
+            return resolved;
           }
         }
       } catch {
-        console.warn('[PDF][Logo] Failed readFile from normalizedPath:', {
-          normalizedPath,
-        });
         // fallback to raw uri when local file cannot be converted.
       }
 
       if (Platform.OS === 'android' && !isHttpLikeUri) {
         const assetPath = forcedAssetPath || normalizeAssetPath(rawUri);
-        console.log('[PDF][Logo] Android assetPath candidate:', { assetPath });
         if (assetPath) {
           try {
             const base64 = await RNFS.readFileAssets(assetPath, 'base64');
-            const src = await resolveBase64ForPdfSrc(base64, 'bundled-asset');
-            if (src) {
-              console.log('[PDF][Logo] Loaded from bundled asset:', {
-                assetPath,
-                base64Length: String(base64 || '').length,
-              });
-              return src;
+            const resolved = await resolveBase64ForPdfSrc(
+              base64,
+              'bundled-asset',
+              `readFileAssets:${assetPath}`,
+            );
+            if (resolved.src) {
+              return resolved;
             }
           } catch {
-            console.warn('[PDF][Logo] Failed readFileAssets from assetPath:', {
-              assetPath,
-            });
-
             // Release-safe fallback: read from Android drawable/raw resource name.
             try {
               const resourceName = toAndroidResourceName(assetPath);
               if (resourceName) {
                 const base64 = await RNFS.readFileRes(resourceName, 'base64');
-                const src = await resolveBase64ForPdfSrc(base64, 'android-res');
-                if (src) {
-                  console.log(
-                    '[PDF][Logo] Loaded from Android resource fallback:',
-                    {
-                      assetPath,
-                      resourceName,
-                      base64Length: String(base64 || '').length,
-                    },
-                  );
-                  return src;
+                const resolved = await resolveBase64ForPdfSrc(
+                  base64,
+                  'android-res',
+                  `readFileRes:${resourceName}`,
+                );
+                if (resolved.src) {
+                  return resolved;
                 }
               }
             } catch {
-              console.warn('[PDF][Logo] Failed readFileRes fallback:', {
-                assetPath,
-                resourceName: toAndroidResourceName(assetPath),
-              });
+              // no-op
             }
 
             // fallback to raw uri when bundled asset cannot be converted.
@@ -595,98 +671,59 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
         }
       }
 
-      if (Platform.OS === 'android' && isHttpLikeUri) {
-        console.log(
-          '[PDF][Logo] Skipping readFileAssets for HTTP URI in dev/metro mode',
-          {
-            rawUri,
-          },
-        );
-      }
-
       if (isHttpLikeUri) {
-        console.warn(
-          '[PDF][Logo] HTTP URI detected. Trying network fetch fallback:',
-          {
-            rawUri,
-          },
-        );
-
         try {
           const RNBlobUtil = require('react-native-blob-util');
           const blobUtil = RNBlobUtil?.default ?? RNBlobUtil;
 
-          if (!blobUtil?.fetch) {
-            console.warn(
-              '[PDF][Logo] RNBlobUtil.fetch unavailable for HTTP fallback',
-            );
-            return '';
-          }
+          if (!blobUtil?.fetch)
+            return ensureResolved('', 'empty', 'no-blob-fetch');
 
           const response = await blobUtil.fetch('GET', rawUri);
           const base64 = response?.base64?.();
-          const src = await resolveBase64ForPdfSrc(base64, 'http-fetch');
-
-          if (src) {
-            console.log(
-              '[PDF][Logo] Loaded from HTTP URI via blob-util fetch:',
-              {
-                rawUri,
-                base64Length: String(base64 || '').length,
-              },
-            );
-            return src;
-          }
-
-          console.warn(
-            '[PDF][Logo] HTTP fallback fetched but base64 is empty:',
-            {
-              rawUri,
-            },
+          const resolved = await resolveBase64ForPdfSrc(
+            base64,
+            'http-fetch',
+            `http-fetch:${rawUri.slice(0, 64)}`,
           );
-        } catch (error: any) {
-          console.warn('[PDF][Logo] HTTP fallback fetch failed:', {
-            rawUri,
-            message: String(error?.message || error || 'unknown error'),
-          });
-        }
 
-        console.warn(
-          '[PDF][Logo] HTTP URI fallback failed. Logo will be omitted:',
-          {
-            rawUri,
-          },
-        );
-        return '';
+          if (resolved.src) {
+            return resolved;
+          }
+        } catch (error: any) {
+          return ensureResolved(
+            '',
+            'empty',
+            `http-fetch-failed:${String(error?.message || error || 'unknown')}`,
+          );
+        }
+        return ensureResolved('', 'empty', 'http-fallback-empty');
       }
 
       if (normalizedPath && (await RNFS.exists(normalizedPath))) {
         const fileSrc = ensureFileUri(normalizedPath);
         if (isRenderablePdfImgSrc(fileSrc)) {
-          console.log('[PDF][Logo] Using existing local file path fallback:', {
-            normalizedPath,
-            fileSrcPreview: fileSrc.slice(0, 80),
-          });
-          return fileSrc;
+          return ensureResolved(
+            fileSrc,
+            'file-uri-fallback',
+            `file-uri:${normalizedPath}`,
+          );
         }
       }
 
       if (rawUri.startsWith('data:')) {
         const base64Part = rawUri.split(',')[1] || '';
-        const src = await resolveBase64ForPdfSrc(base64Part, 'raw-data-uri');
-        if (src) {
-          console.log('[PDF][Logo] Resolved from raw data URI');
-          return src;
+        const resolved = await resolveBase64ForPdfSrc(
+          base64Part,
+          'raw-data-uri',
+          'raw-data-uri-split',
+        );
+        if (resolved.src) {
+          return resolved;
         }
       }
 
-      console.warn(
-        '[PDF][Logo] No valid data URI/local file path resolved. Logo will be omitted:',
-        {
-          rawUri,
-        },
-      );
-      return '';
+      return ensureResolved('', 'empty', 'unresolved');
     },
     [],
   );
@@ -1333,38 +1370,32 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
         String(header.digital_sign || '')
           .trim()
           .toUpperCase() === 'Y';
-      const [kencanaHeaderSrc, jayaHeaderSrc, madaniHeaderSrc] =
+      const [kencanaHeaderResolved, jayaHeaderResolved, madaniHeaderResolved] =
         await Promise.all([
-          resolvePdfImageSrc(
-            pdfHeaderAssetUri.KENCANA_PRINT.uri,
-            pdfHeaderAssetUri.KENCANA_PRINT.assetPath,
-          ),
-          resolvePdfImageSrc(
-            pdfHeaderAssetUri.JAYA_ABADI_MULIA.uri,
-            pdfHeaderAssetUri.JAYA_ABADI_MULIA.assetPath,
-          ),
-          resolvePdfImageSrc(
-            pdfHeaderAssetUri.MADANI_PRODUCTION.uri,
-            pdfHeaderAssetUri.MADANI_PRODUCTION.assetPath,
-          ),
+          resolvePdfImageSrc(pdfHeaderAssetConfig.KENCANA_PRINT),
+          resolvePdfImageSrc(pdfHeaderAssetConfig.JAYA_ABADI_MULIA),
+          resolvePdfImageSrc(pdfHeaderAssetConfig.MADANI_PRODUCTION),
         ]);
 
-      const [kencanaSignSrc, jayaSignSrc, madaniSignSrc] = isDigitalSignEnabled
-        ? await Promise.all([
-            resolvePdfImageSrc(
-              pdfDigitalSignAssetUri.KENCANA_PRINT.uri,
-              pdfDigitalSignAssetUri.KENCANA_PRINT.assetPath,
-            ),
-            resolvePdfImageSrc(
-              pdfDigitalSignAssetUri.JAYA_ABADI_MULIA.uri,
-              pdfDigitalSignAssetUri.JAYA_ABADI_MULIA.assetPath,
-            ),
-            resolvePdfImageSrc(
-              pdfDigitalSignAssetUri.MADANI_PRODUCTION.uri,
-              pdfDigitalSignAssetUri.MADANI_PRODUCTION.assetPath,
-            ),
-          ])
-        : ['', '', ''];
+      const [kencanaSignResolved, jayaSignResolved, madaniSignResolved] =
+        isDigitalSignEnabled
+          ? await Promise.all([
+              resolvePdfImageSrc(pdfDigitalSignAssetConfig.KENCANA_PRINT),
+              resolvePdfImageSrc(pdfDigitalSignAssetConfig.JAYA_ABADI_MULIA),
+              resolvePdfImageSrc(pdfDigitalSignAssetConfig.MADANI_PRODUCTION),
+            ])
+          : [
+              { src: '', sourceType: 'empty', debug: 'digital-sign-disabled' },
+              { src: '', sourceType: 'empty', debug: 'digital-sign-disabled' },
+              { src: '', sourceType: 'empty', debug: 'digital-sign-disabled' },
+            ];
+
+      const kencanaHeaderSrc = kencanaHeaderResolved.src;
+      const jayaHeaderSrc = jayaHeaderResolved.src;
+      const madaniHeaderSrc = madaniHeaderResolved.src;
+      const kencanaSignSrc = kencanaSignResolved.src;
+      const jayaSignSrc = jayaSignResolved.src;
+      const madaniSignSrc = madaniSignResolved.src;
 
       const finalLogoSrcSummary = {
         KENCANA_PRINT: summarizePdfImgSrc(kencanaHeaderSrc),
@@ -1372,21 +1403,53 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
         MADANI_PRODUCTION: summarizePdfImgSrc(madaniHeaderSrc),
       };
 
-      console.log(
-        '[PDF][Logo] Final resolved src summary:',
-        JSON.stringify(finalLogoSrcSummary),
-      );
-
-      const finalDigitalSignSrcSummary = {
-        enabled: isDigitalSignEnabled,
-        KENCANA_PRINT: summarizePdfImgSrc(kencanaSignSrc),
-        JAYA_ABADI_MULIA: summarizePdfImgSrc(jayaSignSrc),
-        MADANI_PRODUCTION: summarizePdfImgSrc(madaniSignSrc),
+      const finalReleaseSourceSummary = {
+        os: Platform.OS,
+        digitalSignEnabled: isDigitalSignEnabled,
+        header: {
+          KENCANA_PRINT: {
+            sourceType: kencanaHeaderResolved.sourceType,
+            debug: kencanaHeaderResolved.debug,
+            src: summarizePdfImgSrc(kencanaHeaderSrc),
+          },
+          JAYA_ABADI_MULIA: {
+            sourceType: jayaHeaderResolved.sourceType,
+            debug: jayaHeaderResolved.debug,
+            src: summarizePdfImgSrc(jayaHeaderSrc),
+          },
+          MADANI_PRODUCTION: {
+            sourceType: madaniHeaderResolved.sourceType,
+            debug: madaniHeaderResolved.debug,
+            src: summarizePdfImgSrc(madaniHeaderSrc),
+          },
+        },
+        sign: {
+          KENCANA_PRINT: {
+            sourceType: kencanaSignResolved.sourceType,
+            debug: kencanaSignResolved.debug,
+            src: summarizePdfImgSrc(kencanaSignSrc),
+          },
+          JAYA_ABADI_MULIA: {
+            sourceType: jayaSignResolved.sourceType,
+            debug: jayaSignResolved.debug,
+            src: summarizePdfImgSrc(jayaSignSrc),
+          },
+          MADANI_PRODUCTION: {
+            sourceType: madaniSignResolved.sourceType,
+            debug: madaniSignResolved.debug,
+            src: summarizePdfImgSrc(madaniSignSrc),
+          },
+        },
       };
 
       console.log(
-        '[PDF][DigitalSign] Final resolved src summary:',
-        JSON.stringify(finalDigitalSignSrcSummary),
+        '[PDF][Release] Final source summary:',
+        JSON.stringify(finalReleaseSourceSummary),
+      );
+
+      console.log(
+        '[PDF][Logo] Final resolved src summary:',
+        JSON.stringify(finalLogoSrcSummary),
       );
 
       const html = buildPdfHtml(
@@ -1524,8 +1587,8 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
     buildPdfHtml,
     header,
     nomor,
-    pdfDigitalSignAssetUri,
-    pdfHeaderAssetUri,
+    pdfDigitalSignAssetConfig,
+    pdfHeaderAssetConfig,
     resolvePdfImageSrc,
   ]);
 

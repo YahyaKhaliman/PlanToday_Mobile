@@ -86,22 +86,35 @@ export default function App() {
 
     setIsUpdating(true);
     setDownloadProgress(0);
-    const downloaded = await downloadUpdateApk(pendingUpdate, percent => {
+    const downloadResult = await downloadUpdateApk(pendingUpdate, percent => {
       setDownloadProgress(percent);
     });
 
-    if (downloaded) {
+    if (downloadResult.status === 'opened-installer') {
       Toast.show({
         type: 'glassSuccess',
         text1: 'Download Selesai',
         text2: 'Installer update sedang dibuka.',
       });
-    } else {
-      await Linking.openURL(pendingUpdate.apkUrl);
+    } else if (downloadResult.status === 'downloaded-no-installer') {
       Toast.show({
         type: 'glassSuccess',
         text1: 'Download Selesai',
-        text2: 'Silakan lanjutkan instalasi update dari file yang diunduh.',
+        text2:
+          'File update sudah diunduh. Buka dari notifikasi/download manager untuk instalasi.',
+      });
+    } else if (downloadResult.status === 'failed-network') {
+      await Linking.openURL(pendingUpdate.apkUrl);
+      Toast.show({
+        type: 'glassInfo',
+        text1: 'Jaringan Bermasalah',
+        text2: 'Membuka link update di browser sebagai fallback.',
+      });
+    } else {
+      Toast.show({
+        type: 'glassError',
+        text1: 'Update Gagal',
+        text2: 'Unduhan gagal diproses. Coba lagi beberapa saat.',
       });
     }
 
