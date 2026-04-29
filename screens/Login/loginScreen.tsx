@@ -19,7 +19,7 @@ import DeviceInfo from 'react-native-device-info';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import api from '../../services/api';
 import { useAuth } from '../../context/authContext';
-import { checkAppUpdate } from '../../services/appUpdate';
+import { checkAppUpdateWithStatus } from '../../services/appUpdate';
 
 const THEME = {
   primary: '#4F46E5',
@@ -79,7 +79,13 @@ export default function LoginScreen({ navigation }: any) {
       setLatestVersionLabel(null);
 
       try {
-        const updateManifest = await checkAppUpdate();
+        const { manifest: updateManifest, failed } =
+          await checkAppUpdateWithStatus();
+
+        if (failed) {
+          setUpdateStatus('failed_check');
+          return;
+        }
 
         if (updateManifest) {
           setUpdateStatus('update_available');

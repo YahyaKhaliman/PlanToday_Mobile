@@ -17,6 +17,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import RNFS from 'react-native-fs';
+import * as RNHTMLtoPDF from 'react-native-html-to-pdf';
 import {
   getPenawaranActivityLogs,
   getPenawaranDetail,
@@ -123,6 +124,54 @@ const normalizeAssetPath = (value?: string | null) =>
     .replace(/^asset:\/+/i, '')
     .replace(/^\/+/, '');
 
+const isRenderablePdfImgSrc = (value?: string) => {
+  const src = String(value || '').trim();
+  if (!src) return false;
+  return /^(file:\/\/|data:image\/|https?:\/\/)/i.test(src);
+};
+
+const ensureFileUri = (value?: string) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (/^file:\/\//i.test(raw)) {
+    return raw.replace(/^file:\/\/(?!\/)/i, 'file:///');
+  }
+
+  if (/^[a-zA-Z]:\\/.test(raw)) {
+    const windowsPath = raw.replace(/\\/g, '/');
+    return `file:///${windowsPath}`;
+  }
+
+  return `file:///${raw.replace(/^\/+/, '')}`;
+};
+
+const summarizePdfImgSrc = (value?: string) => {
+  const src = String(value || '').trim();
+  return {
+    hasSrc: Boolean(src),
+    isDataUri: /^data:image\//i.test(src),
+    isFileUri: /^file:\/\//i.test(src),
+    isHttpUri: /^https?:\/\//i.test(src),
+    length: src.length,
+    preview: src.slice(0, 80),
+  };
+};
+
+const renderPdfLogoImageTag = (
+  src: string,
+  alt: string,
+  style: string,
+  fallbackHtml: string,
+) => {
+  const normalizedSrc = String(src || '').trim();
+  if (!normalizedSrc) return fallbackHtml;
+
+  const safeAlt = escapeHtml(alt || 'Company logo');
+  const safeSrc = normalizedSrc.replace(/"/g, '&quot;');
+
+  return `<img src="${safeSrc}" alt="${safeAlt}" style="${style}" />`;
+};
+
 const sleep = (ms: number) =>
   new Promise(resolve => {
     setTimeout(() => resolve(undefined), ms);
@@ -177,12 +226,45 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
   const insets = useSafeAreaInsets();
   const pdfHeaderAssetUri = useMemo(
     () => ({
-      KENCANA_PRINT:
-        Image.resolveAssetSource(require('../../utils/kp.jpg'))?.uri || '',
-      JAYA_ABADI_MULIA:
-        Image.resolveAssetSource(require('../../utils/jaya.jpg'))?.uri || '',
-      MADANI_PRODUCTION:
-        Image.resolveAssetSource(require('../../utils/madani.jpg'))?.uri || '',
+      KENCANA_PRINT: {
+        uri: Image.resolveAssetSource(require('../../utils/kp.jpg'))?.uri || '',
+        assetPath: 'utils/kp.jpg',
+      },
+      JAYA_ABADI_MULIA: {
+        uri:
+          Image.resolveAssetSource(require('../../utils/jaya.jpg'))?.uri || '',
+        assetPath: 'utils/jaya.jpg',
+      },
+      MADANI_PRODUCTION: {
+        uri:
+          Image.resolveAssetSource(require('../../utils/madani.jpg'))?.uri ||
+          '',
+        assetPath: 'utils/madani.jpg',
+      },
+    }),
+    [],
+  );
+
+  const pdfDigitalSignAssetUri = useMemo(
+    () => ({
+      KENCANA_PRINT: {
+        uri:
+          Image.resolveAssetSource(require('../../utils/pen_kp.jpg'))?.uri ||
+          '',
+        assetPath: 'utils/pen_kp.jpg',
+      },
+      JAYA_ABADI_MULIA: {
+        uri:
+          Image.resolveAssetSource(require('../../utils/pen_ja.jpg'))?.uri ||
+          '',
+        assetPath: 'utils/pen_ja.jpg',
+      },
+      MADANI_PRODUCTION: {
+        uri:
+          Image.resolveAssetSource(require('../../utils/pen_md.jpg'))?.uri ||
+          '',
+        assetPath: 'utils/pen_md.jpg',
+      },
     }),
     [],
   );
@@ -331,47 +413,252 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
     return 'KENCANA_PRINT' as PdfTemplateKey;
   }, []);
 
-  const resolvePdfImageSrc = useCallback(async (assetUri?: string) => {
-    const rawUri = String(assetUri || '').trim();
-    if (!rawUri) return '';
-
-    if (rawUri.startsWith('data:') || /^https?:\/\//i.test(rawUri)) {
-      return rawUri;
-    }
-
-    const normalizedPath = normalizePdfPath(rawUri);
-    const mimeType = resolveImageMimeType(rawUri);
-
-    try {
-      if (normalizedPath && (await RNFS.exists(normalizedPath))) {
-        const base64 = await RNFS.readFile(normalizedPath, 'base64');
-        if (base64) {
-          return `data:${mimeType};base64,${base64}`;
-        }
+  const resolvePdfImageSrc = useCallback(
+    async (assetUri?: string, forcedAssetPath?: string) => {
+      const rawUri = String(assetUri || '').trim();
+      if (!rawUri) {
+        console.warn('[PDF][Logo] Empty assetUri received');
+        return '';
       }
-    } catch {
-      // fallback to raw uri when local file cannot be converted.
-    }
 
-    if (Platform.OS === 'android') {
-      const assetPath = normalizeAssetPath(rawUri);
-      if (assetPath) {
+      console.log('[PDF][Logo] Resolve start:', { rawUri });
+
+      const isHttpLikeUri = /^https?:\/\//i.test(rawUri);
+
+      if (rawUri.startsWith('data:')) {
+        console.log('[PDF][Logo] Using direct URI/data source:', {
+          rawUriPreview: rawUri.slice(0, 80),
+        });
+        return rawUri;
+      }
+
+      const normalizedPath = normalizePdfPath(rawUri);
+      const mimeType = resolveImageMimeType(rawUri);
+      console.log('[PDF][Logo] Normalized path candidate:', {
+        normalizedPath,
+        mimeType,
+      });
+
+      const buildTempLogoFilePath = (extension: string) => {
+        const baseDir =
+          Platform.OS === 'ios'
+            ? RNFS.TemporaryDirectoryPath || RNFS.CachesDirectoryPath
+            : RNFS.CachesDirectoryPath;
+        return `${baseDir}/pdf-logo-${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2)}.${extension}`;
+      };
+
+      const materializeBase64ToTempFile = async (
+        base64?: string,
+        source?: string,
+      ) => {
+        const cleaned = String(base64 || '').trim();
+        if (!cleaned) return '';
+
+        const extension = mimeType.includes('png')
+          ? 'png'
+          : mimeType.includes('webp')
+          ? 'webp'
+          : mimeType.includes('gif')
+          ? 'gif'
+          : 'jpg';
+
+        const tempPath = buildTempLogoFilePath(extension);
+
         try {
-          const base64 = await RNFS.readFileAssets(assetPath, 'base64');
-          if (base64) {
-            return `data:${mimeType};base64,${base64}`;
-          }
+          await RNFS.writeFile(tempPath, cleaned, 'base64');
+          const fileSrc = ensureFileUri(tempPath);
+          console.log('[PDF][Logo] Temp logo file created:', {
+            source,
+            tempPath,
+          });
+          return fileSrc;
         } catch {
-          // fallback to raw uri when bundled asset cannot be converted.
+          console.warn('[PDF][Logo] Temp logo file write failed:', {
+            source,
+          });
+          return '';
+        }
+      };
+
+      const ensureDataUri = (base64?: string) => {
+        const cleaned = String(base64 || '').trim();
+        if (!cleaned) return '';
+        return `data:${mimeType};base64,${cleaned}`;
+      };
+
+      const resolveBase64ForPdfSrc = async (
+        base64?: string,
+        source?: string,
+      ) => {
+        const cleaned = String(base64 || '').trim();
+        if (!cleaned) return '';
+
+        const dataUri = ensureDataUri(cleaned);
+        if (isRenderablePdfImgSrc(dataUri)) {
+          console.log('[PDF][Logo] Using base64 data URI src (preferred):', {
+            source,
+            length: dataUri.length,
+            preview: dataUri.slice(0, 64),
+          });
+          return dataUri;
+        }
+
+        const tempFileSrc = await materializeBase64ToTempFile(cleaned, source);
+        if (isRenderablePdfImgSrc(tempFileSrc)) {
+          const normalizedTempFileSrc = ensureFileUri(tempFileSrc);
+          console.log('[PDF][Logo] Falling back to temp file src:', {
+            source,
+            length: normalizedTempFileSrc.length,
+            preview: normalizedTempFileSrc.slice(0, 80),
+          });
+          return normalizedTempFileSrc;
+        }
+
+        return '';
+      };
+
+      try {
+        if (normalizedPath && (await RNFS.exists(normalizedPath))) {
+          const base64 = await RNFS.readFile(normalizedPath, 'base64');
+          const src = await resolveBase64ForPdfSrc(base64, 'file-path');
+          if (src) {
+            console.log('[PDF][Logo] Loaded from file path:', {
+              normalizedPath,
+              base64Length: String(base64 || '').length,
+            });
+            return src;
+          }
+        }
+      } catch {
+        console.warn('[PDF][Logo] Failed readFile from normalizedPath:', {
+          normalizedPath,
+        });
+        // fallback to raw uri when local file cannot be converted.
+      }
+
+      if (Platform.OS === 'android' && !isHttpLikeUri) {
+        const assetPath = forcedAssetPath || normalizeAssetPath(rawUri);
+        console.log('[PDF][Logo] Android assetPath candidate:', { assetPath });
+        if (assetPath) {
+          try {
+            const base64 = await RNFS.readFileAssets(assetPath, 'base64');
+            const src = await resolveBase64ForPdfSrc(base64, 'bundled-asset');
+            if (src) {
+              console.log('[PDF][Logo] Loaded from bundled asset:', {
+                assetPath,
+                base64Length: String(base64 || '').length,
+              });
+              return src;
+            }
+          } catch {
+            console.warn('[PDF][Logo] Failed readFileAssets from assetPath:', {
+              assetPath,
+            });
+            // fallback to raw uri when bundled asset cannot be converted.
+          }
         }
       }
-    }
 
-    return rawUri;
-  }, []);
+      if (Platform.OS === 'android' && isHttpLikeUri) {
+        console.log(
+          '[PDF][Logo] Skipping readFileAssets for HTTP URI in dev/metro mode',
+          {
+            rawUri,
+          },
+        );
+      }
+
+      if (isHttpLikeUri) {
+        console.warn(
+          '[PDF][Logo] HTTP URI detected. Trying network fetch fallback:',
+          {
+            rawUri,
+          },
+        );
+
+        try {
+          const RNBlobUtil = require('react-native-blob-util');
+          const blobUtil = RNBlobUtil?.default ?? RNBlobUtil;
+
+          if (!blobUtil?.fetch) {
+            console.warn(
+              '[PDF][Logo] RNBlobUtil.fetch unavailable for HTTP fallback',
+            );
+            return '';
+          }
+
+          const response = await blobUtil.fetch('GET', rawUri);
+          const base64 = response?.base64?.();
+          const src = await resolveBase64ForPdfSrc(base64, 'http-fetch');
+
+          if (src) {
+            console.log(
+              '[PDF][Logo] Loaded from HTTP URI via blob-util fetch:',
+              {
+                rawUri,
+                base64Length: String(base64 || '').length,
+              },
+            );
+            return src;
+          }
+
+          console.warn(
+            '[PDF][Logo] HTTP fallback fetched but base64 is empty:',
+            {
+              rawUri,
+            },
+          );
+        } catch (error: any) {
+          console.warn('[PDF][Logo] HTTP fallback fetch failed:', {
+            rawUri,
+            message: String(error?.message || error || 'unknown error'),
+          });
+        }
+
+        console.warn(
+          '[PDF][Logo] HTTP URI fallback failed. Logo will be omitted:',
+          {
+            rawUri,
+          },
+        );
+        return '';
+      }
+
+      if (normalizedPath && (await RNFS.exists(normalizedPath))) {
+        const fileSrc = ensureFileUri(normalizedPath);
+        if (isRenderablePdfImgSrc(fileSrc)) {
+          console.log('[PDF][Logo] Using existing local file path fallback:', {
+            normalizedPath,
+            fileSrcPreview: fileSrc.slice(0, 80),
+          });
+          return fileSrc;
+        }
+      }
+
+      if (rawUri.startsWith('data:')) {
+        const base64Part = rawUri.split(',')[1] || '';
+        const src = await resolveBase64ForPdfSrc(base64Part, 'raw-data-uri');
+        if (src) {
+          console.log('[PDF][Logo] Resolved from raw data URI');
+          return src;
+        }
+      }
+
+      console.warn(
+        '[PDF][Logo] No valid data URI/local file path resolved. Logo will be omitted:',
+        {
+          rawUri,
+        },
+      );
+      return '';
+    },
+    [],
+  );
 
   const buildKencanaPrintPdfHtml = useCallback(
-    (headerImageSrc?: string) => {
+    (headerImageSrc?: string, signatureImageSrc?: string) => {
       if (!header) return '';
 
       const rows = details
@@ -411,15 +698,15 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
             @page { size: A4; margin: 16mm; }
             body { font-family: Arial, sans-serif; color: #111; font-size: 11px; line-height: 1.28; }
             .wrap { width: 100%; }
-            .top { display: table; width: 100%; margin-bottom: 10px; }
+            .top { display: table; width: 100%; margin-bottom: 6px; }
             .top-left, .top-right { display: table-cell; vertical-align: top; }
             .top-left { width: 46%; }
-            .top-right { width: 54%; padding-left: 10px; }
-            .logo-wrap { width: 100%; padding-top: 2px; }
+            .top-right { width: 54%; padding-left: 8px; }
+            .logo-wrap { width: 100%; padding-top: 0; margin-bottom: 2px; }
             .logo-img {
-              width: 96%;
-              max-width: 280px;
-              max-height: 92px;
+              width: 92%;
+              max-width: 260px;
+              max-height: 74px;
               height: auto;
               object-fit: contain;
               object-position: left top;
@@ -432,23 +719,23 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
             .svc-list li { margin: 2px 0; }
             .svc-list li::before { content: "- "; }
 
-            .company { margin-top: 4px; margin-bottom: 8px; }
+            .company { margin-top: 2px; margin-bottom: 6px; }
             .company-name { font-size: 18px; font-weight: 700; text-decoration: underline; margin-bottom: 2px; }
             .company-line { font-size: 12px; margin-bottom: 1px; }
 
-            .meta-wrap { display: table; width: 100%; margin-top: 6px; margin-bottom: 8px; }
+            .meta-wrap { display: table; width: 100%; margin-top: 4px; margin-bottom: 6px; }
             .meta-left, .meta-right { display: table-cell; vertical-align: top; }
-            .meta-left { width: 58%; border: 1px solid #222; padding: 6px; min-height: 86px; }
-            .meta-right { width: 42%; padding-left: 14px; }
+            .meta-left { width: 58%; border: 1px solid #222; padding: 5px 6px; min-height: 78px; }
+            .meta-right { width: 42%; padding-left: 10px; }
             .meta-left-line { margin-bottom: 2px; font-size: 12px; }
-            .meta-up { margin-top: 34px; font-size: 12px; }
+            .meta-up { margin-top: 26px; font-size: 12px; }
             .meta-table { width: 100%; border-collapse: collapse; }
             .meta-table td { font-size: 12px; padding: 1px 0; vertical-align: top; }
             .meta-table .label { width: 82px; }
             .meta-table .sep { width: 12px; text-align: center; }
 
-            .greet { margin-top: 8px; font-size: 12px; }
-            .intro { margin-top: 6px; margin-bottom: 8px; font-size: 12px; text-align: justify; }
+            .greet { margin-top: 6px; font-size: 12px; }
+            .intro { margin-top: 5px; margin-bottom: 7px; font-size: 12px; text-align: justify; }
 
             .grid { width: 100%; border-collapse: collapse; margin-top: 4px; }
             .grid th, .grid td { border: 1px solid #333; padding: 4px 5px; font-size: 11px; vertical-align: top; }
@@ -463,19 +750,22 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
             .grid .w-harga { width: 90px; }
             .grid .w-total { width: 100px; }
 
-            .note-tax { margin-top: 18px; font-size: 13px; font-style: italic; }
-            .closing { margin-top: 12px; font-size: 12px; text-align: justify; }
+            .note-tax { margin-top: 12px; font-size: 13px; font-style: italic; }
+            .closing { margin-top: 10px; font-size: 12px; text-align: justify; }
 
             .note-label { margin-top: 12px; font-size: 12px; }
             .note-box { margin-top: 4px; background: #fff200; padding: 6px 8px; min-height: 44px; font-size: 11px; }
 
-            .sign-wrap { display: table; width: 100%; margin-top: 6px; }
+            .sign-wrap { display: table; width: 100%; margin-top: 10px; }
             .sign-left, .sign-right { display: table-cell; vertical-align: top; }
             .sign-left { width: 70%; }
-            .sign-right { width: 30%; text-align: center; }
-            .sign-title { font-size: 12px; margin-bottom: 64px; text-align: left; }
-            .sign-name { font-size: 12px; font-weight: 700; border-bottom: 1px solid #111; display: inline-block; padding: 0 8px 2px; }
+            .sign-right { width: 30%; text-align: center; padding-top: 4px; }
+            .sign-title { font-size: 12px; margin-bottom: 6px; text-align: center; }
+            .sign-name { font-size: 12px; font-weight: 700; border-bottom: 1px solid #111; display: inline-block; padding: 0 8px 1px; }
             .sign-role { font-size: 10px; margin-top: 2px; }
+            .sign-digital { min-height: 50px; margin-bottom: 4px; display: flex; align-items: flex-end; justify-content: center; }
+            .sign-digital.sign-digital-empty { min-height: 38px; }
+            .sign-digital img { width: 108px; max-width: 100%; max-height: 64px; object-fit: contain; display: inline-block; }
           </style>
         </head>
         <body>
@@ -484,9 +774,12 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
                 <div class="top-left">
                   ${
                     headerImageSrc
-                      ? `<div class="logo-wrap"><img class="logo-img" src="${escapeHtml(
+                      ? `<div class="logo-wrap">${renderPdfLogoImageTag(
                           headerImageSrc,
-                        )}" alt="Kencana Print" /></div>`
+                          'Kencana Print',
+                          'display:block;width:92%;max-width:260px;height:auto;max-height:74px;border:0;outline:none;text-decoration:none;',
+                          '',
+                        )}</div>`
                       : '<div class="brand">Kencana Print</div><div class="tagline">Semakin Nyala Semakin Nyata</div>'
                   }
               </div>
@@ -522,8 +815,8 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
                   <tr><td class="label">No</td><td class="sep">:</td><td>${escapeHtml(
                     header.nomor || nomor,
                   )}</td></tr>
-                  <tr><td class="label">note</td><td class="sep">:</td><td>${escapeHtml(
-                    header.note || '-',
+                  <tr><td class="label">Keterangan</td><td class="sep">:</td><td>${escapeHtml(
+                    header.keterangan || '-',
                   )}</td></tr>
                 </table>
               </div>
@@ -577,6 +870,16 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
               <div class="sign-left"></div>
               <div class="sign-right">
                 <div class="sign-title">Hormat Kami,</div>
+                ${
+                  signatureImageSrc
+                    ? `<div class="sign-digital">${renderPdfLogoImageTag(
+                        signatureImageSrc,
+                        'Tanda tangan digital Kencana Print',
+                        'display:inline-block;width:108px;max-width:100%;height:auto;max-height:64px;border:0;outline:none;text-decoration:none;',
+                        '',
+                      )}</div>`
+                    : '<div class="sign-digital sign-digital-empty"></div>'
+                }
                 <div class="sign-name">${escapeHtml(ttdName)}</div>
                 <div class="sign-role">${escapeHtml(ttdJabatan)}</div>
               </div>
@@ -590,7 +893,7 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
   );
 
   const buildJayaAbadiPdfHtml = useCallback(
-    (headerImageSrc?: string) => {
+    (headerImageSrc?: string, signatureImageSrc?: string) => {
       if (!header) return '';
 
       const rows = details
@@ -628,46 +931,56 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
           <style>
             @page { size: A4; margin: 14mm; }
             body { font-family: Arial, sans-serif; color: #111; font-size: 11px; }
-            .head { text-align: center; margin-bottom: 8px; }
-            .logo-wrap { text-align: center; margin-bottom: 4px; }
-            .logo-img { width: 100%; max-width: 360px; max-height: 95px; object-fit: contain; display: inline-block; }
+            .head { text-align: right; margin-bottom: 4px; }
+            .logo-wrap { text-align: right; margin-bottom: 2px; }
+            .logo-img { width: 100%; max-width: 320px; max-height: 76px; object-fit: contain; display: inline-block; }
             .brand { font-size: 42px; font-weight: 800; }
             .brand-red { color: #d80f16; }
             .tagline { font-size: 12px; color: #b11f1f; font-style: italic; margin-top: 2px; }
-            .date { text-align: right; margin: 12px 0 8px; font-size: 12px; font-weight: 700; }
-            .to { margin-top: 2px; font-size: 12px; line-height: 1.5; }
-            .meta { margin-top: 10px; }
+            .date { text-align: right; margin: 2px 0 8px; font-size: 12px; font-weight: 700; }
+            .to { margin-top: 1px; font-size: 12px; line-height: 1.42; }
+            .meta { margin-top: 8px; }
             .meta-row { font-size: 12px; margin-bottom: 2px; }
             .label { display: inline-block; width: 116px; font-weight: 700; }
-            .intro { margin-top: 10px; font-size: 12px; text-align: justify; line-height: 1.45; }
+            .intro { margin-top: 8px; font-size: 12px; text-align: justify; line-height: 1.45; }
             table { width: 100%; border-collapse: collapse; margin-top: 8px; }
             th, td { border: 1px solid #333; padding: 4px; font-size: 11px; vertical-align: top; }
             th { text-align: left; }
             .num { text-align: right; }
             .note-tax { margin-top: 6px; font-style: italic; font-size: 12px; }
-            .closing { margin-top: 10px; font-size: 12px; text-align: justify; }
+            .closing { margin-top: 10px; font-size: 12px; text-align: justify; line-height: 1.45; }
             .note-title { margin-top: 8px; font-size: 12px; }
             .note-box { background: #fff200; min-height: 30px; padding: 6px; font-size: 11px; }
-            .sign { margin-top: 10px; width: 100%; display: table; }
+            .sign { margin-top: 12px; width: 100%; display: table; }
             .sign-left, .sign-right { display: table-cell; vertical-align: top; }
             .sign-left { width: 70%; }
-            .sign-right { width: 30%; text-align: center; }
-            .sign-title { font-size: 12px; margin-bottom: 68px; }
-            .sign-name { font-size: 12px; border-bottom: 1px solid #111; display: inline-block; padding: 0 8px 2px; }
+            .sign-right { width: 30%; text-align: center; padding-top: 4px; }
+            .sign-title { font-size: 12px; margin-bottom: 6px; }
+            .sign-name { font-size: 12px; border-bottom: 1px solid #111; display: inline-block; padding: 0 8px 1px; }
             .sign-role { font-size: 11px; margin-top: 2px; }
+            .sign-digital { min-height: 50px; margin-bottom: 4px; display: flex; align-items: flex-end; justify-content: center; }
+            .sign-digital.sign-digital-empty { min-height: 38px; }
+            .sign-digital img { width: 108px; max-width: 100%; max-height: 64px; object-fit: contain; display: inline-block; }
+            .jam-footer { margin-top: 56px; border-top: 2px solid #222; padding-top: 10px; }
+            .jam-footer .f-title { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
+            .jam-footer .f-line { font-size: 12px; font-style: italic; margin-bottom: 2px; }
+            .jam-footer .f-site { font-size: 12px; font-style: italic; font-weight: 700; }
           </style>
         </head>
         <body>
           <div class="head">
             ${
               headerImageSrc
-                ? `<div class="logo-wrap"><img class="logo-img" src="${escapeHtml(
+                ? `<div class="logo-wrap">${renderPdfLogoImageTag(
                     headerImageSrc,
-                  )}" alt="PT. Jaya Abadi Mulia" /></div>`
+                    'PT. Jaya Abadi Mulia',
+                    'display:inline-block;width:100%;max-width:320px;height:auto;max-height:76px;border:0;outline:none;text-decoration:none;',
+                    '',
+                  )}</div>`
                 : '<div class="brand"><span class="brand-red">PT.</span> Jaya Abadi Mulia</div><div class="tagline">Your Best Solutions Partner</div>'
             }
+            <div class="date">${dateLine}</div>
           </div>
-          <div class="date">${dateLine}</div>
 
           <div class="to">
             <div>Kepada Yth.</div>
@@ -687,7 +1000,8 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
 
           <div class="intro">
             Dengan Hormat,<br/>
-            Bersama dengan surat ini kami mengajukan penawaran harga untuk item-item barang tersebut di bawah ini.
+            Pertama kami mengucapkan terima kasih atas kesempatan yang diberikan kepada kami untuk memberikan Surat Penawaran Harga kepada perusahaan yang Bapak/Ibu pimpin.<br/>
+            Kami dari PT. Jaya Abadi Mulia yang bergerak di bidang penyedia material promosi dalam bidang printing dan garment bermaksud untuk memberikan penawaran harga atas beberapa pekerjaan yang tersebut di bawah ini :
           </div>
 
           <table>
@@ -711,7 +1025,7 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
           </table>
 
           <div class="note-tax">* Note : Harga belum termasuk PPn 11%</div>
-          <div class="closing">Demikian surat penawaran ini kami sampaikan. Atas perhatian dan kerja samanya kami ucapkan terima kasih.</div>
+          <div class="closing">Keterangan lebih lanjut bisa menghubungi marketing kami di nomor atau (0271) 722998.<br/><br/>Demikian Surat Penawaran ini kami sampaikan, kabar baik dari Bapak/Ibu sangat kami nantikan. Atas perhatian dan kerja samanya kami ucapkan terima kasih.</div>
           <div class="note-title">Note :</div>
           <div class="note-box">${escapeHtml(note)}</div>
 
@@ -719,9 +1033,26 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
             <div class="sign-left"></div>
             <div class="sign-right">
               <div class="sign-title">Hormat Kami,</div>
+              ${
+                signatureImageSrc
+                  ? `<div class="sign-digital">${renderPdfLogoImageTag(
+                      signatureImageSrc,
+                      'Tanda tangan digital Jaya Abadi Mulia',
+                      'display:inline-block;width:108px;max-width:100%;height:auto;max-height:64px;border:0;outline:none;text-decoration:none;',
+                      '',
+                    )}</div>`
+                  : '<div class="sign-digital sign-digital-empty"></div>'
+              }
               <div class="sign-name">${escapeHtml(ttdName)}</div>
               <div class="sign-role">${escapeHtml(ttdJabatan)}</div>
             </div>
+          </div>
+
+          <div class="jam-footer">
+            <div class="f-title">PT. Jaya Abadi Mulia</div>
+            <div class="f-line">Dk. Padokan RT 004 RW 004 Sawahan, Ngemplak Kb. Boyolali Jawa Tengah 57375</div>
+            <div class="f-line">Telp  0271-722998 / Fax  0271-722998</div>
+            <div class="f-site">www. jayaabadimulia.com</div>
           </div>
         </body>
       </html>
@@ -731,7 +1062,7 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
   );
 
   const buildMadaniPdfHtml = useCallback(
-    (headerImageSrc?: string) => {
+    (headerImageSrc?: string, signatureImageSrc?: string) => {
       if (!header) return '';
 
       const rows = details
@@ -768,24 +1099,25 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
           <style>
             @page { size: A4; margin: 14mm; }
             body { font-family: Arial, sans-serif; color: #111; font-size: 11px; }
-            .top { display: table; width: 100%; margin-bottom: 8px; }
+            .top { display: table; width: 100%; margin-bottom: 6px; }
             .top-left, .top-right { display: table-cell; vertical-align: top; }
             .top-left { width: 46%; }
-            .top-right { width: 54%; padding-left: 10px; }
-            .logo { width: 100%; max-width: 320px; max-height: 90px; object-fit: contain; border: 1px solid #999; }
-            .brand { font-size: 17px; font-weight: 700; margin-top: 4px; }
+            .top-right { width: 54%; padding-left: 8px; }
+            .logo { width: 100%; max-width: 280px; max-height: 72px; object-fit: contain; border: 1px solid #999; }
+            .brand { font-size: 17px; font-weight: 800; margin-top: 6px; }
             .svc-title { font-size: 12px; font-weight: 700; }
-            .svc-list { margin: 4px 0 0; padding-left: 0; list-style: none; }
+            .svc-list { margin: 2px 0 0; padding-left: 0; list-style: none; }
             .svc-list li { margin: 2px 0; font-size: 11px; }
             .svc-list li::before { content: '- '; }
             .company-line { font-size: 12px; margin-top: 2px; }
-            .meta-wrap { display: table; width: 100%; margin-top: 8px; }
+            .company-line-strong { font-size: 15px; font-weight: 800; margin-top: 2px; }
+            .meta-wrap { display: table; width: 100%; margin-top: 6px; }
             .meta-left, .meta-right { display: table-cell; vertical-align: top; }
-            .meta-left { width: 58%; border: 1px solid #333; padding: 6px; }
-            .meta-right { width: 42%; padding-left: 12px; }
+            .meta-left { width: 58%; border: 1px solid #333; padding: 5px 6px; }
+            .meta-right { width: 42%; padding-left: 10px; }
             .meta-right-row { font-size: 12px; margin-bottom: 3px; }
             .label { display: inline-block; width: 72px; }
-            .intro { margin-top: 10px; font-size: 12px; text-align: justify; }
+            .intro { margin-top: 8px; font-size: 12px; text-align: justify; }
             table { width: 100%; border-collapse: collapse; margin-top: 8px; }
             th, td { border: 1px solid #333; padding: 4px; font-size: 11px; }
             th { text-align: left; }
@@ -794,32 +1126,31 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
             .closing { margin-top: 10px; font-size: 12px; text-align: justify; }
             .note-title { margin-top: 8px; font-size: 12px; }
             .note-box { background: #fff200; min-height: 30px; padding: 6px; font-size: 11px; }
-            .sign { margin-top: 10px; width: 100%; display: table; }
+            .sign { margin-top: 12px; width: 100%; display: table; }
             .sign-left, .sign-right { display: table-cell; vertical-align: top; }
             .sign-left { width: 70%; }
-            .sign-right { width: 30%; text-align: center; }
-            .sign-title { font-size: 12px; margin-bottom: 68px; }
-            .sign-name { font-size: 12px; border-bottom: 1px solid #111; display: inline-block; padding: 0 8px 2px; }
+            .sign-right { width: 30%; text-align: center; padding-top: 4px; }
+            .sign-title { font-size: 12px; margin-bottom: 6px; }
+            .sign-name { font-size: 12px; border-bottom: 1px solid #111; display: inline-block; padding: 0 8px 1px; }
             .sign-role { font-size: 11px; margin-top: 2px; }
+            .sign-digital { min-height: 50px; margin-bottom: 4px; display: flex; align-items: flex-end; justify-content: center; }
+            .sign-digital.sign-digital-empty { min-height: 38px; }
+            .sign-digital img { width: 108px; max-width: 100%; max-height: 64px; object-fit: contain; display: inline-block; }
           </style>
         </head>
         <body>
           <div class="top">
             <div class="top-left">
-              ${
-                headerImageSrc
-                  ? `<img class="logo" src="${escapeHtml(
-                      headerImageSrc,
-                    )}" alt="Company logo" />`
-                  : '<div class="brand">PT. Madani Production</div>'
-              }
-              <div class="brand">PT.Madani Production</div>
-              <div class="company-line">${escapeHtml(
-                header.perusahaan || '-',
-              )}</div>
-              <div class="company-line">${escapeHtml(
-                header.customer_alamat || '-',
-              )}</div>
+              ${renderPdfLogoImageTag(
+                headerImageSrc || '',
+                'Company logo',
+                'display:block;width:100%;max-width:280px;height:auto;max-height:72px;border:1px solid #999;outline:none;text-decoration:none;',
+                '<div class="brand">PT. Madani Production</div>',
+              )}
+              <div class="company-line-strong">PT.Madani Production</div>
+              <div class="company-line">Dusun Demen RT 003 RW 001, Kel. Jeron, Kec. Nogosari, Kab. Boyolali, Jawa Tengah</div>
+              <div class="company-line">Telp&nbsp;&nbsp;0271-7889327&nbsp;&nbsp;/&nbsp;&nbsp;Fax&nbsp;&nbsp;0271-7889327</div>
+              <div class="company-line">m.officer@madaniproduction.co.id</div>
             </div>
             <div class="top-right">
               <div class="svc-title">OUR SERVICES :</div>
@@ -887,6 +1218,16 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
             <div class="sign-left"></div>
             <div class="sign-right">
               <div class="sign-title">Hormat Kami,</div>
+              ${
+                signatureImageSrc
+                  ? `<div class="sign-digital">${renderPdfLogoImageTag(
+                      signatureImageSrc,
+                      'Tanda tangan digital Madani Production',
+                      'display:inline-block;width:108px;max-width:100%;height:auto;max-height:64px;border:0;outline:none;text-decoration:none;',
+                      '',
+                    )}</div>`
+                  : '<div class="sign-digital sign-digital-empty"></div>'
+              }
               <div class="sign-name">${escapeHtml(ttdName)}</div>
               <div class="sign-role">${escapeHtml(ttdJabatan)}</div>
             </div>
@@ -899,7 +1240,10 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
   );
 
   const buildPdfHtml = useCallback(
-    (headerImageByTemplate: Record<PdfTemplateKey, string>) => {
+    (
+      headerImageByTemplate: Record<PdfTemplateKey, string>,
+      signatureImageByTemplate?: Record<PdfTemplateKey, string>,
+    ) => {
       if (!header) return '';
 
       const templateKey = resolvePdfTemplateKey(header.perusahaan);
@@ -908,18 +1252,22 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
         case 'KENCANA_PRINT':
           return buildKencanaPrintPdfHtml(
             headerImageByTemplate.KENCANA_PRINT || '',
+            signatureImageByTemplate?.KENCANA_PRINT || '',
           );
         case 'JAYA_ABADI_MULIA':
           return buildJayaAbadiPdfHtml(
             headerImageByTemplate.JAYA_ABADI_MULIA || '',
+            signatureImageByTemplate?.JAYA_ABADI_MULIA || '',
           );
         case 'MADANI_PRODUCTION':
           return buildMadaniPdfHtml(
             headerImageByTemplate.MADANI_PRODUCTION || '',
+            signatureImageByTemplate?.MADANI_PRODUCTION || '',
           );
         default:
           return buildKencanaPrintPdfHtml(
             headerImageByTemplate.KENCANA_PRINT || '',
+            signatureImageByTemplate?.KENCANA_PRINT || '',
           );
       }
     },
@@ -937,22 +1285,97 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
 
     setExportingPdf(true);
     try {
-      const { generatePDF } = await import('react-native-html-to-pdf');
+      const generatePDFFn =
+        (RNHTMLtoPDF as any)?.generatePDF ||
+        (RNHTMLtoPDF as any)?.default?.generatePDF;
+
+      if (typeof generatePDFFn !== 'function') {
+        throw new Error('PDF generator tidak tersedia (generatePDF undefined)');
+      }
 
       const safeNomor = toSafeFileName(header.nomor || nomor);
       const fileName = `Penawaran_${safeNomor}_${Date.now()}`;
+      const isDigitalSignEnabled =
+        String(header.digital_sign || '')
+          .trim()
+          .toUpperCase() === 'Y';
       const [kencanaHeaderSrc, jayaHeaderSrc, madaniHeaderSrc] =
         await Promise.all([
-          resolvePdfImageSrc(pdfHeaderAssetUri.KENCANA_PRINT),
-          resolvePdfImageSrc(pdfHeaderAssetUri.JAYA_ABADI_MULIA),
-          resolvePdfImageSrc(pdfHeaderAssetUri.MADANI_PRODUCTION),
+          resolvePdfImageSrc(
+            pdfHeaderAssetUri.KENCANA_PRINT.uri,
+            pdfHeaderAssetUri.KENCANA_PRINT.assetPath,
+          ),
+          resolvePdfImageSrc(
+            pdfHeaderAssetUri.JAYA_ABADI_MULIA.uri,
+            pdfHeaderAssetUri.JAYA_ABADI_MULIA.assetPath,
+          ),
+          resolvePdfImageSrc(
+            pdfHeaderAssetUri.MADANI_PRODUCTION.uri,
+            pdfHeaderAssetUri.MADANI_PRODUCTION.assetPath,
+          ),
         ]);
 
-      const html = buildPdfHtml({
-        KENCANA_PRINT: kencanaHeaderSrc,
-        JAYA_ABADI_MULIA: jayaHeaderSrc,
-        MADANI_PRODUCTION: madaniHeaderSrc,
-      });
+      const [kencanaSignSrc, jayaSignSrc, madaniSignSrc] = isDigitalSignEnabled
+        ? await Promise.all([
+            resolvePdfImageSrc(
+              pdfDigitalSignAssetUri.KENCANA_PRINT.uri,
+              pdfDigitalSignAssetUri.KENCANA_PRINT.assetPath,
+            ),
+            resolvePdfImageSrc(
+              pdfDigitalSignAssetUri.JAYA_ABADI_MULIA.uri,
+              pdfDigitalSignAssetUri.JAYA_ABADI_MULIA.assetPath,
+            ),
+            resolvePdfImageSrc(
+              pdfDigitalSignAssetUri.MADANI_PRODUCTION.uri,
+              pdfDigitalSignAssetUri.MADANI_PRODUCTION.assetPath,
+            ),
+          ])
+        : ['', '', ''];
+
+      const finalLogoSrcSummary = {
+        KENCANA_PRINT: summarizePdfImgSrc(kencanaHeaderSrc),
+        JAYA_ABADI_MULIA: summarizePdfImgSrc(jayaHeaderSrc),
+        MADANI_PRODUCTION: summarizePdfImgSrc(madaniHeaderSrc),
+      };
+
+      console.log(
+        '[PDF][Logo] Final resolved src summary:',
+        JSON.stringify(finalLogoSrcSummary),
+      );
+
+      const finalDigitalSignSrcSummary = {
+        enabled: isDigitalSignEnabled,
+        KENCANA_PRINT: summarizePdfImgSrc(kencanaSignSrc),
+        JAYA_ABADI_MULIA: summarizePdfImgSrc(jayaSignSrc),
+        MADANI_PRODUCTION: summarizePdfImgSrc(madaniSignSrc),
+      };
+
+      console.log(
+        '[PDF][DigitalSign] Final resolved src summary:',
+        JSON.stringify(finalDigitalSignSrcSummary),
+      );
+
+      const html = buildPdfHtml(
+        {
+          KENCANA_PRINT: kencanaHeaderSrc,
+          JAYA_ABADI_MULIA: jayaHeaderSrc,
+          MADANI_PRODUCTION: madaniHeaderSrc,
+        },
+        {
+          KENCANA_PRINT: kencanaSignSrc,
+          JAYA_ABADI_MULIA: jayaSignSrc,
+          MADANI_PRODUCTION: madaniSignSrc,
+        },
+      );
+
+      const htmlRenderSummary = {
+        htmlLength: html.length,
+        imgTagCount: (html.match(/<img\b/gi) || []).length,
+        hasDataImageTag: /<img[^>]+src="data:image\//i.test(html),
+        hasFileImageTag: /<img[^>]+src="file:\/\//i.test(html),
+      };
+
+      console.log('[PDF][HTML] Final html render summary:', htmlRenderSummary);
 
       // Android: use logical folder name. iOS: absolute path is supported.
       const directory =
@@ -962,7 +1385,7 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
 
       console.log('[PDF] Generate start:', { os: Platform.OS, directory });
 
-      const result = await generatePDF({
+      const result = await generatePDFFn({
         html,
         fileName,
         directory,
@@ -1063,7 +1486,14 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
     } finally {
       setExportingPdf(false);
     }
-  }, [buildPdfHtml, header, nomor, pdfHeaderAssetUri, resolvePdfImageSrc]);
+  }, [
+    buildPdfHtml,
+    header,
+    nomor,
+    pdfDigitalSignAssetUri,
+    pdfHeaderAssetUri,
+    resolvePdfImageSrc,
+  ]);
 
   return (
     <LinearGradient
