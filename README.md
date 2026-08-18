@@ -105,7 +105,7 @@ Buka file [services/api.tsx](file:///d:/Coding/PlanToday/services/api.tsx) dan s
 export const PUBLIC_API_ORIGIN = 'http://10.0.2.2:3001'; 
 
 // Untuk mode produksi / server staging VPS
-// export const PUBLIC_API_ORIGIN = 'http://103.94.238.252:3005'; 
+// export const PUBLIC_API_ORIGIN = 'http://YOUR_SERVER_IP:3005'; 
 ```
 
 ### Langkah 2: Jalankan Metro Bundler
@@ -159,5 +159,5 @@ Rilis aplikasi Android dikelola secara otomatis menggunakan GitHub Actions melal
    ```bash
    ./gradlew assembleRelease
    ```
-6. **Unggah ke VPS**: Mengunggah APK hasil kompilasi dan manifes pembaruan `latest.json` ke VPS tujuan (`103.94.238.252`) via SCP.
+6. **Unggah ke VPS**: Mengunggah APK hasil kompilasi dan manifes pembaruan `latest.json` ke VPS tujuan via SCP.
 7. **Pembersihan Logistik**: Script di VPS akan memindahkan APK ke folder rilis utama dan menghapus versi lama secara otomatis, dengan hanya mempertahankan **2 versi APK terbaru** untuk efisiensi penyimpanan.
