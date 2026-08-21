@@ -988,7 +988,7 @@ export default function HomeScreen({ navigation }: any) {
               <Text style={[styles.quickStatNumber, { color: '#10B981' }]}>
                 {totalActiveSpk}
               </Text>
-              <Text style={styles.quickStatLabel}>SPK Aktif</Text>
+              <Text style={styles.quickStatLabel}>SPK Open</Text>
               <View
                 style={[styles.quickStatAccent, { backgroundColor: '#10B981' }]}
               />
@@ -1835,15 +1835,15 @@ export default function HomeScreen({ navigation }: any) {
                           style={[
                             styles.breakdownChip,
                             {
-                              backgroundColor: 'rgba(107,114,128,0.1)',
-                              borderColor: 'rgba(107,114,128,0.35)',
+                              backgroundColor: `${COMPANY_STATUS_COLORS.BELUM.base}1A`,
+                              borderColor: `${COMPANY_STATUS_COLORS.BELUM.base}40`,
                             },
                           ]}
                         >
                           <Text
                             style={[
                               styles.breakdownChipText,
-                              { color: '#374151' },
+                              { color: COMPANY_STATUS_COLORS.BELUM.text },
                             ]}
                           >
                             BELUM: {phStatusCounts.BELUM}
@@ -1910,6 +1910,26 @@ export default function HomeScreen({ navigation }: any) {
                           </Text>
                         </View>
                       )}
+                      {phStatusCounts.CANCEL > 0 && (
+                        <View
+                          style={[
+                            styles.breakdownChip,
+                            {
+                              backgroundColor: `${COMPANY_STATUS_COLORS.CANCEL.base}1A`,
+                              borderColor: `${COMPANY_STATUS_COLORS.CANCEL.base}40`,
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.breakdownChipText,
+                              { color: COMPANY_STATUS_COLORS.CANCEL.text },
+                            ]}
+                          >
+                            CANCEL: {phStatusCounts.CANCEL}
+                          </Text>
+                        </View>
+                      )}
                     </View>
 
                     {/* Horizontal Segmented Bar (Grafik Line Horizontal Status) */}
@@ -1918,7 +1938,8 @@ export default function HomeScreen({ navigation }: any) {
                         phStatusCounts.BELUM +
                         phStatusCounts.MINTA +
                         phStatusCounts.WAIT +
-                        phStatusCounts.DONE;
+                        phStatusCounts.DONE +
+                        phStatusCounts.CANCEL;
                       return total > 0 ? (
                         <View
                           style={{
@@ -1962,6 +1983,15 @@ export default function HomeScreen({ navigation }: any) {
                                 flex: phStatusCounts.DONE,
                                 backgroundColor:
                                   COMPANY_STATUS_COLORS.DONE.base,
+                              }}
+                            />
+                          )}
+                          {phStatusCounts.CANCEL > 0 && (
+                            <View
+                              style={{
+                                flex: phStatusCounts.CANCEL,
+                                backgroundColor:
+                                  COMPANY_STATUS_COLORS.CANCEL.base,
                               }}
                             />
                           )}
@@ -2564,7 +2594,7 @@ export default function HomeScreen({ navigation }: any) {
                               { color: '#B91C1C' },
                             ]}
                           >
-                            BELUM: {spkStatusCounts.BELUM}
+                            OPEN: {spkStatusCounts.BELUM}
                           </Text>
                         </View>
                       )}
@@ -2604,7 +2634,7 @@ export default function HomeScreen({ navigation }: any) {
                               { color: '#047857' },
                             ]}
                           >
-                            SUDAH: {spkStatusCounts.SUDAH}
+                            CLOSE: {spkStatusCounts.SUDAH}
                           </Text>
                         </View>
                       )}
@@ -2681,10 +2711,10 @@ export default function HomeScreen({ navigation }: any) {
                           const real = item.realisasi_total || 0;
                           const ord = item.spk_jumlah || 0;
                           const progress = ord > 0 ? (real / ord) * 100 : 0;
-                          let statusText = 'BELUM';
+                          let statusText = 'OPEN';
                           let statusColor = '#EF4444';
                           if (real >= ord - 0.01) {
-                            statusText = 'SUDAH';
+                            statusText = 'CLOSE';
                             statusColor = '#10B981';
                           } else if (real > 0) {
                             statusText = 'PROSES';
@@ -3004,7 +3034,7 @@ export default function HomeScreen({ navigation }: any) {
                       size={16}
                       color={COMPANY_STATUS_COLORS.BELUM.base}
                     />
-                    <Text style={styles.statusLabel}>Belum Diproses</Text>
+                    <Text style={styles.statusLabel}>Belum</Text>
                   </View>
                   <View
                     style={[
@@ -3031,7 +3061,7 @@ export default function HomeScreen({ navigation }: any) {
                       size={16}
                       color={COMPANY_STATUS_COLORS.MINTA.base}
                     />
-                    <Text style={styles.statusLabel}>Permintaan</Text>
+                    <Text style={styles.statusLabel}>Minta</Text>
                   </View>
                   <View
                     style={[
@@ -3058,7 +3088,7 @@ export default function HomeScreen({ navigation }: any) {
                       size={16}
                       color={COMPANY_STATUS_COLORS.WAIT.base}
                     />
-                    <Text style={styles.statusLabel}>Menunggu</Text>
+                    <Text style={styles.statusLabel}>Wait</Text>
                   </View>
                   <View
                     style={[
@@ -3085,7 +3115,7 @@ export default function HomeScreen({ navigation }: any) {
                       size={16}
                       color={COMPANY_STATUS_COLORS.DONE.base}
                     />
-                    <Text style={styles.statusLabel}>Selesai</Text>
+                    <Text style={styles.statusLabel}>Done</Text>
                   </View>
                   <View
                     style={[
@@ -3112,7 +3142,7 @@ export default function HomeScreen({ navigation }: any) {
                       size={16}
                       color={COMPANY_STATUS_COLORS.CANCEL.base}
                     />
-                    <Text style={styles.statusLabel}>Dibatalkan</Text>
+                    <Text style={styles.statusLabel}>Cancel</Text>
                   </View>
                   <View
                     style={[
@@ -3269,7 +3299,7 @@ export default function HomeScreen({ navigation }: any) {
                         backgroundColor: '#EF4444',
                       }}
                     />
-                    <Text style={styles.statusLabel}>BELUM</Text>
+                    <Text style={styles.statusLabel}>OPEN</Text>
                   </View>
                   <View
                     style={[styles.statusBadge, { backgroundColor: '#EF4444' }]}
@@ -3323,7 +3353,7 @@ export default function HomeScreen({ navigation }: any) {
                         backgroundColor: '#10B981',
                       }}
                     />
-                    <Text style={styles.statusLabel}>SUDAH</Text>
+                    <Text style={styles.statusLabel}>CLOSE</Text>
                   </View>
                   <View
                     style={[styles.statusBadge, { backgroundColor: '#10B981' }]}

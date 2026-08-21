@@ -25,6 +25,7 @@ import {
 } from '../../services/permintaanHargaApi';
 import { PENAWARAN_THEME } from '../Penawaran/penawaranTheme';
 import { COMPANY_STATUS_COLORS } from '../theme';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
 const THEME = PENAWARAN_THEME;
 
@@ -63,6 +64,136 @@ const formatNumber = (n: any) => {
   const num = Number(n);
   if (Number.isNaN(num)) return String(n ?? '-');
   return new Intl.NumberFormat('id-ID').format(num);
+};
+
+export type ParsedKetKalkulasi = {
+  ppnStatus: 'EXCLUDE' | 'INCLUDE' | null;
+  items: string[];
+};
+
+export const parseKetKalkulasi = (raw?: string): ParsedKetKalkulasi => {
+  if (!raw) return { ppnStatus: null, items: [] };
+
+  const rawParts = raw
+    .split(/[;\n\r]+/)
+    .map(p => p.trim())
+    .filter(Boolean);
+
+  let ppnStatus: 'EXCLUDE' | 'INCLUDE' | null = null;
+  const items: string[] = [];
+
+  for (const part of rawParts) {
+    const upper = part.toUpperCase().replace(/\s+/g, '');
+    if (
+      upper === 'EXCPPN' ||
+      upper === 'EXCLUDEPPN' ||
+      upper === 'NONPPN' ||
+      upper === 'EXCLUDE'
+    ) {
+      ppnStatus = 'EXCLUDE';
+    } else if (
+      upper === 'INCPPN' ||
+      upper === 'INCLUDEPPN' ||
+      upper === 'INCLUDE'
+    ) {
+      ppnStatus = 'INCLUDE';
+    } else {
+      let formatted = part
+        .replace(/\bSTIAP\b/gi, 'Setiap')
+        .replace(/\bSTP\b/gi, 'Setiap')
+        .replace(/\bTDK\b/gi, 'Tidak')
+        .replace(/\bDG\b/gi, 'Dengan')
+        .replace(/\bDGN\b/gi, 'Dengan')
+        .replace(/\bBLM\b/gi, 'Belum')
+        .replace(/\bSDH\b/gi, 'Sudah')
+        .replace(/\bHARGA\s*\+?\s*(\d+)/gi, (_, num) => {
+          const formattedNum = new Intl.NumberFormat('id-ID').format(
+            Number(num),
+          );
+          return `Harga +Rp ${formattedNum}`;
+        })
+        .replace(/\+\s*(\d{3,})/g, (_, num) => {
+          const formattedNum = new Intl.NumberFormat('id-ID').format(
+            Number(num),
+          );
+          return `+Rp ${formattedNum}`;
+        });
+
+      items.push(formatted);
+    }
+  }
+
+  return { ppnStatus, items };
+};
+
+const HasilKalkulasiSection = ({
+  status,
+  harga,
+  ket,
+}: {
+  status: string;
+  harga: number;
+  ket?: string;
+}) => {
+  if (String(status || '').toUpperCase() !== 'DONE') return null;
+  const parsed = parseKetKalkulasi(ket);
+  return (
+    <>
+      <Text style={[styles.sectionTitle, styles.sectionTitleGap]}>
+        Hasil Kalkulasi
+      </Text>
+      <View style={styles.kalkulasiCard}>
+        <View style={styles.kalkulasiHeader}>
+          <View style={styles.kalkulasiHeaderLeft}>
+            <Text style={styles.kalkulasiLabel}>Harga Kalkulasi</Text>
+            <Text style={styles.kalkulasiPrice}>
+              Rp {formatNumber(harga || 0)}
+            </Text>
+          </View>
+          {parsed.ppnStatus && (
+            <View
+              style={[
+                styles.ppnBadge,
+                parsed.ppnStatus === 'INCLUDE'
+                  ? styles.ppnBadgeInclude
+                  : styles.ppnBadgeExclude,
+              ]}
+            >
+              <MaterialIcons
+                name={parsed.ppnStatus === 'INCLUDE' ? 'check-circle' : 'info'}
+                size={14}
+                color={parsed.ppnStatus === 'INCLUDE' ? '#15803D' : '#B45309'}
+              />
+              <Text
+                style={[
+                  styles.ppnBadgeText,
+                  parsed.ppnStatus === 'INCLUDE'
+                    ? styles.ppnBadgeTextInclude
+                    : styles.ppnBadgeTextExclude,
+                ]}
+              >
+                {parsed.ppnStatus === 'INCLUDE' ? 'Include PPN' : 'Exclude PPN'}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {parsed.items.length > 0 && (
+          <View style={styles.kalkulasiKetWrap}>
+            <Text style={styles.kalkulasiKetLabel}>Keterangan:</Text>
+            <View style={styles.kalkulasiItemList}>
+              {parsed.items.map((itemText, idx) => (
+                <View key={`ket-${idx}`} style={styles.kalkulasiItemRow}>
+                  <Text style={styles.kalkulasiBullet}>•</Text>
+                  <Text style={styles.kalkulasiItemText}>{itemText}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+      </View>
+    </>
+  );
 };
 
 const statusBadgeStyle = (status: string) => {
@@ -199,8 +330,12 @@ export default function PermintaanHargaDetailScreen({
   const [image2AspectRatio, setImage2AspectRatio] = useState(16 / 9);
   const [image1Error, setImage1Error] = useState(false);
   const [image2Error, setImage2Error] = useState(false);
-  const imageUrl1 = data ? pickImageUrl(data, 1) : buildFallbackImageUrl(nomor, 1);
-  const imageUrl2 = data ? pickImageUrl(data, 2) : buildFallbackImageUrl(nomor, 2);
+  const imageUrl1 = data
+    ? pickImageUrl(data, 1)
+    : buildFallbackImageUrl(nomor, 1);
+  const imageUrl2 = data
+    ? pickImageUrl(data, 2)
+    : buildFallbackImageUrl(nomor, 2);
 
   const cacheBuster = useMemo(() => {
     if (!data) return '';
@@ -377,6 +512,12 @@ export default function PermintaanHargaDetailScreen({
             />
             <InfoRow label="Keterangan" value={data?.mh_ket} />
 
+            <HasilKalkulasiSection
+              status={data?.mh_status}
+              harga={data?.mh_harga_kalkulasi}
+              ket={data?.mh_ket_kalkulasi}
+            />
+
             <Text style={[styles.imageSectionTitle, styles.sectionTitleGap]}>
               Gambar
             </Text>
@@ -482,7 +623,8 @@ export default function PermintaanHargaDetailScreen({
             <View style={styles.modalIndicator} />
             <Text style={styles.modalTitle}>Konfirmasi Hapus</Text>
             <Text style={styles.modalBody}>
-              Dokumen permintaan harga ini akan dihapus permanen.{`\n`}Lanjutkan?
+              Dokumen permintaan harga ini akan dihapus permanen.{`\n`}
+              Lanjutkan?
             </Text>
             <View style={styles.modalActions}>
               <TouchableOpacity
@@ -494,7 +636,10 @@ export default function PermintaanHargaDetailScreen({
                 <Text style={styles.modalBtnCancelText}>Batal</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalBtnDelete, deleting ? styles.modalBtnDisabled : null]}
+                style={[
+                  styles.modalBtnDelete,
+                  deleting ? styles.modalBtnDisabled : null,
+                ]}
                 onPress={confirmDelete}
                 disabled={deleting}
                 activeOpacity={0.85}
@@ -641,6 +786,95 @@ const styles = StyleSheet.create({
   },
   sectionTitleGap: {
     marginTop: 14,
+  },
+  kalkulasiCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 14,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  kalkulasiHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  kalkulasiHeaderLeft: {
+    flex: 1,
+  },
+  kalkulasiLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: THEME.muted,
+    marginBottom: 2,
+  },
+  kalkulasiPrice: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#0F172A',
+  },
+  ppnBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  ppnBadgeExclude: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FDE68A',
+  },
+  ppnBadgeInclude: {
+    backgroundColor: '#DCFCE7',
+    borderColor: '#BBF7D0',
+  },
+  ppnBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  ppnBadgeTextExclude: {
+    color: '#92400E',
+  },
+  ppnBadgeTextInclude: {
+    color: '#166534',
+  },
+  kalkulasiKetWrap: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  kalkulasiKetLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: THEME.muted,
+    marginBottom: 6,
+  },
+  kalkulasiItemList: {
+    gap: 4,
+  },
+  kalkulasiItemRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+  },
+  kalkulasiBullet: {
+    fontSize: 14,
+    color: THEME.primary,
+    lineHeight: 18,
+    fontWeight: '900',
+  },
+  kalkulasiItemText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: THEME.ink,
+    lineHeight: 18,
   },
   imageSectionTitle: {
     color: THEME.ink,

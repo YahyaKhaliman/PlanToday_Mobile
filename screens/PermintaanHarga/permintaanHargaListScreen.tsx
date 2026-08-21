@@ -61,6 +61,45 @@ const formatDate = (ymd: string) => {
   });
 };
 
+const formatNumber = (n: any) => {
+  const num = Number(n);
+  if (Number.isNaN(num)) return String(n ?? '-');
+  return new Intl.NumberFormat('id-ID').format(num);
+};
+
+const parseKetKalkulasi = (raw?: string) => {
+  if (!raw) return { ppnStatus: null, items: [] };
+  const rawParts = raw
+    .split(/[;\n\r]+/)
+    .map(p => p.trim())
+    .filter(Boolean);
+
+  let ppnStatus: 'EXCLUDE' | 'INCLUDE' | null = null;
+  const items: string[] = [];
+
+  for (const part of rawParts) {
+    const upper = part.toUpperCase().replace(/\s+/g, '');
+    if (
+      upper === 'EXCPPN' ||
+      upper === 'EXCLUDEPPN' ||
+      upper === 'NONPPN' ||
+      upper === 'EXCLUDE'
+    ) {
+      ppnStatus = 'EXCLUDE';
+    } else if (
+      upper === 'INCPPN' ||
+      upper === 'INCLUDEPPN' ||
+      upper === 'INCLUDE'
+    ) {
+      ppnStatus = 'INCLUDE';
+    } else {
+      items.push(part);
+    }
+  }
+
+  return { ppnStatus, items };
+};
+
 const getStatusBadgeStyle = (status: string) => {
   const value = String(status || '').toUpperCase();
   const colors = COMPANY_STATUS_COLORS[value] || COMPANY_STATUS_COLORS.DEFAULT;
@@ -69,6 +108,50 @@ const getStatusBadgeStyle = (status: string) => {
     borderColor: colors.base,
     textColor: colors.text,
   };
+};
+
+const KalkulasiRowItem = ({
+  status,
+  harga,
+  ket,
+}: {
+  status: string;
+  harga: number;
+  ket?: string;
+}) => {
+  if (String(status || '').toUpperCase() !== 'DONE') return null;
+  const parsed = parseKetKalkulasi(ket);
+  return (
+    <View style={styles.kalkulasiRow}>
+      <View style={styles.kalkulasiRowLeft}>
+        <Text style={styles.kalkulasiLabel}>Harga Kalkulasi:</Text>
+        <Text style={styles.kalkulasiValue}>
+          Rp {formatNumber(harga || 0)}
+        </Text>
+      </View>
+      {parsed.ppnStatus && (
+        <View
+          style={[
+            styles.ppnMiniBadge,
+            parsed.ppnStatus === 'INCLUDE'
+              ? styles.ppnMiniBadgeInclude
+              : styles.ppnMiniBadgeExclude,
+          ]}
+        >
+          <Text
+            style={[
+              styles.ppnMiniBadgeText,
+              parsed.ppnStatus === 'INCLUDE'
+                ? styles.ppnMiniBadgeTextInclude
+                : styles.ppnMiniBadgeTextExclude,
+            ]}
+          >
+            {parsed.ppnStatus === 'INCLUDE' ? 'Inc PPN' : 'Exc PPN'}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
 };
 
 export default function PermintaanHargaListScreen({ navigation, route }: any) {
@@ -435,11 +518,11 @@ export default function PermintaanHargaListScreen({ navigation, route }: any) {
                 const count =
                   opt === 'all' ? rawItems.length : statusCounts[opt];
                 const getDotColor = (): string | undefined => {
-                  if (opt === 'done') return '#000000';
-                  if (opt === 'minta') return '#FF0000';
-                  if (opt === 'wait') return '#008000';
-                  if (opt === 'belum') return '#6B7280';
-                  if (opt === 'cancel') return '#0000FF';
+                  if (opt === 'done') return COMPANY_STATUS_COLORS.DONE.base;
+                  if (opt === 'minta') return COMPANY_STATUS_COLORS.MINTA.base;
+                  if (opt === 'wait') return COMPANY_STATUS_COLORS.WAIT.base;
+                  if (opt === 'belum') return COMPANY_STATUS_COLORS.BELUM.base;
+                  if (opt === 'cancel') return COMPANY_STATUS_COLORS.CANCEL.base;
                   return undefined;
                 };
                 const dotColor = getDotColor();
@@ -568,6 +651,11 @@ export default function PermintaanHargaListScreen({ navigation, route }: any) {
               <Text style={styles.metaText} numberOfLines={1}>
                 Jumlah Order: {item.jml_order || 0}
               </Text>
+              <KalkulasiRowItem
+                status={item.status}
+                harga={item.harga_kalkulasi}
+                ket={item.ket_kalkulasi}
+              />
               <Text style={styles.detail}>Tap untuk lihat detail</Text>
             </TouchableOpacity>
           );
@@ -710,7 +798,7 @@ export default function PermintaanHargaListScreen({ navigation, route }: any) {
                 <View
                   style={[
                     styles.legendModalDot,
-                    { backgroundColor: '#6B7280' },
+                    { backgroundColor: COMPANY_STATUS_COLORS.BELUM.base },
                   ]}
                 />
                 <View style={styles.legendModalTextWrap}>
@@ -725,7 +813,7 @@ export default function PermintaanHargaListScreen({ navigation, route }: any) {
                 <View
                   style={[
                     styles.legendModalDot,
-                    { backgroundColor: '#FF0000' },
+                    { backgroundColor: COMPANY_STATUS_COLORS.MINTA.base },
                   ]}
                 />
                 <View style={styles.legendModalTextWrap}>
@@ -740,7 +828,7 @@ export default function PermintaanHargaListScreen({ navigation, route }: any) {
                 <View
                   style={[
                     styles.legendModalDot,
-                    { backgroundColor: '#008000' },
+                    { backgroundColor: COMPANY_STATUS_COLORS.WAIT.base },
                   ]}
                 />
                 <View style={styles.legendModalTextWrap}>
@@ -755,7 +843,7 @@ export default function PermintaanHargaListScreen({ navigation, route }: any) {
                 <View
                   style={[
                     styles.legendModalDot,
-                    { backgroundColor: '#000000' },
+                    { backgroundColor: COMPANY_STATUS_COLORS.DONE.base },
                   ]}
                 />
                 <View style={styles.legendModalTextWrap}>
@@ -770,7 +858,7 @@ export default function PermintaanHargaListScreen({ navigation, route }: any) {
                 <View
                   style={[
                     styles.legendModalDot,
-                    { backgroundColor: '#0000FF' },
+                    { backgroundColor: COMPANY_STATUS_COLORS.CANCEL.base },
                   ]}
                 />
                 <View style={styles.legendModalTextWrap}>
@@ -1041,6 +1129,57 @@ const styles = StyleSheet.create({
   statusText: { fontWeight: '800', fontSize: 11, letterSpacing: 0.3 },
   nama: { color: THEME.ink, fontWeight: '800', marginTop: 6, fontSize: 15 },
   metaText: { marginTop: 2, fontSize: 12, color: THEME.ink },
+  kalkulasiRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginTop: 6,
+  },
+  kalkulasiRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  kalkulasiLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: THEME.muted,
+  },
+  kalkulasiValue: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  ppnMiniBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  ppnMiniBadgeExclude: {
+    backgroundColor: '#FEF3C7',
+    borderColor: '#FDE68A',
+  },
+  ppnMiniBadgeInclude: {
+    backgroundColor: '#DCFCE7',
+    borderColor: '#BBF7D0',
+  },
+  ppnMiniBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  ppnMiniBadgeTextExclude: {
+    color: '#92400E',
+  },
+  ppnMiniBadgeTextInclude: {
+    color: '#166534',
+  },
   detail: {
     color: THEME.muted,
     fontWeight: '700',

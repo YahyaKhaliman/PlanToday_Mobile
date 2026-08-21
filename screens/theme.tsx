@@ -44,12 +44,12 @@ export const SHADOWS = {
 };
 
 export const COMPANY_STATUS_COLORS: Record<string, { base: string; text: string }> = {
-  BELUM: { base: '#64748B', text: '#1E293B' },      // Slate
-  MINTA: { base: '#F43F5E', text: '#9F1239' },      // Rose
-  CANCEL: { base: '#EF4444', text: '#991B1B' },     // Red
-  WAIT: { base: '#F59E0B', text: '#92400E' },       // Amber
-  DONE: { base: '#10B981', text: '#065F46' },       // Emerald
-  SELESAI: { base: '#10B981', text: '#065F46' },    // Emerald
+  BELUM: { base: '#6B7280', text: '#374151' },      // Abu-abu / Gray
+  MINTA: { base: '#DC2626', text: '#991B1B' },      // Merah / Red (Dimintakan harga)
+  WAIT: { base: '#16A34A', text: '#15803D' },       // Hijau / Green (Menunggu acc)
+  DONE: { base: '#18181B', text: '#09090B' },       // Hitam / Black (Selesai diproses)
+  CANCEL: { base: '#2563EB', text: '#1D4ED8' },     // Biru / Blue (Dibatalkan)
+  SELESAI: { base: '#18181B', text: '#09090B' },    // Hitam / Black
   DEFAULT: { base: '#6366F1', text: '#4F46E5' },    // Indigo
 };
 

@@ -426,10 +426,10 @@ export default function TrackingSpkScreen({ route }: any) {
                       opt === 'all'
                         ? `Semua (${rawItems.length})`
                         : opt === 'belum'
-                        ? `Belum (${counts.belum})`
+                        ? `Open (${counts.belum})`
                         : opt === 'proses'
                         ? `Proses (${counts.proses})`
-                        : `Sudah (${counts.sudah})`;
+                        : `Close (${counts.sudah})`;
                     return (
                       <TouchableOpacity
                         key={`status-${opt}`}
@@ -514,14 +514,14 @@ const TrackingSpkRow = memo(
       const realisasi = Number(item.realisasi_total) || 0;
       if (realisasi < 0.01) {
         return {
-          label: 'BELUM',
+          label: 'OPEN',
           color: '#EF4444',
           bgColor: 'rgba(239, 68, 68, 0.08)',
         };
       }
       if (realisasi >= (order - 0.01)) {
         return {
-          label: 'SUDAH',
+          label: 'CLOSE',
           color: '#10B981',
           bgColor: 'rgba(16, 185, 129, 0.08)',
         };
