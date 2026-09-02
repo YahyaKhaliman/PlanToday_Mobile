@@ -1,4 +1,4 @@
-import api from './api';
+﻿import api from './api';
 import { PUBLIC_IMAGE_READ_ORIGIN } from './api';
 import RNBlobUtil from 'react-native-blob-util';
 
@@ -335,4 +335,120 @@ export const getPermintaanHargaStatusCounts = async (
     DONE: 0,
     CANCEL: 0,
   }) as PermintaanHargaStatusCounts;
+};
+
+
+// --- KALKULASI HARGA API SERVICES ---
+
+export const getJenisKainLookup = async (
+  kodeModel: string = 'KH-0001',
+  token?: string | null,
+) => {
+  const response = await api.get('/permintaan-harga/kalkulasi/kain', {
+    params: { kodeModel },
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  return response.data?.data || [];
+};
+
+export const getCetakLookup = async (token?: string | null) => {
+  const response = await api.get('/permintaan-harga/kalkulasi/cetak', {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  return response.data?.data || [];
+};
+
+export const getTambahanLookup = async (token?: string | null) => {
+  const response = await api.get('/permintaan-harga/kalkulasi/tambahan', {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  return response.data?.data || [];
+};
+
+export const getKalkulasiMetadata = async (
+  params: {
+    model: string;
+    jenisKain: string;
+    warna: string;
+    qty: number;
+  },
+  token?: string | null,
+) => {
+  const response = await api.get('/permintaan-harga/kalkulasi/metadata', {
+    params,
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  return response.data?.data;
+};
+
+export const saveKalkulasiData = async (
+  payload: {
+    nomorMh: string;
+    kal: any;
+    namaPekerjaan?: string;
+    custKode?: string;
+    rencanaOrder?: number;
+  },
+  token?: string | null,
+) => {
+  const response = await api.post('/permintaan-harga/kalkulasi/save', payload, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  return response.data?.data;
+};
+
+
+// --- KALKULASI ENGINE API (SPANDUK & MMT) ---
+
+export interface SpandukCalculatePayload {
+  metode: 'MANUAL' | 'MACHINE';
+  lebar: number;
+  jenisKain: string;
+  panjang: number;
+  qty: number;
+}
+
+export interface MmtCalculatePayload {
+  kategori: 'VYNIL' | 'NON_VYNIL';
+  bahanKode: string;
+  panjang: number;
+  lebar: number;
+  qty: number;
+  toppingKode?: string;
+  toppingQty?: number;
+}
+
+export const getKalkulasiMasterOptions = async (token?: string | null) => {
+  const response = await api.get('/permintaan-harga/kalkulasi/options', {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  return response.data?.data;
+};
+
+export const calculateSpandukApi = async (
+  payload: SpandukCalculatePayload,
+  token?: string | null,
+) => {
+  const response = await api.post(
+    '/permintaan-harga/kalkulasi/spanduk/calculate',
+    payload,
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    },
+  );
+  return response.data?.data;
+};
+
+export const calculateMmtApi = async (
+  payload: MmtCalculatePayload,
+  token?: string | null,
+) => {
+  const response = await api.post(
+    '/permintaan-harga/kalkulasi/mmt/calculate',
+    payload,
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    },
+  );
+  return response.data?.data;
 };

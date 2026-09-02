@@ -7,6 +7,7 @@ Aplikasi ini dibangun menggunakan **TypeScript** dan berkomunikasi dengan backen
 ---
 
 ## 📱 Panduan Fitur & Menu Aplikasi
+
 Aplikasi PlanToday memiliki menu yang disesuaikan dengan peran kerja pengguna (**SALES**, **MANAGER**, dan **KURIR**):
 
 ```mermaid
@@ -32,49 +33,60 @@ graph TD
 ### Penjelasan Menu Secara Sederhana:
 
 #### 1. 👥 Customer (Buku Kontak Calon Pelanggan)
-* **Apa gunanya?** Tempat mencatat dan menyimpan daftar calon pelanggan atau toko/instansi yang ingin diprospek.
-* **Cara pakainya:** Sales memasukkan nama usaha, alamat toko, nomor telepon, dan orang yang bisa dihubungi (PIC). Jika butuh membagikan data ke tim, ada tombol praktis untuk menyalin ringkasan data ke WhatsApp.
+
+- **Apa gunanya?** Tempat mencatat dan menyimpan daftar calon pelanggan atau toko/instansi yang ingin diprospek.
+- **Cara pakainya:** Sales memasukkan nama usaha, alamat toko, nomor telepon, dan orang yang bisa dihubungi (PIC). Jika butuh membagikan data ke tim, ada tombol praktis untuk menyalin ringkasan data ke WhatsApp.
 
 #### 2. 📅 Visit Plan (Rencana Jadwal Kunjungan)
-* **Apa gunanya?** Membantu sales menyusun jadwal agenda kerja harian atau mingguan agar terencana dengan rapi.
-* **Cara pakainya:** Pilih pelanggan yang ingin didatangi, tentukan tanggal rencananya, dan tulis tujuan kunjungan (misalnya: perkenalan produk, follow up penawaran, atau penagihan).
+
+- **Apa gunanya?** Membantu sales menyusun jadwal agenda kerja harian atau mingguan agar terencana dengan rapi.
+- **Cara pakainya:** Pilih pelanggan yang ingin didatangi, tentukan tanggal rencananya, dan tulis tujuan kunjungan (misalnya: perkenalan produk, follow up penawaran, atau penagihan).
 
 #### 3. 📍 Visit (Laporan Kunjungan Lapangan)
-* **Apa gunanya?** Mencatat bukti bahwa sales benar-benar sudah datang dan bertemu dengan pelanggan di lokasi.
-* **Cara pakainya:** Saat tiba di tempat pelanggan, sales membuka menu ini untuk *check-in*, menjepret foto langsung di lokasi, mencatat hasil pembicaraan, dan sistem otomatis merekam titik lokasi GPS saat itu.
+
+- **Apa gunanya?** Mencatat bukti bahwa sales benar-benar sudah datang dan bertemu dengan pelanggan di lokasi.
+- **Cara pakainya:** Saat tiba di tempat pelanggan, sales membuka menu ini untuk _check-in_, menjepret foto langsung di lokasi, mencatat hasil pembicaraan, dan sistem otomatis merekam titik lokasi GPS saat itu.
 
 #### 4. 📊 Achievement (Rapor Target Penjualan & Omset)
-* **Apa gunanya?** Melihat performa penjualan pribadi maupun tim apakah sudah mencapai target bulanan/tahunan.
-* **Cara pakainya:** Tampil grafik batang dan persentase yang mudah dilihat. Sales bisa mengecek berapa omset yang sudah dikumpulkan bulan ini, dan Manager bisa melihat perbandingan performa seluruh anggota tim sales.
+
+- **Apa gunanya?** Melihat performa penjualan pribadi maupun tim apakah sudah mencapai target bulanan/tahunan.
+- **Cara pakainya:** Tampil grafik batang dan persentase yang mudah dilihat. Sales bisa mengecek berapa omset yang sudah dikumpulkan bulan ini, dan Manager bisa melihat perbandingan performa seluruh anggota tim sales.
 
 #### 5. 💰 Permintaan Harga (Hitung Biaya Cetak / Custom)
-* **Apa gunanya?** Meminta bantuan tim kalkulator/estimator pabrik untuk menghitung harga barang custom sebelum dibuatkan surat penawaran resmi.
-* **Cara pakainya:** Sales mengisi spesifikasi barang (ukuran, jenis kertas/bahan, finishing, dan jumlah pesanan) serta mengunggah hingga 5 foto contoh produk/sampel.
+
+- **Apa gunanya?** Meminta bantuan tim kalkulator/estimator pabrik untuk menghitung harga barang custom sebelum dibuatkan surat penawaran resmi.
+- **Cara pakainya:** Sales mengisi spesifikasi barang (ukuran, jenis kertas/bahan, finishing, dan jumlah pesanan) serta mengunggah hingga 5 foto contoh produk/sampel.
 
 #### 6. 📄 Penawaran Harga (Pembuatan Surat Penawaran Resmi)
-* **Apa gunanya?** Membuat draf surat penawaran harga resmi dengan kop surat perusahaan untuk diserahkan ke pelanggan.
-* **Cara pakainya:** Pilih nama pembeli, masukkan daftar barang yang ingin dibeli beserta harganya, lalu aplikasi otomatis menghitung total harga dan PPN. Hasilnya bisa langsung diekspor menjadi dokumen PDF resmi.
+
+- **Apa gunanya?** Membuat draf surat penawaran harga resmi dengan kop surat perusahaan untuk diserahkan ke pelanggan.
+- **Cara pakainya:** Pilih nama pembeli, masukkan daftar barang yang ingin dibeli beserta harganya, lalu aplikasi otomatis menghitung total harga dan PPN. Hasilnya bisa langsung diekspor menjadi dokumen PDF resmi.
 
 #### 7. 📌 Tracking Penawaran (Pantau Status Penawaran)
-* **Apa gunanya?** Memantau nasib surat penawaran yang sudah dikirim ke pelanggan.
-* **Cara pakainya:** Sales bisa melihat penawaran mana yang masih tahap negosiasi, yang sudah berhasil *Deal* (menjadi order), atau yang batal (*Lost*).
+
+- **Apa gunanya?** Memantau nasib surat penawaran yang sudah dikirim ke pelanggan.
+- **Cara pakainya:** Sales bisa melihat penawaran mana yang masih tahap negosiasi, yang sudah berhasil _Deal_ (menjadi order), atau yang batal (_Lost_).
 
 #### 8. 🗺️ Tracking MAP (Pantau Memo SPK Pabrik)
-* **Apa gunanya?** Memantau alur berkas lembar kerja pesanan (Memo SPK) yang sedang diproses di internal operasional dan pabrik.
+
+- **Apa gunanya?** Memantau alur berkas lembar kerja pesanan (Memo SPK) yang sedang diproses di internal operasional dan pabrik.
 
 #### 9. 📋 Tracking SPK (Pantau Jadwal & Status Kirim Barang)
-* **Apa gunanya?** Mengetahui apakah barang pesanan pelanggan yang diproduksi sudah selesai dan berapa banyak yang sudah dikirim ke alamat pembeli.
-* **Cara pakainya:** Menampilkan ringkasan status pengiriman yang sangat jelas:
-  * 🔴 **Belum Kirim**: Barang masih proses produksi di pabrik.
-  * 🟡 **Sebagian**: Sebagian barang sudah dikirim dengan Surat Jalan, sisanya menyusul.
-  * 🟢 **Selesai**: Seluruh pesanan sudah tuntas dikirim ke pelanggan.
 
-#### 10. 🚚 Pengiriman Kurir *(Khusus Bagian Kurir - Masih Dalam Pengembangan)*
-* **Apa gunanya?** Membantu kurir mengantar barang sesuai daftar Surat Jalan dan mencatat tanda terima pengantaran.
-* **Cara pakainya:** Kurir melihat rute/jadwal kirim, lalu saat menyerahkan paket ke pembeli, kurir mengambil foto barang diterima (*bukti serah terima*) dan sistem mencatat lokasi GPS pengantaran.
+- **Apa gunanya?** Mengetahui apakah barang pesanan pelanggan yang diproduksi sudah selesai dan berapa banyak yang sudah dikirim ke alamat pembeli.
+- **Cara pakainya:** Menampilkan ringkasan status pengiriman yang sangat jelas:
+  - 🔴 **Belum Kirim**: Barang masih proses produksi di pabrik.
+  - 🟡 **Sebagian**: Sebagian barang sudah dikirim dengan Surat Jalan, sisanya menyusul.
+  - 🟢 **Selesai**: Seluruh pesanan sudah tuntas dikirim ke pelanggan.
+
+#### 10. 🚚 Pengiriman Kurir _(Khusus Bagian Kurir - Masih Dalam Pengembangan)_
+
+- **Apa gunanya?** Membantu kurir mengantar barang sesuai daftar Surat Jalan dan mencatat tanda terima pengantaran.
+- **Cara pakainya:** Kurir melihat rute/jadwal kirim, lalu saat menyerahkan paket ke pembeli, kurir mengambil foto barang diterima (_bukti serah terima_) dan sistem mencatat lokasi GPS pengantaran.
 
 #### 11. 🔐 Ganti Password & Akun
-* **Apa gunanya?** Mengganti kata sandi login akun sendiri sewaktu-waktu agar tetap aman.
+
+- **Apa gunanya?** Mengganti kata sandi login akun sendiri sewaktu-waktu agar tetap aman.
 
 ---
 
@@ -147,19 +159,78 @@ export const PUBLIC_API_ORIGIN = 'http://10.0.2.2:3001';
 // export const PUBLIC_API_ORIGIN = 'http://api.example.com:3001';
 ```
 
-### 4. Menjalankan Aplikasi
+### 4. Menjalankan Aplikasi (Debug Mode)
+
+#### a. Menjalankan Metro Bundler
 
 Buka terminal dan jalankan Metro bundler:
 
 ```bash
 npm start
+# Atau jalankan dengan mereset cache jika terjadi masalah caching:
+npm start -- --reset-cache
 ```
 
-Buka terminal kedua dan jalankan aplikasi pada emulator/device Android:
+#### b. Menjalankan di Emulator / Perangkat Android
+
+Buka terminal baru dan jalankan aplikasi:
 
 ```bash
-npm run android
+npx react-native run-android --mode=debug
 ```
+
+#### c. Menjalankan di Emulator / Simulator iOS (Khusus macOS)
+
+```bash
+npm run ios
+```
+
+---
+
+## 🐞 Panduan Debugging & Developer Menu
+
+### 1. Menghubungkan Perangkat Fisik (USB Debugging)
+
+Jika menggunakan HP fisik via kabel USB, pastikan USB Debugging aktif di Developer Options, lalu lakukan port forwarding agar perangkat dapat mengakses Metro Bundler dan backend lokal:
+
+```bash
+# Pastikan perangkat terdeteksi
+adb devices
+
+# Forward port Metro Bundler
+adb reverse tcp:8081 tcp:8081
+
+# Forward port Backend Lokal (jika menjalankan server di localhost:3001)
+adb reverse tcp:3001 tcp:3001
+```
+
+### 2. Membuka React Native In-App Developer Menu
+
+Developer Menu menyediakan akses ke fitur Reload, Hot Reloading, Inspector, dan Debugger:
+
+- **Emulator Android**: Tekan shortcut `Ctrl + M` (Windows) atau `Cmd + M` (macOS), atau jalankan perintah:
+  ```bash
+  adb shell input keyevent 82
+  ```
+- **Simulator iOS**: Tekan shortcut `Cmd + D` atau `Cmd + Ctrl + Z`.
+- **Perangkat Fisik**: Goyangkan perangkat (_shake device_).
+
+### 3. Opsi Debugging yang Tersedia
+
+- **Reload / Fast Refresh**: Tekan tombol `R` dua kali pada terminal Metro atau pilih _Reload_ di Developer Menu.
+- **Toggle Element Inspector**: Digunakan untuk menginspeksi hierarchy elemen UI, padding, margin, dan style secara langsung di layar.
+- **Monitoring Console & Logcat**:
+
+  ```bash
+  # Memantau log React Native di Android
+  npx react-native log-android
+
+  # Atau menggunakan adb logcat khusus tag ReactNative
+  adb logcat *:S ReactNative:V ReactNativeJS:V
+  ```
+
+- **Hermes / Chrome DevTools Debugging**:
+  Buka browser Chrome/Edge dan navigasikan ke `chrome://inspect` untuk mendebug JavaScript, breakpoint, serta network request langsung dari Hermes runtime.
 
 ---
 

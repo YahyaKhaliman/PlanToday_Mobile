@@ -1,8 +1,7 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   ActivityIndicator,
-  Image,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -13,22 +12,18 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import LinearGradient from 'react-native-linear-gradient';
-import { launchImageLibrary } from 'react-native-image-picker';
 import Toast from 'react-native-toast-message';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useAuth } from '../../context/authContext';
 import {
   createPermintaanHarga,
-  deletePermintaanHargaImage,
-  PermintaanHargaImageUpload,
   PermintaanHargaPayload,
   updatePermintaanHarga,
-  uploadPermintaanHargaImage,
+  calculateSpandukApi,
+  calculateMmtApi,
+  getKalkulasiMasterOptions,
 } from '../../services/permintaanHargaApi';
-import {
-  PUBLIC_IMAGE_BASE_PATH,
-  PUBLIC_IMAGE_READ_ORIGIN,
-} from '../../services/api';
 import { usePressGuard } from '../../utils/usePressGuard';
 import { PENAWARAN_SHADOW, PENAWARAN_THEME } from '../Penawaran/penawaranTheme';
 
@@ -36,8 +31,8 @@ const THEME = PENAWARAN_THEME;
 
 const DIVISI_OPTIONS = [
   { kode: '1', label: '1 - SPANDUK' },
-  { kode: '4', label: '4 - GARMEN' },
   { kode: '5', label: '5 - MMT' },
+  { kode: '4', label: '4 - GARMEN' },
 ];
 
 const toYmd = (d: Date) => {
@@ -47,38 +42,19 @@ const toYmd = (d: Date) => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
-const parseYmd = (ymd: string) => {
-  const [y, m, d] = String(ymd || '')
-    .split('-')
-    .map(Number);
-  return new Date(y || 2000, (m || 1) - 1, d || 1);
-};
-
-const formatDate = (ymd: string) => {
-  const [y, m, d] = String(ymd || '')
-    .split('-')
-    .map(Number);
-  if (!y || !m || !d) return '-';
-  return new Date(y, m - 1, d).toLocaleDateString('id-ID', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-};
-
 const toUpper = (v: string) => String(v || '').toUpperCase();
 
 const onlyDigits = (value: string) =>
   String(value || '').replace(/[^0-9]/g, '');
 
-const formatThousandsId = (value: string) => {
-  const cleaned = onlyDigits(value);
-  if (!cleaned) return '';
+const formatThousandsId = (value: string | number) => {
+  const cleaned = onlyDigits(String(value ?? ''));
+  if (!cleaned) return '0';
   return new Intl.NumberFormat('id-ID').format(Number(cleaned));
 };
 
-const toNumCurrency = (v: string) => {
-  const raw = String(v || '');
+const toNumCurrency = (v: string | number) => {
+  const raw = String(v ?? '');
   const onlyNum = onlyDigits(raw);
   if (!onlyNum) return 0;
   const n = Number(onlyNum);
@@ -100,41 +76,6 @@ const toNumDecimal = (v: string) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-const sanitizeDecimalInput = (value: string) => {
-  const normalizedSeparators = String(value || '').replace(/,/g, '.');
-  const cleaned = normalizedSeparators.replace(/[^0-9.]/g, '');
-  const firstDot = cleaned.indexOf('.');
-  if (firstDot === -1) return cleaned;
-  const before = cleaned.slice(0, firstDot + 1);
-  const after = cleaned.slice(firstDot + 1).replace(/\./g, '');
-  return before + after;
-};
-
-const editableStatus = (status?: string) => {
-  const s = String(status || '').toUpperCase();
-  return !s || s === 'BELUM';
-};
-
-type PickedImage = {
-  uri: string;
-  type?: string;
-  fileName?: string;
-  fileSize?: number;
-};
-
-type FormImage =
-  | ({ source: 'existing' } & PickedImage)
-  | ({ source: 'new' } & PickedImage);
-
-const MAX_IMAGE_SIZE = 1024 * 1024; // 1MB
-const ALLOWED_IMAGE_MIME = new Set(['image/jpeg', 'image/jpg', 'image/png']);
-
-const formatSizeMb = (size?: number) => {
-  const bytes = Number(size || 0);
-  if (!bytes) return '0 MB';
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
-};
-
 export default function PermintaanHargaFormScreen({ navigation, route }: any) {
   const insets = useSafeAreaInsets();
   const runGuardedPress = usePressGuard();
@@ -146,7 +87,9 @@ export default function PermintaanHargaFormScreen({ navigation, route }: any) {
     () => route?.params?.initialData || {},
     [route?.params],
   );
-  const nomor = String(route?.params?.nomor || initial?.mh_nomor || '');
+  const [currentNomor, setCurrentNomor] = useState(
+    String(route?.params?.nomor || initial?.mh_nomor || ''),
+  );
 
   const isManager = useMemo(
     () =>
@@ -173,6 +116,12 @@ export default function PermintaanHargaFormScreen({ navigation, route }: any) {
     [user?.sales_kode, user?.sal_kode, user?.kode_sales, user?.spk_sal_kode],
   );
 
+  // --- STATE TABS ---
+  const [activeTab, setActiveTab] = useState<'permintaan' | 'kalkulasi'>(
+    'permintaan',
+  );
+
+  // --- STATE TAB 1: PERMINTAAN HARGA ---
   const [saving, setSaving] = useState(false);
   const [showDateOrderPicker, setShowDateOrderPicker] = useState(false);
   const [showDivisiOptions, setShowDivisiOptions] = useState(false);
@@ -194,6 +143,9 @@ export default function PermintaanHargaFormScreen({ navigation, route }: any) {
   const [mh_jmlorder, setMhJmlOrder] = useState(
     String(initial?.mh_jmlorder ?? ''),
   );
+  const [mh_harga_kalkulasi, setMhHargaKalkulasi] = useState<number>(
+    Number(initial?.mh_harga_kalkulasi) || 0,
+  );
   const [mh_harga, setMhHarga] = useState(
     formatThousandsId(String(initial?.mh_harga ?? '')),
   );
@@ -201,7 +153,9 @@ export default function PermintaanHargaFormScreen({ navigation, route }: any) {
     formatThousandsId(String(initial?.mh_budget ?? '')),
   );
   const [mh_dateorder, setMhDateOrder] = useState(
-    String(initial?.mh_dateorder || '').trim().slice(0, 10) || toYmd(new Date()),
+    String(initial?.mh_dateorder || '')
+      .trim()
+      .slice(0, 10) || toYmd(new Date()),
   );
   const [mh_kain, setMhKain] = useState(String(initial?.mh_kain || ''));
   const [mh_panjang, setMhPanjang] = useState(
@@ -217,112 +171,29 @@ export default function PermintaanHargaFormScreen({ navigation, route }: any) {
   );
   const [mh_ket, setMhKet] = useState(String(initial?.mh_ket || ''));
 
-  const [image1, setImage1] = useState<FormImage | null>(null);
-  const [image2, setImage2] = useState<FormImage | null>(null);
-  const [deletedSlots, setDeletedSlots] = useState<number[]>([]);
+  // --- STATE KALKULATOR DIVISI 1: SPANDUK ---
+  const [spandukMetode, setSpandukMetode] = useState<'MANUAL' | 'MACHINE'>(
+    'MANUAL',
+  );
+  const [spandukLebar, setSpandukLebar] = useState<number>(90);
+  const [spandukKain, setSpandukKain] = useState<string>('POLYESTER 50/36');
+  const [spandukLoading, setSpandukLoading] = useState(false);
+  const [spandukResult, setSpandukResult] = useState<any>(null);
+  const [showSpandukStrataTabel, setShowSpandukStrataTabel] = useState(false);
 
-  useEffect(() => {
-    if (mode !== 'edit') return;
+  // --- STATE KALKULATOR DIVISI 5: MMT ---
+  const [mmtKategori, setMmtKategori] = useState<'VYNIL' | 'NON_VYNIL'>(
+    'VYNIL',
+  );
+  const [mmtBahanKode, setMmtBahanKode] = useState<string>('260');
+  const [mmtToppingKode, setMmtToppingKode] = useState<string>('');
+  const [mmtToppingQty, setMmtToppingQty] = useState<string>('');
+  const [mmtLoading, setMmtLoading] = useState(false);
+  const [mmtResult, setMmtResult] = useState<any>(null);
+  const [showMmtStrataTabel, setShowMmtStrataTabel] = useState(false);
+  const [masterToppingList, setMasterToppingList] = useState<any[]>([]);
 
-    const baseOrigin = String(PUBLIC_IMAGE_READ_ORIGIN || '').replace(/\/$/, '');
-    const basePath = String(PUBLIC_IMAGE_BASE_PATH || '').trim().replace(/\/$/, '');
-
-    const normalizeImageUrl = (value: string): string => {
-      const trimmed = String(value || '').trim();
-      if (!trimmed) return '';
-      const forcedReadUrl = trimmed.replace(
-        /^http:\/\/103\.94\.238\.252:8182/i,
-        baseOrigin,
-      );
-      return forcedReadUrl
-        .replace(
-          /^http:\/\/103\.94\.238\.252:3005\/image\/mintaharga/i,
-          `${baseOrigin}${basePath}`,
-        )
-        .replace(
-          /^http:\/\/103\.94\.238\.252:8182\/image\/mintaharga/i,
-          `${baseOrigin}${basePath}`,
-        );
-    };
-
-    const getSafeImageUrl = (value: any): string | null => {
-      if (typeof value !== 'string') return null;
-      const trimmed = normalizeImageUrl(value);
-      if (!trimmed) return null;
-      if (/^https?:\/\//i.test(trimmed)) return trimmed;
-      return null;
-    };
-
-    const pickImageUrl = (payload: any, index: 1 | 2): string | null => {
-      if (!payload) return null;
-      const candidates =
-        index === 1
-          ? [
-              payload?.gambar_1_url,
-              payload?.gambar1_url,
-              payload?.img1,
-              payload?.image1,
-              payload?.mh_gambar1,
-              payload?.gambar1,
-              payload?.mh_img1,
-              payload?.mh_image1,
-            ]
-          : [
-              payload?.gambar_2_url,
-              payload?.gambar2_url,
-              payload?.img2,
-              payload?.image2,
-              payload?.mh_gambar2,
-              payload?.gambar2,
-              payload?.mh_img2,
-              payload?.mh_image2,
-            ];
-
-      for (const candidate of candidates) {
-        const safeUrl = getSafeImageUrl(candidate);
-        if (safeUrl) return safeUrl;
-      }
-      return null;
-    };
-
-    const buildFallbackImageUrl = (n: string, idx: 1 | 2): string | null => {
-      const cleaned = String(n || '').trim();
-      if (!cleaned) return null;
-      const suffix = idx === 1 ? '.jpg' : '-2.jpg';
-      return `${baseOrigin}${basePath}/${encodeURIComponent(cleaned)}${suffix}`;
-    };
-
-    const resolvedUrl1 = pickImageUrl(initial, 1) || buildFallbackImageUrl(nomor, 1);
-    const resolvedUrl2 = pickImageUrl(initial, 2) || buildFallbackImageUrl(nomor, 2);
-
-    setImage1(
-      resolvedUrl1
-        ? {
-            source: 'existing',
-            uri: resolvedUrl1,
-            type: 'image/jpeg',
-            fileName: String(initial?.gambar_1_file || `${nomor}.jpg`),
-          }
-        : null,
-    );
-
-    setImage2(
-      resolvedUrl2
-        ? {
-            source: 'existing',
-            uri: resolvedUrl2,
-            type: 'image/jpeg',
-            fileName: String(initial?.gambar_2_file || `${nomor}-2.jpg`),
-          }
-        : null,
-    );
-  }, [initial, mode, nomor]);
-
-  const imageList = [
-    image1 ? { slot: 1 as const, image: image1 } : null,
-    image2 ? { slot: 2 as const, image: image2 } : null,
-  ].filter(Boolean) as Array<{ slot: 1 | 2; image: FormImage }>;
-
+  // Update customer dan sales bila dipilih dari navigation screen lain
   useEffect(() => {
     const selectedCustomer = route?.params?.selectedCustomer;
     if (selectedCustomer) {
@@ -347,105 +218,122 @@ export default function PermintaanHargaFormScreen({ navigation, route }: any) {
     }
   }, [isManager, loginSalesKode, loginSalesName]);
 
-  const canEdit = useMemo(
-    () => editableStatus(initial?.mh_status),
-    [initial?.mh_status],
-  );
-  const selectedDivisiLabel = useMemo(() => {
-    const found = DIVISI_OPTIONS.find(
-      opt => opt.kode === String(mh_divisi || '').trim(),
-    );
-    if (found) return found.label;
-    return mh_divisi ? `${mh_divisi} - LAINNYA` : '-';
-  }, [mh_divisi]);
-
-  const pickImage = async (slot: 1 | 2) => {
-    const res = await launchImageLibrary({
-      mediaType: 'photo',
-      selectionLimit: 1,
-      quality: 0.9,
-    });
-    const asset = res.assets?.[0];
-    if (!asset?.uri) return;
-    const mime = String(asset.type || '').toLowerCase();
-    const fileName = String(asset.fileName || '').toLowerCase();
-    const extOk = /\.(jpg|jpeg|png)$/.test(fileName);
-    const mimeOk = ALLOWED_IMAGE_MIME.has(mime);
-    if (!mimeOk && !extOk) {
-      Toast.show({
-        type: 'glassError',
-        text1: 'Format file tidak didukung',
-        text2: 'Hanya file gambar JPG/JPEG/PNG yang diperbolehkan.',
-      });
-      return;
-    }
-    const size = Number(asset.fileSize || 0);
-    if (size > MAX_IMAGE_SIZE) {
-      Toast.show({
-        type: 'glassError',
-        text1: 'Ukuran terlalu besar',
-        text2: `Maksimal ukuran gambar 1MB per file. File dipilih: ${formatSizeMb(
-          size,
-        )}`,
-      });
-      return;
-    }
-    const img: FormImage = {
-      source: 'new',
-      uri: asset.uri,
-      type: asset.type,
-      fileName: asset.fileName,
-      fileSize: asset.fileSize,
+  // Load Master Options saat buka layar
+  useEffect(() => {
+    const loadMaster = async () => {
+      try {
+        const resOptions = await getKalkulasiMasterOptions(token);
+        if (resOptions?.topping) {
+          setMasterToppingList(resOptions.topping);
+        }
+      } catch (e) {
+        console.log('[Kalkulasi][MasterLoad][Error]', e);
+      }
     };
-    if (slot === 1) setImage1(img);
-    else setImage2(img);
-  };
+    loadMaster();
+  }, [token]);
 
-  const pickNextImage = async () => {
-    if (!image1) {
-      await pickImage(1);
-      return;
+  // --- TRIGGER ENGINE KALKULASI SPANDUK (BE) ---
+  const handleHitungSpanduk = useCallback(async () => {
+    setSpandukLoading(true);
+    try {
+      const res = await calculateSpandukApi(
+        {
+          metode: spandukMetode,
+          lebar: spandukLebar,
+          jenisKain: spandukKain,
+          panjang: toNumDecimal(mh_panjang),
+          qty: toNumCurrency(mh_jmlorder),
+        },
+        token,
+      );
+      setSpandukResult(res);
+      Toast.show({
+        type: 'glassSuccess',
+        text1: 'Kalkulasi Spanduk Berhasil',
+        text2: `Harga: Rp ${formatThousandsId(res?.hargaSatuanPcs)} /pcs`,
+      });
+    } catch (e: any) {
+      Toast.show({
+        type: 'glassError',
+        text1: 'Gagal Kalkulasi Spanduk',
+        text2: e?.response?.data?.message || e?.message || 'Error',
+      });
+    } finally {
+      setSpandukLoading(false);
     }
-    if (!image2) {
-      await pickImage(2);
-      return;
+  }, [
+    spandukMetode,
+    spandukLebar,
+    spandukKain,
+    mh_panjang,
+    mh_jmlorder,
+    token,
+  ]);
+
+  // --- TRIGGER ENGINE KALKULASI MMT (BE) ---
+  const handleHitungMmt = useCallback(async () => {
+    setMmtLoading(true);
+    try {
+      const res = await calculateMmtApi(
+        {
+          kategori: mmtKategori,
+          bahanKode: mmtBahanKode,
+          panjang: toNumDecimal(mh_panjang),
+          lebar: toNumDecimal(mh_lebar),
+          qty: toNumCurrency(mh_jmlorder),
+          toppingKode: mmtToppingKode,
+          toppingQty: toNumCurrency(mmtToppingQty),
+        },
+        token,
+      );
+      setMmtResult(res);
+      Toast.show({
+        type: 'glassSuccess',
+        text1: 'Kalkulasi MMT Berhasil',
+        text2: `Harga: Rp ${formatThousandsId(res?.hargaSatuanPcs)} /pcs`,
+      });
+    } catch (e: any) {
+      Toast.show({
+        type: 'glassError',
+        text1: 'Gagal Kalkulasi MMT',
+        text2: e?.response?.data?.message || e?.message || 'Error',
+      });
+    } finally {
+      setMmtLoading(false);
     }
+  }, [
+    mmtKategori,
+    mmtBahanKode,
+    mh_panjang,
+    mh_lebar,
+    mh_jmlorder,
+    mmtToppingKode,
+    mmtToppingQty,
+    token,
+  ]);
+
+  // Terapkan Harga Kalkulasi ke Form Permintaan Harga (Tab 1)
+  const applyPriceToTab1 = (hargaPcs: number) => {
+    setMhHarga(formatThousandsId(hargaPcs));
+    setMhHargaKalkulasi(hargaPcs);
+    setActiveTab('permintaan');
     Toast.show({
-      type: 'glassError',
-      text1: 'Maksimal gambar',
-      text2: 'Maksimal 2 gambar. Hapus salah satu untuk mengganti.',
+      type: 'glassSuccess',
+      text1: 'Harga Kalkulasi Diterapkan',
+      text2: `Harga Rp ${formatThousandsId(
+        hargaPcs,
+      )} /pcs (+ PPN 11%) berhasil dipasang di Tab 1`,
     });
   };
 
-  const removeImageAt = (slot: 1 | 2) => {
-    if (slot === 1) {
-      setImage1(null);
-      if (mode === 'edit' && image1?.source === 'existing') {
-        setDeletedSlots(prev => [...prev, 1]);
-      }
-    } else {
-      setImage2(null);
-      if (mode === 'edit' && image2?.source === 'existing') {
-        setDeletedSlots(prev => [...prev, 2]);
-      }
-    }
-  };
-
-  const toUploadPayload = (img: FormImage): PermintaanHargaImageUpload => ({
-    uri: img.uri,
-    type: img.type || 'image/jpeg',
-    name: `permintaan-harga-${Date.now()}.${
-      (img.type || '').includes('png') ? 'png' : 'jpg'
-    }`,
-  });
-
-  const submit = async () => {
+  // Simpan Permintaan Harga (Tab 1)
+  const submitPermintaan = async () => {
     if (mh_cus_nama && !mh_cus_kode) {
       Toast.show({
         type: 'glassError',
         text1: 'Validasi Customer',
-        text2:
-          'Customer belum valid. Pilih dari tombol Cari sampai kode customer terisi.',
+        text2: 'Customer belum valid. Pilih dari tombol Cari.',
       });
       return;
     }
@@ -473,6 +361,7 @@ export default function PermintaanHargaFormScreen({ navigation, route }: any) {
       mh_nama,
       mh_jmlorder: toNumCurrency(mh_jmlorder),
       mh_harga: toNumCurrency(mh_harga),
+      mh_harga_kalkulasi: mh_harga_kalkulasi || toNumCurrency(mh_harga),
       mh_budget: toNumCurrency(mh_budget),
       mh_dateorder,
       mh_kain,
@@ -484,53 +373,18 @@ export default function PermintaanHargaFormScreen({ navigation, route }: any) {
       mh_ket,
     };
 
-    console.log('[permintaanHargaForm.submit] price normalization', {
-      mh_harga_input: mh_harga,
-      mh_budget_input: mh_budget,
-      mh_harga_payload: payload.mh_harga,
-      mh_budget_payload: payload.mh_budget,
-      mh_panjang_input: mh_panjang,
-      mh_lebar_input: mh_lebar,
-      mh_panjang_payload: payload.mh_panjang,
-      mh_lebar_payload: payload.mh_lebar,
-    });
-
     setSaving(true);
-    let nomorSaved = nomor;
+    let nomorSaved = currentNomor;
 
     try {
       if (mode === 'edit') {
-        if (!canEdit) {
-          Toast.show({
-            type: 'glassError',
-            text1: 'Tidak bisa diedit',
-            text2: 'Dokumen dengan status ini tidak dapat diubah',
-          });
-          return;
-        }
-        console.log('[permintaanHargaForm.submit] start update', {
-          nomor,
-          hasImage1: Boolean(image1),
-          hasImage2: Boolean(image2),
-        });
-        await updatePermintaanHarga(nomor, payload, token);
-        console.log('[permintaanHargaForm.submit] update success', { nomor });
+        await updatePermintaanHarga(currentNomor, payload, token);
       } else {
-        console.log('[permintaanHargaForm.submit] start create', {
-          hasImage1: Boolean(image1),
-          hasImage2: Boolean(image2),
-        });
         const created = await createPermintaanHarga(payload, token);
         nomorSaved = String(created?.nomor || '');
-        console.log('[permintaanHargaForm.submit] create success', {
-          nomor: nomorSaved,
-        });
+        setCurrentNomor(nomorSaved);
       }
     } catch (err: any) {
-      console.log('[permintaanHargaForm.submit] create/update failed', {
-        message: err?.message,
-        serverMessage: err?.response?.data?.message,
-      });
       Toast.show({
         type: 'glassError',
         text1: 'Error',
@@ -541,151 +395,46 @@ export default function PermintaanHargaFormScreen({ navigation, route }: any) {
       return;
     }
 
-    const targetNomor = String(nomorSaved || nomor || '').trim();
-    const uploadFailures: number[] = [];
-    const uploadFailureDetails: string[] = [];
-    console.log('[permintaanHargaForm.submit] upload gate check', {
-      mode,
-      nomor,
-      nomorSaved,
-      targetNomor,
-      hasImage1: Boolean(image1),
-      hasImage2: Boolean(image2),
-      image1Meta: image1
-        ? {
-            uri: image1.uri,
-            type: image1.type,
-            fileName: image1.fileName,
-            fileSize: image1.fileSize,
-          }
-        : null,
-      image2Meta: image2
-        ? {
-            uri: image2.uri,
-            type: image2.type,
-            fileName: image2.fileName,
-            fileSize: image2.fileSize,
-          }
-        : null,
-      hasToken: Boolean(token),
+    Toast.show({
+      type: 'glassSuccess',
+      text1: 'Berhasil',
+      text2:
+        mode === 'edit'
+          ? 'Permintaan harga berhasil diperbarui'
+          : 'Permintaan harga berhasil ditambah',
     });
-    if (targetNomor) {
-      // Process deleted slots first
-      for (const slot of deletedSlots) {
-        try {
-          console.log('[permintaanHargaForm.submit] start deleting image', {
-            nomor: targetNomor,
-            slot,
-          });
-          await deletePermintaanHargaImage(targetNomor, slot, token);
-          console.log('[permintaanHargaForm.submit] delete image success', {
-            nomor: targetNomor,
-            slot,
-          });
-        } catch (err: any) {
-          console.log('[permintaanHargaForm.submit] delete image failed', {
-            nomor: targetNomor,
-            slot,
-            message: err?.message,
-          });
-        }
-      }
-
-      if (image1?.source === 'new') {
-        try {
-          console.log('[permintaanHargaForm.submit] start upload', {
-            nomor: targetNomor,
-            slot: 1,
-            hasToken: Boolean(token),
-          });
-          await uploadPermintaanHargaImage(
-            targetNomor,
-            1,
-            toUploadPayload(image1),
-            token,
-          );
-          console.log('[permintaanHargaForm.submit] upload success', {
-            nomor: targetNomor,
-            slot: 1,
-          });
-        } catch (err: any) {
-          uploadFailures.push(1);
-          uploadFailureDetails.push(
-            `slot1:${String(
-              err?.response?.status || err?.code || err?.message || 'UNKNOWN',
-            )}`,
-          );
-          console.log('[permintaanHargaForm.submit] upload failed', {
-            nomor: targetNomor,
-            slot: 1,
-            message: err?.message,
-            serverMessage: err?.response?.data?.message,
-            status: err?.response?.status,
-            code: err?.code,
-            responseData: err?.response?.data,
-          });
-        }
-      }
-
-      if (image2?.source === 'new') {
-        try {
-          console.log('[permintaanHargaForm.submit] start upload', {
-            nomor: targetNomor,
-            slot: 2,
-            hasToken: Boolean(token),
-          });
-          await uploadPermintaanHargaImage(
-            targetNomor,
-            2,
-            toUploadPayload(image2),
-            token,
-          );
-          console.log('[permintaanHargaForm.submit] upload success', {
-            nomor: targetNomor,
-            slot: 2,
-          });
-        } catch (err: any) {
-          uploadFailures.push(2);
-          uploadFailureDetails.push(
-            `slot2:${String(
-              err?.response?.status || err?.code || err?.message || 'UNKNOWN',
-            )}`,
-          );
-          console.log('[permintaanHargaForm.submit] upload failed', {
-            nomor: targetNomor,
-            slot: 2,
-            message: err?.message,
-            serverMessage: err?.response?.data?.message,
-            status: err?.response?.status,
-            code: err?.code,
-            responseData: err?.response?.data,
-          });
-        }
-      }
-    }
-
-    const successText =
-      mode === 'edit'
-        ? 'Permintaan harga berhasil diubah'
-        : 'Permintaan harga berhasil ditambah';
-    if (uploadFailures.length > 0) {
-      Toast.show({
-        type: 'glassError',
-        text1: 'Tersimpan dengan peringatan',
-        text2: `Permintaan harga berhasil disimpan, namun upload gambar ${uploadFailures.join(
-          ', ',
-        )} gagal (${uploadFailureDetails.join(' | ') || 'tanpa detail'})`,
-      });
-    } else {
-      Toast.show({
-        type: 'glassSuccess',
-        text1: 'Berhasil',
-        text2: successText,
-      });
-    }
     setSaving(false);
     navigation.navigate('PermintaanHargaList');
   };
+
+  const selectedDivisiLabel = useMemo(() => {
+    const found = DIVISI_OPTIONS.find(d => d.kode === mh_divisi);
+    return found ? found.label : `${mh_divisi} - DIVISI`;
+  }, [mh_divisi]);
+
+  const nonVynilOptions = [
+    {
+      kode: 'ALBATROS_MT',
+      nama: 'Albatros (Normal Hi-Res - MT)',
+      harga: 45000,
+    },
+    { kode: 'ALBATROS_MI', nama: 'Albatros (Super Hi-Res - MI)', harga: 55000 },
+    {
+      kode: 'STICKER_ONEWAY',
+      nama: 'Sticker One Way (Super Hi-Res - MI)',
+      harga: 65000,
+    },
+    {
+      kode: 'STICKER_CHINA',
+      nama: 'Sticker China Glossy (Super Hi-Res - MI)',
+      harga: 50000,
+    },
+    {
+      kode: 'STICKER_RITRAMA',
+      nama: 'Sticker Ritrama (Super Hi-Res - MI)',
+      harga: 65000,
+    },
+  ];
 
   return (
     <LinearGradient
@@ -697,89 +446,155 @@ export default function PermintaanHargaFormScreen({ navigation, route }: any) {
         translucent
         backgroundColor="transparent"
       />
+
+      {/* Header Area */}
       <View style={styles.headerArea}>
         <TouchableOpacity
           style={styles.backBtn}
           onPress={() => navigation.navigate('PermintaanHargaList')}
-          activeOpacity={0.9}
+          activeOpacity={0.8}
         >
+          <MaterialIcons name="arrow-back" size={20} color={THEME.ink} />
           <Text style={styles.backBtnText}>Kembali</Text>
         </TouchableOpacity>
 
         <View style={styles.headerTextWrap}>
           <Text style={styles.title}>
-            {mode === 'edit'
-              ? 'Edit \nPermintaan Harga'
-              : 'Buat \nPermintaan Harga'}
+            {mode === 'edit' ? 'Edit Permintaan' : 'Buat Permintaan'}
           </Text>
         </View>
-
-        <View style={styles.headerRightSpacer} />
+        <View style={{ width: 60 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.card}>
-          {mode === 'edit' ? (
-            <Text style={styles.nomor}>No. Permintaan: {nomor || '-'}</Text>
-          ) : null}
-          <Text style={[styles.label, { marginTop: 12 }]}>Sales</Text>
-          <View style={styles.row}>
-            <TextInput
-              style={[
-                styles.input,
-                styles.rowInput,
-                !isManager ? styles.inputDisabled : null,
-              ]}
-              value={mh_sal_nama}
-              editable={isManager}
-              onChangeText={t => {
-                if (!isManager) return;
-                setMhSalNama(toUpper(t));
-                if (mh_sal_kode) setMhSalKode('');
-              }}
-              placeholder="Pilih Sales"
-              placeholderTextColor={THEME.ink}
-            />
-            {isManager ? (
-              <TouchableOpacity
-                style={styles.searchButton}
-                onPress={() =>
-                  runGuardedPress('permintaan-harga:search-sales', () =>
-                    navigation.navigate('CariSalesPenawaran', {
-                      from: 'PERMINTAAN_HARGA_FORM',
-                      keyword: mh_sal_nama,
-                    }),
-                  )
-                }
-              >
-                <Text style={styles.btnSoftText}>Cari</Text>
-              </TouchableOpacity>
-            ) : null}
-          </View>
-          {mh_sal_kode ? (
-            <Text style={styles.helper}>Kode Sales: {mh_sal_kode}</Text>
-          ) : null}
+      {/* Segmented Tab Bar */}
+      <View style={styles.tabBarWrap}>
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === 'permintaan' && styles.tabButtonActive,
+          ]}
+          onPress={() => setActiveTab('permintaan')}
+          activeOpacity={0.9}
+        >
+          <MaterialIcons
+            name="description"
+            size={18}
+            color={activeTab === 'permintaan' ? THEME.primary : THEME.muted}
+          />
+          <Text
+            style={[
+              styles.tabButtonText,
+              activeTab === 'permintaan' && styles.tabButtonTextActive,
+            ]}
+          >
+            1. Permintaan
+          </Text>
+        </TouchableOpacity>
 
-          <Text style={[styles.label]}>Customer</Text>
-          <View style={[styles.row, styles.rowFieldAlign]}>
-            <TextInput
-              style={[styles.input, styles.rowInput]}
-              value={mh_cus_nama}
-              onChangeText={t => {
-                if (mode === 'edit') return;
-                setMhCusNama(toUpper(t));
-                if (mh_cus_kode) setMhCusKode('');
-              }}
-              placeholder="Pilih Customer"
-              placeholderTextColor={THEME.muted}
-              editable={mode !== 'edit'}
-            />
-            {mode !== 'edit' ? (
-              <>
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === 'kalkulasi' && styles.tabButtonActive,
+          ]}
+          onPress={() => setActiveTab('kalkulasi')}
+          activeOpacity={0.9}
+        >
+          <MaterialIcons
+            name="calculate"
+            size={18}
+            color={activeTab === 'kalkulasi' ? THEME.primary : THEME.muted}
+          />
+          <Text
+            style={[
+              styles.tabButtonText,
+              activeTab === 'kalkulasi' && styles.tabButtonTextActive,
+            ]}
+          >
+            2. Kalkulasi (
+            {mh_divisi === '1'
+              ? 'Spanduk'
+              : mh_divisi === '5'
+              ? 'MMT'
+              : 'Garmen'}
+            )
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Main Content ScrollView */}
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* ==================== TAB 1: PERMINTAAN HARGA ==================== */}
+        {activeTab === 'permintaan' ? (
+          <View style={styles.card}>
+            {currentNomor ? (
+              <View style={styles.nomorBadge}>
+                <Text style={styles.nomorBadgeText}>
+                  No. MH: {currentNomor}
+                </Text>
+              </View>
+            ) : null}
+
+            {/* Sales Field */}
+            <Text style={[styles.label, { marginTop: 8 }]}>Sales</Text>
+            <View style={styles.row}>
+              <TextInput
+                style={[
+                  styles.input,
+                  styles.rowInput,
+                  !isManager && styles.inputDisabled,
+                ]}
+                value={mh_sal_nama}
+                editable={isManager}
+                onChangeText={t => {
+                  if (isManager) {
+                    setMhSalNama(toUpper(t));
+                    setMhSalKode('');
+                  }
+                }}
+                placeholder="Pilih Sales"
+                placeholderTextColor={THEME.muted}
+              />
+              {isManager ? (
                 <TouchableOpacity
                   style={styles.searchButton}
                   onPress={() =>
-                    runGuardedPress('permintaan-harga:search-customer', () =>
+                    runGuardedPress('permintaan:sales', () =>
+                      navigation.navigate('CariSalesPenawaran', {
+                        from: 'PERMINTAAN_HARGA_FORM',
+                        keyword: mh_sal_nama,
+                      }),
+                    )
+                  }
+                >
+                  <Text style={styles.btnSoftText}>Cari</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            {/* Customer Field */}
+            <Text style={[styles.label, { marginTop: 10 }]}>Customer</Text>
+            <View style={styles.row}>
+              <TextInput
+                style={[styles.input, styles.rowInput]}
+                value={mh_cus_nama}
+                onChangeText={t => {
+                  if (mode !== 'edit') {
+                    setMhCusNama(toUpper(t));
+                    setMhCusKode('');
+                  }
+                }}
+                placeholder="Pilih Customer"
+                placeholderTextColor={THEME.muted}
+                editable={mode !== 'edit'}
+              />
+              {mode !== 'edit' ? (
+                <TouchableOpacity
+                  style={styles.searchButton}
+                  onPress={() =>
+                    runGuardedPress('permintaan:cust', () =>
                       navigation.navigate('CariCustomer', {
                         from: 'PERMINTAAN_HARGA_FORM',
                         keyword: mh_cus_nama,
@@ -789,275 +604,1082 @@ export default function PermintaanHargaFormScreen({ navigation, route }: any) {
                 >
                   <Text style={styles.btnSoftText}>Cari</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.searchButton}
-                  onPress={() =>
-                    runGuardedPress('permintaan-harga:add-customer', () =>
-                      navigation.navigate('TambahCustomerPermintaanHarga'),
-                    )
-                  }
-                >
-                  <Text style={styles.btnSoftText}>Tambah</Text>
-                </TouchableOpacity>
-              </>
-            ) : null}
-          </View>
-          {mh_cus_kode ? (
-            <Text style={styles.helper}>Kode: {mh_cus_kode}</Text>
-          ) : mh_cus_nama ? (
-            <Text style={styles.warningText}>Customer belum valid.</Text>
-          ) : null}
-
-          <View style={styles.fieldWrap}>
-            <Text style={styles.label}>Nama Pekerjaan</Text>
-            <TextInput
-              style={styles.input}
-              value={mh_nama}
-              onChangeText={setMhNama}
-              placeholder="Nama Pekerjaan"
-              placeholderTextColor={THEME.muted}
-            />
-          </View>
-
-          <Text style={[styles.label, { marginTop: 8 }]}>Divisi Tujuan</Text>
-          <TouchableOpacity
-            style={styles.inputButton}
-            onPress={() => setShowDivisiOptions(v => !v)}
-          >
-            <Text style={styles.inputButtonText}>{selectedDivisiLabel}</Text>
-            <Text style={styles.dropdownArrowText}>
-              {showDivisiOptions ? '▲' : '▼'}
-            </Text>
-          </TouchableOpacity>
-          {showDivisiOptions ? (
-            <View style={styles.dropdownWrap}>
-              {DIVISI_OPTIONS.map(opt => (
-                <TouchableOpacity
-                  key={`divisi-${opt.kode}`}
-                  style={styles.dropdownItem}
-                  onPress={() => {
-                    setMhDivisi(opt.kode);
-                    setShowDivisiOptions(false);
-                  }}
-                >
-                  <Text style={styles.dropdownItemText}>{opt.label}</Text>
-                </TouchableOpacity>
-              ))}
+              ) : null}
             </View>
-          ) : null}
 
-          <View style={styles.fieldWrap}>
-            <Text style={styles.label}>Rencana Jumlah Order</Text>
-            <TextInput
-              style={styles.input}
-              value={mh_jmlorder}
-              onChangeText={t => setMhJmlOrder(onlyDigits(t))}
-              keyboardType="numeric"
-              placeholder="Rencana Jumlah Order"
-              placeholderTextColor={THEME.muted}
-            />
-          </View>
-          <View style={styles.fieldWrap}>
-            <Text style={styles.label}>Harga Lama</Text>
-            <View style={styles.moneyInputWrap}>
-              <Text style={styles.moneyPrefix}>Rp.</Text>
-              <TextInput
-                style={[styles.input, styles.moneyInput]}
-                value={mh_harga}
-                onChangeText={t => setMhHarga(formatThousandsId(t))}
-                keyboardType="numeric"
-                placeholder="0"
-                placeholderTextColor={THEME.muted}
-              />
-            </View>
-          </View>
-          <View style={styles.fieldWrap}>
-            <Text style={styles.label}>Harga Budget</Text>
-            <View style={styles.moneyInputWrap}>
-              <Text style={styles.moneyPrefix}>Rp.</Text>
-              <TextInput
-                style={[styles.input, styles.moneyInput]}
-                value={mh_budget}
-                onChangeText={t => setMhBudget(formatThousandsId(t))}
-                keyboardType="numeric"
-                placeholder="0"
-                placeholderTextColor={THEME.muted}
-              />
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={styles.dateChip}
-            onPress={() => setShowDateOrderPicker(true)}
-          >
-            <Text style={styles.label}>Tanggal Order Terakhir</Text>
-            <Text style={styles.dateValue}>{formatDate(mh_dateorder)}</Text>
-          </TouchableOpacity>
-
-          <View style={styles.fieldWrap}>
-            <Text style={styles.label}>Kain</Text>
-            <TextInput
-              style={styles.input}
-              value={mh_kain}
-              onChangeText={setMhKain}
-              placeholder="Kain"
-              placeholderTextColor={THEME.muted}
-            />
-          </View>
-          <View style={styles.row}>
-            <View style={[styles.fieldWrap, styles.rowInput]}>
-              <Text style={styles.label}>Panjang</Text>
+            {/* Nama Pekerjaan */}
+            <View style={styles.fieldWrap}>
+              <Text style={styles.label}>Nama Pekerjaan</Text>
               <TextInput
                 style={styles.input}
-                value={mh_panjang}
-                onChangeText={t => setMhPanjang(sanitizeDecimalInput(t))}
-                keyboardType="numeric"
-                placeholder="0.00"
+                value={mh_nama}
+                onChangeText={setMhNama}
+                placeholder="Nama Pekerjaan"
                 placeholderTextColor={THEME.muted}
               />
-              <Text style={styles.unitSuffix}>M</Text>
             </View>
-            <View style={[styles.fieldWrap, styles.rowInput]}>
-              <Text style={styles.label}>Lebar</Text>
-              <TextInput
-                style={styles.input}
-                value={mh_lebar}
-                onChangeText={t => setMhLebar(sanitizeDecimalInput(t))}
-                keyboardType="numeric"
-                placeholder="0.00"
-                placeholderTextColor={THEME.muted}
-              />
-              <Text style={styles.unitSuffix}>M</Text>
-            </View>
-          </View>
-          <View style={styles.fieldWrap}>
-            <Text style={styles.label}>Ket. Ukuran</Text>
-            <TextInput
-              style={styles.input}
-              value={mh_ukuran}
-              onChangeText={setMhUkuran}
-              placeholder="Contoh: L=40, XL=10"
-              placeholderTextColor={THEME.muted}
-            />
-          </View>
-          <View style={styles.fieldWrap}>
-            <Text style={styles.label}>Gramasi</Text>
-            <TextInput
-              style={styles.input}
-              value={mh_gramasi}
-              onChangeText={setMhGramasi}
-              placeholder="Gramasi"
-              placeholderTextColor={THEME.muted}
-            />
-          </View>
-          <View style={styles.fieldWrap}>
-            <Text style={styles.label}>Finishing</Text>
-            <TextInput
-              style={styles.input}
-              value={mh_finishing}
-              onChangeText={setMhFinishing}
-              placeholder="Finishing"
-              placeholderTextColor={THEME.muted}
-            />
-          </View>
-          <View style={styles.fieldWrap}>
-            <Text style={styles.label}>Keterangan</Text>
-            <TextInput
-              style={[styles.input, styles.inputMulti, styles.keteranganInput]}
-              value={mh_ket}
-              onChangeText={setMhKet}
-              placeholder="Keterangan"
-              placeholderTextColor={THEME.muted}
-              multiline
-            />
-          </View>
 
-          <View style={styles.fieldWrap}>
-            <Text style={styles.label}>
-              Upload Gambar (Ukuran Maksimal 1 MB)
-            </Text>
-            {(!image1 || !image2) && (
-              <TouchableOpacity style={styles.uploadBtn} onPress={pickNextImage}>
-                <Text style={styles.uploadBtnText}>+ Tambah Gambar</Text>
-              </TouchableOpacity>
-            )}
-            {imageList.length > 0 ? (
-              <View style={styles.previewWrap}>
-                {imageList.map(({ slot, image }) => (
-                  <View style={styles.previewItem} key={`preview-${slot}`}>
-                    <View style={styles.previewHeaderRow}>
-                      <Text style={styles.previewLabel}>
-                        Gambar {slot}{' '}
-                        {image.source === 'existing' ? '(server)' : '(baru)'}
-                      </Text>
-                      <View style={styles.previewActions}>
-                        <TouchableOpacity
-                          style={styles.previewReplaceBtn}
-                          onPress={() => pickImage(slot)}
-                          activeOpacity={0.85}
-                        >
-                          <Text style={styles.previewReplaceBtnText}>Ganti</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={styles.previewDeleteBtn}
-                          onPress={() => removeImageAt(slot)}
-                          activeOpacity={0.85}
-                        >
-                          <Text style={styles.previewDeleteBtnText}>Hapus</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                    <View style={styles.previewImageWrap}>
-                      <Image
-                        source={{ uri: image.uri }}
-                        style={styles.previewImage}
-                        resizeMode="cover"
-                      />
-                    </View>
-                    {image.source === 'new' ? (
-                      <Text style={styles.helper}>
-                        Ukuran: {formatSizeMb(image.fileSize)}
-                      </Text>
-                    ) : (
-                      <Text style={styles.helper}>Sumber: server (belum diganti)</Text>
-                    )}
-                  </View>
+            {/* Divisi Tujuan */}
+            <Text style={[styles.label, { marginTop: 10 }]}>Divisi Tujuan</Text>
+            <TouchableOpacity
+              style={styles.inputButton}
+              onPress={() => setShowDivisiOptions(v => !v)}
+            >
+              <Text style={styles.inputButtonText}>{selectedDivisiLabel}</Text>
+              <Text style={styles.dropdownArrowText}>
+                {showDivisiOptions ? '▲' : '▼'}
+              </Text>
+            </TouchableOpacity>
+            {showDivisiOptions ? (
+              <View style={styles.dropdownWrap}>
+                {DIVISI_OPTIONS.map(opt => (
+                  <TouchableOpacity
+                    key={`divisi-${opt.kode}`}
+                    style={styles.dropdownItem}
+                    onPress={() => {
+                      setMhDivisi(opt.kode);
+                      setShowDivisiOptions(false);
+                    }}
+                  >
+                    <Text style={styles.dropdownItemText}>{opt.label}</Text>
+                  </TouchableOpacity>
                 ))}
               </View>
             ) : null}
-          </View>
 
-          <TouchableOpacity
-            style={[
-              styles.submitBtn,
-              (!canEdit && mode === 'edit') || saving
-                ? styles.submitBtnDisabled
-                : null,
-            ]}
-            onPress={submit}
-            disabled={saving || (mode === 'edit' && !canEdit)}
-          >
-            {saving ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.submitText}>
-                {mode === 'edit'
-                  ? 'Simpan Perubahan'
-                  : 'Ajukan Permintaan Harga'}
+            {/* Rencana Jumlah Order */}
+            <View style={styles.fieldWrap}>
+              <Text style={styles.label}>Rencana Jumlah Order (Pcs)</Text>
+              <TextInput
+                style={[styles.input, { fontWeight: '700' }]}
+                value={mh_jmlorder}
+                onChangeText={t => setMhJmlOrder(onlyDigits(t))}
+                keyboardType="numeric"
+                placeholder=""
+                placeholderTextColor={THEME.muted}
+              />
+            </View>
+
+            {/* Dimensi Panjang & Lebar */}
+            <View style={styles.rowField2}>
+              <View style={[styles.fieldWrap, { flex: 1 }]}>
+                <Text style={styles.label}>Panjang (Mtr)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={mh_panjang}
+                  onChangeText={setMhPanjang}
+                  keyboardType="numeric"
+                  placeholder=""
+                />
+              </View>
+              <View style={[styles.fieldWrap, { flex: 1, marginLeft: 10 }]}>
+                <Text style={styles.label}>Lebar (Mtr)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={mh_lebar}
+                  onChangeText={setMhLebar}
+                  keyboardType="numeric"
+                  placeholder=""
+                />
+              </View>
+            </View>
+
+            {/* Harga & Budget */}
+            <View style={styles.rowField2}>
+              <View style={[styles.fieldWrap, { flex: 1 }]}>
+                <Text style={styles.label}>Harga Satuan (Rp)</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    { fontWeight: '700', color: THEME.primary },
+                  ]}
+                  value={mh_harga}
+                  onChangeText={t => setMhHarga(formatThousandsId(t))}
+                  keyboardType="numeric"
+                  placeholder=""
+                />
+              </View>
+              <View style={[styles.fieldWrap, { flex: 1, marginLeft: 10 }]}>
+                <Text style={styles.label}>Harga Budget (Rp)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={mh_budget}
+                  onChangeText={t => setMhBudget(formatThousandsId(t))}
+                  keyboardType="numeric"
+                  placeholder=""
+                />
+              </View>
+            </View>
+
+            {/* Field Total Harga Kalkulasi & Harga Kalkulasi (PPN 11%) */}
+            <View
+              style={[
+                styles.sectionBox,
+                {
+                  backgroundColor: '#f0fdf4',
+                  borderColor: '#bbf7d0',
+                  marginTop: 10,
+                },
+              ]}
+            >
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: 6,
+                }}
+              >
+                <Text
+                  style={{ fontSize: 12, fontWeight: '700', color: '#166534' }}
+                >
+                  Hasil Kalkulasi Harga
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setActiveTab('kalkulasi')}
+                  style={{
+                    backgroundColor: '#dcfce7',
+                    paddingHorizontal: 8,
+                    paddingVertical: 3,
+                    borderRadius: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: '700',
+                      color: '#15803d',
+                    }}
+                  >
+                    ⚙️ Buka Kalkulator
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.rowField2}>
+                <View style={[styles.fieldWrap, { flex: 1, marginTop: 0 }]}>
+                  <Text style={[styles.labelSmall, { color: '#166534' }]}>
+                    Harga Kalkulasi
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: '#fff',
+                        fontWeight: '700',
+                        color: '#15803d',
+                      },
+                    ]}
+                    value={`Rp ${formatThousandsId(
+                      (mh_harga_kalkulasi || toNumCurrency(mh_harga)) *
+                        toNumCurrency(mh_jmlorder),
+                    )}`}
+                    editable={false}
+                  />
+                </View>
+                <View
+                  style={[
+                    styles.fieldWrap,
+                    { flex: 1, marginLeft: 10, marginTop: 0 },
+                  ]}
+                >
+                  <Text style={[styles.labelSmall, { color: '#166534' }]}>
+                    + PPN 11%
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: '#fff',
+                        fontWeight: '800',
+                        color: '#047857',
+                      },
+                    ]}
+                    value={`Rp ${formatThousandsId(
+                      Math.round(
+                        (mh_harga_kalkulasi || toNumCurrency(mh_harga)) *
+                          toNumCurrency(mh_jmlorder) *
+                          1.11,
+                      ),
+                    )}`}
+                    editable={false}
+                  />
+                </View>
+              </View>
+              <Text
+                style={{
+                  fontSize: 10,
+                  color: '#15803d',
+                  marginTop: 4,
+                  fontStyle: 'italic',
+                }}
+              >
+                * PPN 11%: Rp{' '}
+                {formatThousandsId(
+                  Math.round(
+                    (mh_harga_kalkulasi || toNumCurrency(mh_harga)) *
+                      toNumCurrency(mh_jmlorder) *
+                      0.11,
+                  ),
+                )}
               </Text>
+            </View>
+
+            {/* Kain / Bahan */}
+            <View style={styles.fieldWrap}>
+              <Text style={styles.label}>Kain / Bahan</Text>
+              <TextInput
+                style={styles.input}
+                value={mh_kain}
+                onChangeText={setMhKain}
+                placeholder="Contoh: Polyester 50/36 / Vynil 280"
+              />
+            </View>
+
+            {/* Ukuran, Gramasi & Finishing */}
+            <View style={styles.rowField2}>
+              <View style={[styles.fieldWrap, { flex: 1 }]}>
+                <Text style={styles.label}>Ket. Ukuran</Text>
+                <TextInput
+                  style={styles.input}
+                  value={mh_ukuran}
+                  onChangeText={setMhUkuran}
+                  placeholder="Ukuran"
+                />
+              </View>
+              <View style={[styles.fieldWrap, { flex: 1, marginLeft: 10 }]}>
+                <Text style={styles.label}>Gramasi</Text>
+                <TextInput
+                  style={styles.input}
+                  value={mh_gramasi}
+                  onChangeText={setMhGramasi}
+                  placeholder="Gramasi"
+                />
+              </View>
+            </View>
+
+            <View style={styles.fieldWrap}>
+              <Text style={styles.label}>Finishing</Text>
+              <TextInput
+                style={styles.input}
+                value={mh_finishing}
+                onChangeText={setMhFinishing}
+                placeholder="Finishing"
+              />
+            </View>
+
+            {/* Keterangan */}
+            <View style={styles.fieldWrap}>
+              <Text style={styles.label}>Keterangan Tambahan</Text>
+              <TextInput
+                style={[styles.input, { height: 70, textAlignVertical: 'top' }]}
+                value={mh_ket}
+                onChangeText={setMhKet}
+                placeholder="Tulis catatan atau instruksi khusus..."
+                multiline
+              />
+            </View>
+          </View>
+        ) : (
+          /* ==================== TAB 2: KALKULASI HARGA ==================== */
+          <View>
+            {/* 1. JIKA DIVISI 1: SPANDUK KAIN */}
+            {mh_divisi === '1' ? (
+              <View style={styles.card}>
+                <View style={styles.sectionHeaderRow}>
+                  <View>
+                    <Text style={styles.kalkulasiTitle}>Kalkulasi Harga</Text>
+                    <Text style={styles.kalkulasiSubtitle}>
+                      Perhitungan harga per meter panjang
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.refreshEngineBtn}
+                    onPress={handleHitungSpanduk}
+                    disabled={spandukLoading}
+                  >
+                    {spandukLoading ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <MaterialIcons name="refresh" size={16} color="#fff" />
+                        <Text style={styles.refreshEngineText}>
+                          Hitung Ulang
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+
+                {/* Metode Cetak */}
+                <Text style={[styles.label, { marginTop: 12 }]}>
+                  Metode Cetak
+                </Text>
+                <View style={styles.radioRow}>
+                  {[
+                    { val: 'MANUAL', label: 'Manual Printing' },
+                    { val: 'MACHINE', label: 'Machine Printing (MX)' },
+                  ].map(m => (
+                    <TouchableOpacity
+                      key={`metode-${m.val}`}
+                      style={[
+                        styles.radioChip,
+                        spandukMetode === m.val && styles.radioChipActive,
+                      ]}
+                      onPress={() => setSpandukMetode(m.val as any)}
+                    >
+                      <Text
+                        style={[
+                          styles.radioChipText,
+                          spandukMetode === m.val && styles.radioChipTextActive,
+                        ]}
+                      >
+                        {m.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Lebar Bahan */}
+                <Text style={[styles.label, { marginTop: 10 }]}>
+                  Lebar Bahan
+                </Text>
+                <View style={styles.radioRow}>
+                  {[90, 115].map(l => (
+                    <TouchableOpacity
+                      key={`lebar-${l}`}
+                      style={[
+                        styles.radioChip,
+                        spandukLebar === l && styles.radioChipActive,
+                      ]}
+                      onPress={() => {
+                        setSpandukLebar(l);
+                        setMhLebar(l === 90 ? '0.9' : '1.15');
+                        setMhUkuran(`Lebar ${l} cm`);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.radioChipText,
+                          spandukLebar === l && styles.radioChipTextActive,
+                        ]}
+                      >
+                        Lebar {l} CM
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Pilihan Jenis Kain Spanduk */}
+                <Text style={[styles.label, { marginTop: 10 }]}>
+                  Jenis Kain Spanduk
+                </Text>
+                <View style={styles.radioRow}>
+                  {['POLYESTER 50/36', 'OPTIC 70/40', 'TC 60/44'].map(k => (
+                    <TouchableOpacity
+                      key={`kain-sp-${k}`}
+                      style={[
+                        styles.radioChip,
+                        spandukKain === k && styles.radioChipActive,
+                      ]}
+                      onPress={() => {
+                        setSpandukKain(k);
+                        setMhKain(k);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.radioChipText,
+                          spandukKain === k && styles.radioChipTextActive,
+                        ]}
+                      >
+                        {k}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Input Sinkron Panjang & Qty */}
+                <View style={styles.rowField2}>
+                  <View style={[styles.fieldWrap, { flex: 1 }]}>
+                    <Text style={styles.labelSmall}>Panjang (Mtr)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={mh_panjang}
+                      onChangeText={setMhPanjang}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View style={[styles.fieldWrap, { flex: 1, marginLeft: 10 }]}>
+                    <Text style={styles.labelSmall}>Qty Order (Pcs)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={mh_jmlorder}
+                      onChangeText={t => setMhJmlOrder(onlyDigits(t))}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </View>
+
+                {/* Tombol Trigger Hitung */}
+                <TouchableOpacity
+                  style={styles.bigCalcBtn}
+                  onPress={handleHitungSpanduk}
+                  disabled={spandukLoading}
+                >
+                  {spandukLoading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <MaterialIcons name="calculate" size={20} color="#fff" />
+                      <Text style={styles.bigCalcBtnText}>
+                        Hitung Kalkulasi
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                {/* Card Hasil Perhitungan Spanduk */}
+                {spandukResult ? (
+                  <View style={styles.resultCard}>
+                    <View style={styles.resultRow}>
+                      <Text style={styles.resultLabel}>Total Meter Order:</Text>
+                      <Text style={styles.resultValue}>
+                        {spandukResult.totalMeter} Meter
+                      </Text>
+                    </View>
+                    <View style={styles.resultRow}>
+                      <Text style={styles.resultLabel}>
+                        Tarif Strata per Meter:
+                      </Text>
+                      <Text style={[styles.resultValue, { color: '#0284c7' }]}>
+                        Rp {formatThousandsId(spandukResult.tarifPerMeter)} /Mtr
+                      </Text>
+                    </View>
+                    <View style={styles.resultRow}>
+                      <Text style={styles.resultLabel}>
+                        Estimasi Harga Satuan:
+                      </Text>
+                      <Text
+                        style={[
+                          styles.resultValue,
+                          { color: '#16a34a', fontWeight: '800' },
+                        ]}
+                      >
+                        Rp {formatThousandsId(spandukResult.hargaSatuanPcs)}{' '}
+                        /Pcs
+                      </Text>
+                    </View>
+                    <View style={[styles.resultRow, styles.resultTotalRow]}>
+                      <Text style={styles.resultTotalLabel}>
+                        Total Nilai Order:
+                      </Text>
+                      <Text style={styles.resultTotalValue}>
+                        Rp {formatThousandsId(spandukResult.totalHarga)}
+                      </Text>
+                    </View>
+
+                    <TouchableOpacity
+                      style={styles.applyBtn}
+                      onPress={() =>
+                        applyPriceToTab1(spandukResult.hargaSatuanPcs)
+                      }
+                    >
+                      <MaterialIcons name="check" size={16} color="#fff" />
+                      <Text style={styles.applyBtnText}>
+                        Terapkan Harga ke Tab 1
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+
+                {/* Accordion Tabel Strata Referensi Spanduk */}
+                <TouchableOpacity
+                  style={styles.strataAccordionHeader}
+                  onPress={() => setShowSpandukStrataTabel(v => !v)}
+                >
+                  <View style={styles.row}>
+                    <MaterialIcons
+                      name="table-chart"
+                      size={18}
+                      color={THEME.primary}
+                    />
+                    <Text style={styles.strataAccordionTitle}>
+                      Tabel Referensi Strata Spanduk
+                    </Text>
+                  </View>
+                  <MaterialIcons
+                    name={
+                      showSpandukStrataTabel ? 'expand-less' : 'expand-more'
+                    }
+                    size={22}
+                    color={THEME.muted}
+                  />
+                </TouchableOpacity>
+
+                {showSpandukStrataTabel && spandukResult?.tabelReferensi ? (
+                  <View style={styles.strataTableBox}>
+                    <View style={styles.strataTableHeader}>
+                      <Text style={[styles.strataTh, { flex: 2 }]}>
+                        Rentang Qty
+                      </Text>
+                      <Text
+                        style={[
+                          styles.strataTh,
+                          { flex: 1, textAlign: 'right' },
+                        ]}
+                      >
+                        Tarif/Mtr
+                      </Text>
+                      <Text
+                        style={[
+                          styles.strataTh,
+                          { width: 60, textAlign: 'center' },
+                        ]}
+                      >
+                        Status
+                      </Text>
+                    </View>
+                    {spandukResult.tabelReferensi.map((s: any, idx: number) => {
+                      const isActive =
+                        spandukResult.strataAktif &&
+                        spandukResult.strataAktif.id === s.id;
+                      return (
+                        <View
+                          key={`s-ref-${idx}`}
+                          style={[
+                            styles.strataTableRow,
+                            isActive && styles.strataTableRowActive,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.strataTd,
+                              { flex: 2 },
+                              isActive && styles.strataTdActive,
+                            ]}
+                          >
+                            {s.qmin} - {s.qmax >= 999999 ? '> 10.000' : s.qmax}{' '}
+                            meter
+                          </Text>
+                          <Text
+                            style={[
+                              styles.strataTd,
+                              { flex: 1, textAlign: 'right' },
+                              isActive && styles.strataTdActive,
+                            ]}
+                          >
+                            Rp {formatThousandsId(s.harga)}
+                          </Text>
+                          <View style={{ width: 60, alignItems: 'center' }}>
+                            {isActive ? (
+                              <View style={styles.activeBadge}>
+                                <Text style={styles.activeBadgeText}>
+                                  Aktif
+                                </Text>
+                              </View>
+                            ) : (
+                              <Text
+                                style={{ fontSize: 11, color: THEME.muted }}
+                              >
+                                -
+                              </Text>
+                            )}
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                ) : null}
+              </View>
+            ) : mh_divisi === '5' ? (
+              /* 2. JIKA DIVISI 5: MMT & BANNER */
+              <View style={styles.card}>
+                <View style={styles.sectionHeaderRow}>
+                  <View>
+                    <Text style={styles.kalkulasiTitle}>Kalkulasi Harga</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.refreshEngineBtn}
+                    onPress={handleHitungMmt}
+                    disabled={mmtLoading}
+                  >
+                    {mmtLoading ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <>
+                        <MaterialIcons name="refresh" size={16} color="#fff" />
+                        <Text style={styles.refreshEngineText}>
+                          Hitung Ulang
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+
+                {/* Switch Kategori: Vynil vs Non-Vynil */}
+                <Text style={[styles.label, { marginTop: 12 }]}>
+                  Kategori Bahan
+                </Text>
+                <View style={styles.radioRow}>
+                  {[
+                    { val: 'VYNIL', label: 'Vynil Gramasi' },
+                    { val: 'NON_VYNIL', label: 'Bahan Non-Vynil' },
+                  ].map(k => (
+                    <TouchableOpacity
+                      key={`mmt-kat-${k.val}`}
+                      style={[
+                        styles.radioChip,
+                        mmtKategori === k.val && styles.radioChipActive,
+                      ]}
+                      onPress={() => {
+                        setMmtKategori(k.val as any);
+                        if (k.val === 'NON_VYNIL') {
+                          setMmtBahanKode('ALBATROS_MT');
+                        } else {
+                          setMmtBahanKode('260');
+                        }
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.radioChipText,
+                          mmtKategori === k.val && styles.radioChipTextActive,
+                        ]}
+                      >
+                        {k.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {/* Pilihan Bahan */}
+                {mmtKategori === 'VYNIL' ? (
+                  <>
+                    <Text style={[styles.label, { marginTop: 10 }]}>
+                      Pilihan Gramasi Vynil
+                    </Text>
+                    <View style={styles.radioRow}>
+                      {['260', '280', '300', '340', '380'].map(g => (
+                        <TouchableOpacity
+                          key={`vynil-${g}`}
+                          style={[
+                            styles.radioChip,
+                            mmtBahanKode === g && styles.radioChipActive,
+                          ]}
+                          onPress={() => {
+                            setMmtBahanKode(g);
+                            setMhGramasi(`${g} Gram`);
+                            setMhKain(`Vynil Bahan ${g} Gram`);
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.radioChipText,
+                              mmtBahanKode === g && styles.radioChipTextActive,
+                            ]}
+                          >
+                            {g} Gram
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </>
+                ) : (
+                  <>
+                    <Text style={[styles.label, { marginTop: 10 }]}>
+                      Pilihan Bahan Non-Vynil
+                    </Text>
+                    <View style={{ gap: 6, marginTop: 4 }}>
+                      {nonVynilOptions.map(opt => (
+                        <TouchableOpacity
+                          key={`nonv-${opt.kode}`}
+                          style={[
+                            styles.nonVynilOptionRow,
+                            mmtBahanKode === opt.kode &&
+                              styles.nonVynilOptionActive,
+                          ]}
+                          onPress={() => {
+                            setMmtBahanKode(opt.kode);
+                            setMhKain(opt.nama);
+                            setMhGramasi('-');
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.nonVynilOptionText,
+                              mmtBahanKode === opt.kode &&
+                                styles.nonVynilOptionTextActive,
+                            ]}
+                          >
+                            {opt.nama}
+                          </Text>
+                          <Text style={styles.nonVynilPrice}>
+                            Rp {formatThousandsId(opt.harga)} /m²
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </>
+                )}
+
+                {/* Input Sinkron Panjang, Lebar, & Qty di MMT */}
+                <View style={styles.rowField2}>
+                  <View style={[styles.fieldWrap, { flex: 1 }]}>
+                    <Text style={styles.labelSmall}>Panjang (Mtr)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={mh_panjang}
+                      onChangeText={setMhPanjang}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View style={[styles.fieldWrap, { flex: 1, marginLeft: 8 }]}>
+                    <Text style={styles.labelSmall}>Lebar (Mtr)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={mh_lebar}
+                      onChangeText={setMhLebar}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View style={[styles.fieldWrap, { flex: 1, marginLeft: 8 }]}>
+                    <Text style={styles.labelSmall}>Qty (Pcs)</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={mh_jmlorder}
+                      onChangeText={t => setMhJmlOrder(onlyDigits(t))}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </View>
+
+                {/* Topping Standing / Display Banner (Opsional) */}
+                <View style={styles.sectionBox}>
+                  <Text style={styles.sectionTitle}>Tambahan (Opsional)</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={true}
+                    style={{ marginTop: 4 }}
+                  >
+                    <TouchableOpacity
+                      style={[
+                        styles.radioChip,
+                        mmtToppingKode === '' && styles.radioChipActive,
+                      ]}
+                      onPress={() => {
+                        setMmtToppingKode('');
+                        setMmtToppingQty('0');
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.radioChipText,
+                          mmtToppingKode === '' && styles.radioChipTextActive,
+                        ]}
+                      >
+                        Tanpa Topping
+                      </Text>
+                    </TouchableOpacity>
+                    {masterToppingList.map((t: any) => (
+                      <TouchableOpacity
+                        key={`top-${t.kode}`}
+                        style={[
+                          styles.radioChip,
+                          mmtToppingKode === t.kode && styles.radioChipActive,
+                        ]}
+                        onPress={() => {
+                          setMmtToppingKode(t.kode);
+                          if (toNumCurrency(mmtToppingQty) === 0) {
+                            setMmtToppingQty(mh_jmlorder || '1');
+                          }
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.radioChipText,
+                            mmtToppingKode === t.kode &&
+                              styles.radioChipTextActive,
+                          ]}
+                        >
+                          {t.nama} (+Rp {formatThousandsId(t.harga)})
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+
+                  {mmtToppingKode ? (
+                    <View style={[styles.rowField2, { alignItems: 'center' }]}>
+                      <Text style={[styles.label, { flex: 1 }]}>
+                        Jumlah Qty Topping (Pcs):
+                      </Text>
+                      <TextInput
+                        style={[
+                          styles.input,
+                          { width: 100, fontWeight: '700' },
+                        ]}
+                        value={mmtToppingQty}
+                        onChangeText={t => setMmtToppingQty(onlyDigits(t))}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                  ) : null}
+                </View>
+
+                {/* Tombol Trigger Hitung MMT */}
+                <TouchableOpacity
+                  style={styles.bigCalcBtn}
+                  onPress={handleHitungMmt}
+                  disabled={mmtLoading}
+                >
+                  {mmtLoading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <MaterialIcons name="calculate" size={20} color="#fff" />
+                      <Text style={styles.bigCalcBtnText}>
+                        Hitung Kalkulasi
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                {/* Card Hasil Perhitungan MMT */}
+                {mmtResult ? (
+                  <View style={styles.resultCard}>
+                    <View style={styles.resultRow}>
+                      <Text style={styles.resultLabel}>Luas per Pcs:</Text>
+                      <Text style={styles.resultValue}>
+                        {mmtResult.luasPerPcs} m²
+                      </Text>
+                    </View>
+                    <View style={styles.resultRow}>
+                      <Text style={styles.resultLabel}>Total Luas Order:</Text>
+                      <Text style={styles.resultValue}>
+                        {mmtResult.totalLuas} m²
+                      </Text>
+                    </View>
+                    <View style={styles.resultRow}>
+                      <Text style={styles.resultLabel}>
+                        Tarif Strata Bahan:
+                      </Text>
+                      <Text style={[styles.resultValue, { color: '#0284c7' }]}>
+                        Rp {formatThousandsId(mmtResult.tarifPerM2)} /m²
+                      </Text>
+                    </View>
+                    {mmtResult.topping ? (
+                      <View style={styles.resultRow}>
+                        <Text style={styles.resultLabel}>
+                          Biaya Topping ({mmtResult.topping.qty} pcs):
+                        </Text>
+                        <Text style={styles.resultValue}>
+                          +Rp {formatThousandsId(mmtResult.topping.totalHarga)}
+                        </Text>
+                      </View>
+                    ) : null}
+                    <View style={styles.resultRow}>
+                      <Text style={styles.resultLabel}>
+                        Estimasi Harga Satuan:
+                      </Text>
+                      <Text
+                        style={[
+                          styles.resultValue,
+                          { color: '#16a34a', fontWeight: '800' },
+                        ]}
+                      >
+                        Rp {formatThousandsId(mmtResult.hargaSatuanPcs)} /Pcs
+                      </Text>
+                    </View>
+                    <View style={[styles.resultRow, styles.resultTotalRow]}>
+                      <Text style={styles.resultTotalLabel}>
+                        Total Nilai Order:
+                      </Text>
+                      <Text style={styles.resultTotalValue}>
+                        Rp {formatThousandsId(mmtResult.totalHarga)}
+                      </Text>
+                    </View>
+
+                    <TouchableOpacity
+                      style={styles.applyBtn}
+                      onPress={() => applyPriceToTab1(mmtResult.hargaSatuanPcs)}
+                    >
+                      <MaterialIcons name="check" size={16} color="#fff" />
+                      <Text style={styles.applyBtnText}>
+                        Terapkan Harga Kalkulasi
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+
+                {/* Accordion Tabel Strata Referensi MMT */}
+                <TouchableOpacity
+                  style={styles.strataAccordionHeader}
+                  onPress={() => setShowMmtStrataTabel(v => !v)}
+                >
+                  <View style={styles.row}>
+                    <MaterialIcons
+                      name="table-chart"
+                      size={18}
+                      color={THEME.primary}
+                    />
+                    <Text style={styles.strataAccordionTitle}>
+                      Tabel Referensi Strata MMT
+                    </Text>
+                  </View>
+                  <MaterialIcons
+                    name={showMmtStrataTabel ? 'expand-less' : 'expand-more'}
+                    size={22}
+                    color={THEME.muted}
+                  />
+                </TouchableOpacity>
+
+                {showMmtStrataTabel && mmtResult?.tabelReferensi ? (
+                  <View style={styles.strataTableBox}>
+                    <View style={styles.strataTableHeader}>
+                      <Text style={[styles.strataTh, { flex: 2 }]}>
+                        Rentang Luas
+                      </Text>
+                      <Text
+                        style={[
+                          styles.strataTh,
+                          { flex: 1, textAlign: 'right' },
+                        ]}
+                      >
+                        Tarif/m²
+                      </Text>
+                      <Text
+                        style={[
+                          styles.strataTh,
+                          { width: 60, textAlign: 'center' },
+                        ]}
+                      >
+                        Status
+                      </Text>
+                    </View>
+                    {mmtResult.tabelReferensi.map((s: any, idx: number) => {
+                      const isActive =
+                        mmtResult.strataAktif &&
+                        mmtResult.strataAktif.id === s.id;
+                      return (
+                        <View
+                          key={`m-ref-${idx}`}
+                          style={[
+                            styles.strataTableRow,
+                            isActive && styles.strataTableRowActive,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.strataTd,
+                              { flex: 2 },
+                              isActive && styles.strataTdActive,
+                            ]}
+                          >
+                            {s.is_netto
+                              ? 'Harga Netto'
+                              : `${s.qmin} - ${
+                                  s.qmax >= 999999 ? '> 10.000' : s.qmax
+                                } m²`}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.strataTd,
+                              { flex: 1, textAlign: 'right' },
+                              isActive && styles.strataTdActive,
+                            ]}
+                          >
+                            Rp {formatThousandsId(s.harga)}
+                          </Text>
+                          <View style={{ width: 60, alignItems: 'center' }}>
+                            {isActive ? (
+                              <View style={styles.activeBadge}>
+                                <Text style={styles.activeBadgeText}>
+                                  Aktif
+                                </Text>
+                              </View>
+                            ) : (
+                              <Text
+                                style={{ fontSize: 11, color: THEME.muted }}
+                              >
+                                -
+                              </Text>
+                            )}
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                ) : null}
+              </View>
+            ) : (
+              /* 3. JIKA DIVISI 4: GARMEN */
+              <View style={styles.card}>
+                <Text style={styles.kalkulasiTitle}>
+                  Kalkulasi Biaya Garmen
+                </Text>
+              </View>
             )}
-          </TouchableOpacity>
-        </View>
+          </View>
+        )}
+
+        <View style={{ height: 110 }} />
       </ScrollView>
 
+      {/* Floating Bottom Summary Price Bar */}
+      <View
+        style={[
+          styles.bottomBar,
+          { paddingBottom: Math.max(insets.bottom, 12) },
+        ]}
+      >
+        <View style={styles.bottomPriceWrap}>
+          <View style={styles.priceColumn}>
+            <Text style={styles.bottomPriceLabel}>Harga Satuan</Text>
+            <Text
+              style={[
+                styles.bottomPriceValue,
+                { color: THEME.primary, fontWeight: '800' },
+              ]}
+            >
+              Rp {mh_harga || '0'}
+            </Text>
+          </View>
+          <View style={styles.priceColumn}>
+            <Text style={styles.bottomPriceLabel}>Total Order</Text>
+            <Text style={[styles.bottomPriceValue, { fontWeight: '800' }]}>
+              Rp{' '}
+              {formatThousandsId(
+                toNumCurrency(mh_harga) * toNumCurrency(mh_jmlorder),
+              )}
+            </Text>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={styles.submitBtn}
+          onPress={submitPermintaan}
+          disabled={saving}
+          activeOpacity={0.9}
+        >
+          {saving ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.submitBtnText}>
+              {mode === 'edit' ? 'Simpan Perubahan' : 'Buat Permintaan'}
+            </Text>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {/* Date Picker */}
       {showDateOrderPicker ? (
         <DateTimePicker
+          value={new Date()}
           mode="date"
-          value={parseYmd(mh_dateorder)}
-          onChange={(_, d) => {
+          display="default"
+          onChange={(event, selectedDate) => {
             setShowDateOrderPicker(false);
-            if (!d) return;
-            setMhDateOrder(toYmd(d));
+            if (selectedDate) setMhDateOrder(toYmd(selectedDate));
           }}
         />
       ) : null}
@@ -1068,287 +1690,328 @@ export default function PermintaanHargaFormScreen({ navigation, route }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   headerArea: {
-    marginTop: 8,
-    marginHorizontal: 16,
-    marginBottom: 8,
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  headerTextWrap: { alignItems: 'center', paddingHorizontal: 0 },
-  headerRightSpacer: { width: 88 },
-  content: { padding: 16, paddingBottom: 32 },
-  title: {
-    color: THEME.ink,
-    paddingTop: 8,
-    fontWeight: '900',
-    fontSize: 18,
-    lineHeight: 24,
-    textAlign: 'center',
-  },
-  subtitle: {
-    marginTop: 4,
-    marginBottom: 8,
-    color: THEME.muted,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  nomor: {
-    color: THEME.primary,
-    fontWeight: '700',
-    marginTop: 6,
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  card: {
-    backgroundColor: THEME.card,
-    borderWidth: 1,
-    borderColor: THEME.line,
-    borderRadius: 16,
-    padding: 14,
-    ...PENAWARAN_SHADOW.softCard,
-  },
-  fieldWrap: { marginTop: 10 },
-  label: { color: THEME.muted, fontSize: 12, fontWeight: '700' },
-  helper: {
-    marginTop: 4,
-    marginBottom: 10,
-    color: THEME.sub,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  rowFieldAlign: { alignItems: 'flex-end' },
-  input: {
-    marginTop: 6,
-    borderWidth: 1,
-    borderColor: THEME.line,
-    borderRadius: 12,
-    paddingHorizontal: 10,
+    paddingHorizontal: 16,
     paddingVertical: 10,
+  },
+  backBtn: { flexDirection: 'row', alignItems: 'center' },
+  backBtnText: {
+    marginLeft: 4,
     color: THEME.ink,
-    backgroundColor: THEME.soft,
+    fontSize: 14,
     fontWeight: '600',
   },
-  rowInput: { flex: 1 },
-  inputDisabled: { opacity: 0.7, color: THEME.ink },
-  inputMulti: { minHeight: 84, textAlignVertical: 'top' },
-  keteranganInput: { minHeight: 130 },
-  inputButton: {
-    marginTop: 6,
-    height: 46,
+  headerTextWrap: { flex: 1, alignItems: 'center' },
+  title: { fontSize: 16, fontWeight: '700', color: THEME.ink },
+  tabBarWrap: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginBottom: 8,
+    backgroundColor: '#e8edf3',
+    borderRadius: 10,
+    padding: 3,
+  },
+  tabButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  tabButtonActive: {
+    backgroundColor: '#fff',
+    ...PENAWARAN_SHADOW.softCard,
+  },
+  tabButtonText: {
+    marginLeft: 6,
+    fontSize: 13,
+    fontWeight: '600',
+    color: THEME.muted,
+  },
+  tabButtonTextActive: {
+    color: THEME.primary,
+    fontWeight: '700',
+  },
+  content: { paddingHorizontal: 16, paddingBottom: 24 },
+  card: {
+    backgroundColor: '#fff',
     borderRadius: 12,
+    padding: 14,
+    ...PENAWARAN_SHADOW.card,
+  },
+  nomorBadge: {
+    backgroundColor: '#e3f2fd',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginBottom: 8,
+  },
+  nomorBadgeText: { fontSize: 12, fontWeight: '700', color: '#1565c0' },
+  label: { fontSize: 12, fontWeight: '600', color: THEME.ink, marginBottom: 4 },
+  labelSmall: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: THEME.muted,
+    marginBottom: 2,
+  },
+  fieldWrap: { marginTop: 10 },
+  row: { flexDirection: 'row', alignItems: 'center' },
+  rowInput: { flex: 1 },
+  rowField2: { flexDirection: 'row', marginTop: 10 },
+  input: {
+    height: 40,
     borderWidth: 1,
-    borderColor: THEME.line,
+    borderColor: '#cfd8dc',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    fontSize: 13,
+    color: THEME.ink,
+    backgroundColor: '#fafafa',
+  },
+  inputDisabled: { backgroundColor: '#f0f0f0', color: '#888' },
+  searchButton: {
     backgroundColor: THEME.soft,
     paddingHorizontal: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    height: 40,
+    borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
   },
-  inputButtonText: { color: THEME.ink, fontWeight: '700' },
-  dropdownArrowText: { color: THEME.muted, fontWeight: '900' },
-  dropdownWrap: {
-    marginTop: 6,
+  btnSoftText: { color: THEME.primary, fontWeight: '700', fontSize: 12 },
+  inputButton: {
+    height: 40,
     borderWidth: 1,
-    borderColor: THEME.line,
-    borderRadius: 12,
+    borderColor: '#cfd8dc',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fafafa',
+  },
+  inputButtonText: { fontSize: 13, color: THEME.ink },
+  dropdownArrowText: { fontSize: 11, color: THEME.muted },
+  dropdownWrap: {
     backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    marginTop: 4,
     overflow: 'hidden',
   },
   dropdownItem: {
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    borderBottomWidth: 1,
-    borderBottomColor: THEME.line,
-  },
-  dropdownItemText: { color: THEME.ink, fontWeight: '700' },
-  searchButton: {
-    marginTop: 6,
-    minHeight: 42,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: THEME.line,
-    backgroundColor: THEME.soft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  btnSoftText: {
-    color: THEME.primary,
-    fontWeight: '900',
-    letterSpacing: 0.4,
-    fontSize: 12,
-  },
-  dateChip: {
-    borderWidth: 1,
-    borderColor: THEME.line,
-    borderRadius: 12,
-    paddingHorizontal: 10,
     paddingVertical: 10,
-    backgroundColor: THEME.soft,
-    marginTop: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderColor: '#f0f0f0',
   },
-  dateValue: { color: THEME.ink, fontWeight: '800', marginTop: 3 },
-  uploadBtn: {
-    marginTop: 8,
-    flex: 1,
-    backgroundColor: THEME.soft,
-    borderRadius: 10,
+  dropdownItemText: { fontSize: 13, color: THEME.ink },
+  radioRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
+  radioChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: THEME.line,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 42,
+    borderColor: '#cfd8dc',
+    backgroundColor: '#f8fafc',
   },
-  uploadBtnText: { color: THEME.ink, fontWeight: '800', fontSize: 12 },
-  warningText: {
-    marginTop: 6,
-    color: '#B45309',
+  radioChipActive: {
+    borderColor: THEME.primary,
+    backgroundColor: THEME.soft,
+  },
+  radioChipText: { fontSize: 12, color: THEME.muted, fontWeight: '600' },
+  radioChipTextActive: { color: THEME.primary, fontWeight: '700' },
+  kalkulasiTitle: { fontSize: 15, fontWeight: '700', color: THEME.ink },
+  kalkulasiSubtitle: { fontSize: 11, color: THEME.muted },
+  refreshEngineBtn: {
+    backgroundColor: THEME.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  refreshEngineText: {
+    color: '#fff',
     fontSize: 12,
     fontWeight: '700',
+    marginLeft: 4,
   },
-  previewWrap: {
-    marginTop: 10,
-    gap: 10,
+  bigCalcBtn: {
+    backgroundColor: THEME.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 44,
+    borderRadius: 10,
+    marginTop: 14,
   },
-  previewItem: {
+  bigCalcBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+    marginLeft: 6,
+  },
+  sectionBox: {
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: THEME.line,
-    borderRadius: 12,
-    backgroundColor: '#fff',
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
     padding: 10,
+    marginTop: 12,
   },
-  previewLabel: {
-    color: THEME.ink,
-    fontWeight: '800',
+  sectionTitle: {
     fontSize: 12,
-    marginBottom: 8,
-    flex: 1,
+    fontWeight: '700',
+    color: THEME.ink,
+    marginBottom: 4,
   },
-  previewHeaderRow: {
+  sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderColor: '#eee',
+    paddingBottom: 8,
+  },
+  nonVynilOptionRow: {
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    backgroundColor: '#fafafa',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  nonVynilOptionActive: {
+    borderColor: THEME.primary,
+    backgroundColor: '#eef2ff',
+  },
+  nonVynilOptionText: { fontSize: 12, fontWeight: '600', color: THEME.ink },
+  nonVynilOptionTextActive: { color: THEME.primary, fontWeight: '700' },
+  nonVynilPrice: { fontSize: 12, fontWeight: '700', color: '#16a34a' },
+  resultCard: {
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+    borderRadius: 10,
+    padding: 12,
+    marginTop: 14,
+  },
+  resultRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  resultLabel: { fontSize: 12, color: THEME.ink, fontWeight: '500' },
+  resultValue: { fontSize: 13, fontWeight: '700', color: THEME.ink },
+  resultTotalRow: {
+    borderTopWidth: 1,
+    borderColor: '#86efac',
+    paddingTop: 8,
+    marginTop: 4,
+  },
+  resultTotalLabel: { fontSize: 13, fontWeight: '800', color: THEME.ink },
+  resultTotalValue: { fontSize: 16, fontWeight: '800', color: '#15803d' },
+  applyBtn: {
+    backgroundColor: '#16a34a',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 36,
+    borderRadius: 6,
+    marginTop: 10,
+  },
+  applyBtnText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+    marginLeft: 4,
+  },
+  strataAccordionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f1f5f9',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 14,
+  },
+  strataAccordionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: THEME.ink,
+    marginLeft: 6,
+  },
+  strataTableBox: {
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 8,
+    marginTop: 6,
+    overflow: 'hidden',
+  },
+  strataTableHeader: {
+    flexDirection: 'row',
+    backgroundColor: '#f8fafc',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  strataTh: { fontSize: 11, fontWeight: '700', color: THEME.muted },
+  strataTableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderColor: '#f1f5f9',
+  },
+  strataTableRowActive: {
+    backgroundColor: '#dcfce7',
+  },
+  strataTd: { fontSize: 12, color: THEME.ink },
+  strataTdActive: { fontWeight: '700', color: '#15803d' },
+  activeBadge: {
+    backgroundColor: '#16a34a',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  activeBadgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderColor: '#e2e8f0',
+    paddingTop: 10,
+    paddingHorizontal: 16,
+    ...PENAWARAN_SHADOW.card,
+  },
+  bottomPriceWrap: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 8,
   },
-  previewActions: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  previewReplaceBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    backgroundColor: 'rgba(79,70,229,0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(79,70,229,0.2)',
-  },
-  previewReplaceBtnText: {
-    color: THEME.primary,
-    fontWeight: '800',
-    fontSize: 12,
-  },
-  previewDeleteBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    backgroundColor: 'rgba(239,68,68,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.18)',
-  },
-  previewDeleteBtnText: {
-    color: THEME.danger,
-    fontWeight: '800',
-    fontSize: 12,
-  },
-  previewImage: {
-    width: '100%',
-    height: 170,
-    borderRadius: 10,
-    backgroundColor: '#F3F4F6',
-  },
-  previewImageWrap: {
-    position: 'relative',
-  },
-  previewCloseBtn: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: THEME.soft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  previewCloseBtnText: {
-    color: THEME.danger,
-    fontSize: 20,
-    fontWeight: '900',
-    lineHeight: 18,
-    marginTop: -1,
-  },
-  previewPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  previewPlaceholderText: {
-    color: THEME.muted,
-    fontWeight: '700',
-    fontSize: 12,
-  },
+  priceColumn: { flex: 1 },
+  bottomPriceLabel: { fontSize: 11, color: THEME.muted },
+  bottomPriceValue: { fontSize: 14, fontWeight: '700', color: THEME.ink },
   submitBtn: {
-    marginTop: 16,
     backgroundColor: THEME.primary,
-    borderRadius: 12,
-    height: 46,
+    height: 44,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  submitBtnDisabled: { opacity: 0.5 },
-  submitText: { color: '#fff', fontWeight: '800' },
-  backBtn: {
-    backgroundColor: THEME.soft,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderWidth: 1,
-    borderColor: THEME.line,
-    minWidth: 88,
-    alignItems: 'center',
-  },
-  backBtnText: {
-    color: THEME.primary,
-    fontWeight: '900',
-    fontSize: 12,
-    letterSpacing: 0.2,
-  },
-  unitSuffix: {
-    position: 'absolute',
-    right: 10,
-    top: '50%',
-    marginTop: 5,
-    color: THEME.muted,
-    fontSize: 13,
-    fontWeight: '800',
-    includeFontPadding: false,
-  },
-  moneyInputWrap: {
-    position: 'relative',
-  },
-  moneyPrefix: {
-    position: 'absolute',
-    left: 10,
-    top: '50%',
-    marginTop: -5,
-    color: THEME.muted,
-    fontSize: 13,
-    fontWeight: '800',
-    zIndex: 1,
-    includeFontPadding: false,
-  },
-  moneyInput: {
-    paddingLeft: 34,
-  },
+  submitBtnText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 });
