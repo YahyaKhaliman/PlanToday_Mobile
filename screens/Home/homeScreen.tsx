@@ -397,7 +397,7 @@ export default function HomeScreen({ navigation }: any) {
     setIsMonthYearPickerVisible(true);
   };
 
-  const applyMonthYearPicker = async () => {
+    const applyMonthYearPicker = async () => {
     setIsMonthYearPickerVisible(false);
     if (!pickerTarget) return;
 
@@ -439,6 +439,7 @@ export default function HomeScreen({ navigation }: any) {
       SUDAH: 0,
     });
   const [isStatusModalVisible, setStatusModalVisible] = useState(false);
+  
   const [visitPlans, setVisitPlans] = useState<RekapItem[]>([]);
   const [selectedVisitPlanDate, setSelectedVisitPlanDate] = useState<Date>(
     new Date(),
@@ -2990,9 +2991,6 @@ export default function HomeScreen({ navigation }: any) {
           >
             <View style={styles.modalIndicator} />
             <Text style={styles.modalTitle}>Rincian Status Dokumen</Text>
-            <Text style={[styles.modalSubtitle, { marginBottom: 12 }]}>
-              Detail jumlah per status saat ini:
-            </Text>
 
             <ScrollView
               style={{ width: '100%' }}
