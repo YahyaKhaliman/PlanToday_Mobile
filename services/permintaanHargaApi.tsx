@@ -42,6 +42,8 @@ export type PermintaanHargaDetail = {
   mh_ukuran: string;
   mh_gramasi: string;
   mh_finishing: string;
+  mh_sublim?: string;
+  mh_warna?: string;
   mh_ket: string;
   mh_status: string;
   mh_harga_kalkulasi: number;
@@ -69,9 +71,22 @@ export type PermintaanHargaPayload = {
   mh_ukuran: string;
   mh_gramasi: string;
   mh_finishing: string;
+  mh_sublim?: string;
+  mh_warna?: string;
   mh_ket: string;
   mh_harga_kalkulasi?: number;
   mh_ket_kalkulasi?: string;
+  kal_kh_kode?: string;
+  kal_rpallowance?: number;
+  kal_allowance?: number;
+  kal_rplaba?: number;
+  kal_laba?: number;
+  kal_ketbeli?: string;
+  garmen_model?: string;
+  garmen_kain?: string;
+  garmen_warna?: string;
+  garmen_tambahan?: any[];
+  garmen_cetak?: any[];
 };
 
 export type PermintaanHargaImageUpload = {
@@ -337,7 +352,6 @@ export const getPermintaanHargaStatusCounts = async (
   }) as PermintaanHargaStatusCounts;
 };
 
-
 // --- KALKULASI HARGA API SERVICES ---
 
 export const getJenisKainLookup = async (
@@ -397,11 +411,10 @@ export const saveKalkulasiData = async (
   return response.data?.data;
 };
 
-
 // --- KALKULASI ENGINE API (SPANDUK & MMT) ---
 
 export interface SpandukCalculatePayload {
-  metode: 'MANUAL' | 'MACHINE';
+  metode: string;
   lebar: number;
   jenisKain: string;
   panjang: number;
@@ -409,13 +422,14 @@ export interface SpandukCalculatePayload {
 }
 
 export interface MmtCalculatePayload {
-  kategori: 'VYNIL' | 'NON_VYNIL';
+  kategori: string;
   bahanKode: string;
   panjang: number;
   lebar: number;
   qty: number;
   toppingKode?: string;
   toppingQty?: number;
+  isNetto?: boolean;
 }
 
 export const getKalkulasiMasterOptions = async (token?: string | null) => {
@@ -451,4 +465,67 @@ export const calculateMmtApi = async (
     },
   );
   return response.data?.data;
+};
+
+export interface GarmenTambahanPayloadItem {
+  ket: string;
+  tarif?: number;
+}
+
+export interface GarmenCetakPayloadItem {
+  jenis: string;
+  ket: string;
+  biaya: number;
+  customQty?: number;
+}
+
+export interface GarmenCalculatePayload {
+  kodeModel: 'KH-0001' | 'KH-0002';
+  jenisKain: string;
+  warna: string;
+  qty: number;
+  tambahanList?: (string | GarmenTambahanPayloadItem)[];
+  cetakList?: GarmenCetakPayloadItem[];
+  customAllowance?: number;
+  customBiayaJahit?: number;
+}
+
+export const calculateGarmenApi = async (
+  payload: GarmenCalculatePayload,
+  token?: string | null,
+) => {
+  const response = await api.post(
+    '/permintaan-harga/kalkulasi/garmen/calculate',
+    payload,
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    },
+  );
+  return response.data?.data;
+};
+
+
+export const getJenisKainMintaHargaApi = async (
+  kodeModel: string = 'KH-0001',
+  token?: string | null,
+) => {
+  const response = await api.get('/lookups/jenis-kain-minta-harga', {
+    params: { kode: kodeModel },
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  return response.data?.data || [];
+};
+
+export const getTambahanOptionsApi = async (token?: string | null) => {
+  const response = await api.get('/lookups/tambahan', {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  return response.data?.data || [];
+};
+
+export const getCetakOptionsApi = async (token?: string | null) => {
+  const response = await api.get('/lookups/cetak', {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  return response.data?.data || [];
 };

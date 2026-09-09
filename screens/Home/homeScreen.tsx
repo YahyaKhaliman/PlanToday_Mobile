@@ -56,6 +56,7 @@ import {
   TrackingSpkStatusCounts,
   TrackingSpkListItem,
 } from '../../services/trackingSpkApi';
+import { getPotensiList, PotensiListItem } from '../../services/potensiApi';
 
 type Role = 'SALES' | 'MANAGER' | 'KURIR';
 type MenuItem = {
@@ -145,6 +146,12 @@ const menus: MenuItem[] = [
     route: 'TrackingSPK',
     roles: ['SALES', 'MANAGER'],
     icon: 'assignment',
+  },
+  {
+    title: 'Potensi',
+    route: 'Potensi',
+    roles: ['SALES', 'MANAGER'],
+    icon: 'trending-up',
   },
   {
     title: 'Pengiriman Kurir',
@@ -397,7 +404,7 @@ export default function HomeScreen({ navigation }: any) {
     setIsMonthYearPickerVisible(true);
   };
 
-    const applyMonthYearPicker = async () => {
+  const applyMonthYearPicker = async () => {
     setIsMonthYearPickerVisible(false);
     if (!pickerTarget) return;
 
@@ -438,8 +445,13 @@ export default function HomeScreen({ navigation }: any) {
       PROSES: 0,
       SUDAH: 0,
     });
+  const [rawPotensiItems, setRawPotensiItems] = useState<PotensiListItem[]>([]);
+  const [selectedPotensiSales, setSelectedPotensiSales] = useState('ALL');
+  const [isPotensiSalesPickerVisible, setIsPotensiSalesPickerVisible] =
+    useState(false);
+  const [isPotensiListExpanded, setIsPotensiListExpanded] = useState(false);
   const [isStatusModalVisible, setStatusModalVisible] = useState(false);
-  
+
   const [visitPlans, setVisitPlans] = useState<RekapItem[]>([]);
   const [selectedVisitPlanDate, setSelectedVisitPlanDate] = useState<Date>(
     new Date(),
@@ -458,6 +470,48 @@ export default function HomeScreen({ navigation }: any) {
     });
     return Array.from(salesSet).sort();
   }, [visitPlans]);
+
+  const availablePotensiSales = useMemo(() => {
+    const salesSet = new Set<string>();
+    rawPotensiItems.forEach(it => {
+      const sal =
+        it.sal_nama || it.sales_nama || it.pot_sal_kode || it.sales_kode;
+      if (sal) salesSet.add(sal.trim());
+    });
+    return Array.from(salesSet).filter(Boolean).sort();
+  }, [rawPotensiItems]);
+
+  const filteredPotensiItems = useMemo(() => {
+    return rawPotensiItems.filter(it => {
+      const s = String(it.pot_status || it.status || 'OPEN')
+        .trim()
+        .toUpperCase();
+      const isOpen = s === 'OPEN' || s === 'POTENSI' || !s;
+      if (!isOpen) return false;
+
+      if (isManager && selectedPotensiSales !== 'ALL') {
+        const sal =
+          it.sal_nama || it.sales_nama || it.pot_sal_kode || it.sales_kode;
+        return (
+          String(sal || '').toLowerCase() === selectedPotensiSales.toLowerCase()
+        );
+      }
+      return true;
+    });
+  }, [rawPotensiItems, isManager, selectedPotensiSales]);
+
+  const potensiSummary = useMemo(() => {
+    const sum = filteredPotensiItems.reduce((acc, it) => {
+      const h = Number(
+        it.pot_harga !== undefined ? it.pot_harga : it.harga || 0,
+      );
+      return acc + (Number.isFinite(h) ? h : 0);
+    }, 0);
+    return {
+      totalNominal: sum,
+      openCount: filteredPotensiItems.length,
+    };
+  }, [filteredPotensiItems]);
 
   const filteredVisitPlans = useMemo(() => {
     if (!isManager || selectedSalesFilter === 'ALL') return visitPlans;
@@ -585,6 +639,7 @@ export default function HomeScreen({ navigation }: any) {
         phListRes,
         penawaranListRes,
         spkListRes,
+        potensiRes,
       ] = await Promise.all([
         getPermintaanHargaStatusCounts(phRange, token),
         getTrackingPenawaranStatusCounts(penawaranRange, token),
@@ -609,11 +664,29 @@ export default function HomeScreen({ navigation }: any) {
         getPermintaanHargaList({ ...phRange, limit: 10 }, token),
         getTrackingPenawaranList({ ...penawaranRange, limit: 10 }, token),
         getTrackingSpkList({ ...spkRange, limit: 10 }, token),
+        getPotensiList(
+          {
+            startDate: getRangeForMonthYear(currentMonth, currentYear)
+              .startDate,
+            endDate: getRangeForMonthYear(currentMonth, currentYear).endDate,
+          },
+          token,
+        ).catch(err => {
+          console.log(
+            '[HomeScreen] Potensi API failed (non-critical):',
+            err?.response?.data || err?.message,
+          );
+          return { data: [] } as any;
+        }),
       ]);
 
       setPhStatusCounts(phCounts);
       setPenawaranStatusCounts(penawaranCounts);
       setSpkStatusCounts(spkCounts);
+
+      // Simpan raw data potensi bulan ini
+      const pItems: PotensiListItem[] = (potensiRes as any)?.data || [];
+      setRawPotensiItems(pItems);
 
       const rows: UserAggRow[] = achievementRes.data?.data || [];
 
@@ -759,7 +832,7 @@ export default function HomeScreen({ navigation }: any) {
   const menuGroups = useMemo(() => {
     const groups = [
       { title: 'AKTIVITAS HARIAN', items: [] as MenuItem[] },
-      { title: 'DOKUMEN & PENJUALAN', items: [] as MenuItem[] },
+      { title: 'PENJUALAN', items: [] as MenuItem[] },
       { title: 'PELACAKAN & LAINNYA', items: [] as MenuItem[] },
       { title: 'PENGATURAN', items: [] as MenuItem[] },
     ];
@@ -1707,6 +1780,406 @@ export default function HomeScreen({ navigation }: any) {
                       </View>
                     </View>
                   </View>
+                )}
+              </View>
+
+              {/* WIDGET POTENSI BULAN INI */}
+              <View style={styles.cardContainer}>
+                {/* Header Widget */}
+                <View style={styles.cardHeaderRow}>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <MaterialIcons
+                      name="trending-up"
+                      size={18}
+                      color={THEME.primary}
+                    />
+                    <Text style={styles.cardHeaderTitle}>
+                      Potensi Bulan Ini
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.cardHeaderAction}
+                    onPress={() => handleNavigate('LaporanPotensi')}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.cardHeaderActionText}>Lihat Semua</Text>
+                    <MaterialIcons
+                      name="chevron-right"
+                      size={16}
+                      color={THEME.primary}
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Filter Sales untuk Manager (Ramping & Elegan) */}
+                {isManager && availablePotensiSales.length > 0 && (
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      backgroundColor: '#F8FAFC',
+                      paddingHorizontal: 12,
+                      paddingVertical: 7,
+                      borderRadius: 10,
+                      borderWidth: 1,
+                      borderColor: THEME.line,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: '700',
+                        color: THEME.muted,
+                      }}
+                    >
+                      Filter Sales
+                    </Text>
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 3,
+                      }}
+                      onPress={() => setIsPotensiSalesPickerVisible(true)}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 11.5,
+                          fontWeight: '800',
+                          color: THEME.primary,
+                        }}
+                        numberOfLines={1}
+                      >
+                        {selectedPotensiSales === 'ALL'
+                          ? 'Semua Sales'
+                          : selectedPotensiSales}
+                      </Text>
+                      <MaterialIcons
+                        name="arrow-drop-down"
+                        size={16}
+                        color={THEME.primary}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* Nominal Summary & Dropdown Toggle */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                >
+                  <View>
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: '700',
+                        color: THEME.muted,
+                      }}
+                    >
+                      Total Nominal Potensi
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 20,
+                        fontWeight: '900',
+                        color: THEME.primary,
+                        marginTop: 2,
+                        letterSpacing: -0.3,
+                      }}
+                    >
+                      Rp{' '}
+                      {Number(potensiSummary.totalNominal || 0).toLocaleString(
+                        'id-ID',
+                      )}
+                    </Text>
+                  </View>
+
+                  {/* Toggle Dropdown List Item */}
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: isPotensiListExpanded
+                        ? `${THEME.primary}15`
+                        : '#F1F5F9',
+                      borderWidth: 1,
+                      borderColor: isPotensiListExpanded
+                        ? THEME.primary
+                        : THEME.line,
+                      borderRadius: 12,
+                      paddingHorizontal: 11,
+                      paddingVertical: 7,
+                      gap: 4,
+                    }}
+                    onPress={() => setIsPotensiListExpanded(prev => !prev)}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 11.5,
+                        fontWeight: '800',
+                        color: isPotensiListExpanded
+                          ? THEME.primary
+                          : THEME.ink,
+                      }}
+                    >
+                      {potensiSummary.openCount} Item
+                    </Text>
+                    <MaterialIcons
+                      name={
+                        isPotensiListExpanded
+                          ? 'keyboard-arrow-up'
+                          : 'keyboard-arrow-down'
+                      }
+                      size={16}
+                      color={
+                        isPotensiListExpanded ? THEME.primary : THEME.muted
+                      }
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                {/* List Item Dropdown (Accordion) */}
+                {isPotensiListExpanded && (
+                  <View
+                    style={{
+                      backgroundColor: '#F8FAFC',
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: THEME.line,
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                    }}
+                  >
+                    {filteredPotensiItems.length === 0 ? (
+                      <View
+                        style={{ paddingVertical: 12, alignItems: 'center' }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            color: THEME.muted,
+                            fontWeight: '600',
+                          }}
+                        >
+                          Tidak ada item potensi aktif.
+                        </Text>
+                      </View>
+                    ) : (
+                      filteredPotensiItems.slice(0, 5).map((pItem, pIdx) => {
+                        const nama =
+                          pItem.pot_nama_item || pItem.nama_item || '-';
+                        const cus =
+                          pItem.cus_nama ||
+                          pItem.customer_nama ||
+                          pItem.pot_cus_kode ||
+                          pItem.customer_kode ||
+                          '';
+                        const sal = pItem.sal_nama || pItem.sales_nama || '';
+                        const doc =
+                          pItem.pot_pen_nomor ||
+                          pItem.pen_nomor ||
+                          pItem.pot_mspk_nomor ||
+                          pItem.mspk_nomor ||
+                          '';
+                        const harga = Number(
+                          pItem.pot_harga !== undefined
+                            ? pItem.pot_harga
+                            : pItem.harga || 0,
+                        );
+
+                        return (
+                          <TouchableOpacity
+                            key={pItem.pot_nomor || pIdx}
+                            style={{
+                              paddingVertical: 8,
+                              borderBottomWidth:
+                                pIdx <
+                                Math.min(filteredPotensiItems.length, 5) - 1
+                                  ? 1
+                                  : 0,
+                              borderBottomColor: THEME.line,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                            }}
+                            onPress={() => handleNavigate('LaporanPotensi')}
+                            activeOpacity={0.7}
+                          >
+                            <View style={{ flex: 1, marginRight: 8, gap: 2 }}>
+                              <Text
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: '800',
+                                  color: THEME.ink,
+                                }}
+                                numberOfLines={1}
+                              >
+                                {nama}
+                              </Text>
+                              <Text
+                                style={{
+                                  fontSize: 10.5,
+                                  color: THEME.muted,
+                                  fontWeight: '600',
+                                }}
+                                numberOfLines={1}
+                              >
+                                {doc ? `${doc} • ` : ''}
+                                {cus}
+                                {isManager && sal ? ` (${sal})` : ''}
+                              </Text>
+                            </View>
+
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                fontWeight: '800',
+                                color: THEME.primary,
+                              }}
+                            >
+                              Rp {harga.toLocaleString('id-ID')}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })
+                    )}
+
+                    {filteredPotensiItems.length > 5 && (
+                      <TouchableOpacity
+                        onPress={() => handleNavigate('LaporanPotensi')}
+                        style={{
+                          alignItems: 'center',
+                          paddingVertical: 8,
+                          borderTopWidth: 1,
+                          borderTopColor: THEME.line,
+                          marginTop: 2,
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontWeight: '800',
+                            color: THEME.primary,
+                          }}
+                        >
+                          Lihat {filteredPotensiItems.length - 5} item lainnya
+                          di Laporan Potensi →
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+
+                {/* MODAL PICKER SALES POTENSI */}
+                {isManager && (
+                  <Modal
+                    isVisible={isPotensiSalesPickerVisible}
+                    onBackdropPress={() =>
+                      setIsPotensiSalesPickerVisible(false)
+                    }
+                    backdropOpacity={0.4}
+                    animationIn="slideInUp"
+                    animationOut="slideOutDown"
+                    style={{ justifyContent: 'flex-end', margin: 0 }}
+                  >
+                    <View style={styles.salesPickerCard}>
+                      <View style={styles.salesPickerHeader}>
+                        <Text style={styles.salesPickerTitle}>
+                          Pilih Sales (Potensi)
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => setIsPotensiSalesPickerVisible(false)}
+                        >
+                          <MaterialIcons
+                            name="close"
+                            size={22}
+                            color={THEME.muted}
+                          />
+                        </TouchableOpacity>
+                      </View>
+                      <ScrollView
+                        style={{ maxHeight: 300 }}
+                        showsVerticalScrollIndicator={false}
+                      >
+                        <TouchableOpacity
+                          style={[
+                            styles.salesPickerOption,
+                            selectedPotensiSales === 'ALL' &&
+                              styles.salesPickerOptionActive,
+                          ]}
+                          onPress={() => {
+                            setSelectedPotensiSales('ALL');
+                            setIsPotensiSalesPickerVisible(false);
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.salesPickerOptionText,
+                              selectedPotensiSales === 'ALL' &&
+                                styles.salesPickerOptionTextActive,
+                            ]}
+                          >
+                            Semua Sales
+                          </Text>
+                          {selectedPotensiSales === 'ALL' && (
+                            <MaterialIcons
+                              name="check"
+                              size={18}
+                              color="#FFF"
+                            />
+                          )}
+                        </TouchableOpacity>
+
+                        {availablePotensiSales.map((salesName, index) => {
+                          const isActive = selectedPotensiSales === salesName;
+                          return (
+                            <TouchableOpacity
+                              key={index}
+                              style={[
+                                styles.salesPickerOption,
+                                isActive && styles.salesPickerOptionActive,
+                              ]}
+                              onPress={() => {
+                                setSelectedPotensiSales(salesName);
+                                setIsPotensiSalesPickerVisible(false);
+                              }}
+                            >
+                              <Text
+                                style={[
+                                  styles.salesPickerOptionText,
+                                  isActive &&
+                                    styles.salesPickerOptionTextActive,
+                                ]}
+                              >
+                                {salesName}
+                              </Text>
+                              {isActive && (
+                                <MaterialIcons
+                                  name="check"
+                                  size={18}
+                                  color="#FFF"
+                                />
+                              )}
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+                    </View>
+                  </Modal>
                 )}
               </View>
 
@@ -2869,7 +3342,7 @@ export default function HomeScreen({ navigation }: any) {
               </TouchableOpacity>
             </LinearGradient>
 
-            {/* Menu List */}
+            {/* Menu List Grid */}
             <ScrollView
               showsVerticalScrollIndicator={true}
               persistentScrollbar={true}
@@ -2878,58 +3351,61 @@ export default function HomeScreen({ navigation }: any) {
               {menuGroups.map((group, groupIdx) => (
                 <View
                   key={group.title || groupIdx}
-                  style={{ marginBottom: 14 }}
+                  style={styles.sidebarGroupContainer}
                 >
                   <Text style={styles.sidebarCategoryLabel}>{group.title}</Text>
-                  {group.items.map((menuItemObj, itemIdx) => {
-                    const isPH = menuItemObj.title === 'Permintaan Harga';
-                    const isTrackingPenawaran =
-                      menuItemObj.title === 'Tracking Penawaran';
-                    const isTrackingSpk = menuItemObj.title === 'Tracking SPK';
-                    const badgeCount = isPH
-                      ? totalActivePH
-                      : isTrackingPenawaran
-                      ? totalActivePenawaran
-                      : isTrackingSpk
-                      ? totalActiveSpk
-                      : 0;
-                    const hasBadge = badgeCount > 0;
+                  <View style={styles.sidebarGrid}>
+                    {group.items.map((menuItemObj, itemIdx) => {
+                      const isPH = menuItemObj.title === 'Permintaan Harga';
+                      const isTrackingPenawaran =
+                        menuItemObj.title === 'Tracking Penawaran';
+                      const isTrackingSpk =
+                        menuItemObj.title === 'Tracking SPK';
+                      const badgeCount = isPH
+                        ? totalActivePH
+                        : isTrackingPenawaran
+                        ? totalActivePenawaran
+                        : isTrackingSpk
+                        ? totalActiveSpk
+                        : 0;
+                      const hasBadge = badgeCount > 0;
 
-                    return (
-                      <TouchableOpacity
-                        key={menuItemObj.route || itemIdx}
-                        style={styles.sidebarMenuItem}
-                        activeOpacity={0.7}
-                        onPress={() => {
-                          setSidebarVisible(false);
-                          handleNavigate(menuItemObj.route);
-                        }}
-                      >
-                        <View style={styles.sidebarMenuIconContainer}>
-                          <MaterialIcons
-                            name={menuItemObj.icon || 'circle'}
-                            size={18}
-                            color={THEME.primary}
-                          />
-                        </View>
-                        <Text style={styles.sidebarMenuTitle}>
-                          {menuItemObj.title}
-                        </Text>
-                        {hasBadge && (
-                          <View style={styles.sidebarMenuBadge}>
-                            <Text style={styles.sidebarMenuBadgeText}>
-                              {badgeCount}
-                            </Text>
+                      return (
+                        <TouchableOpacity
+                          key={menuItemObj.route || itemIdx}
+                          style={styles.sidebarCardItem}
+                          activeOpacity={0.7}
+                          onPress={() => {
+                            setSidebarVisible(false);
+                            handleNavigate(menuItemObj.route);
+                          }}
+                        >
+                          <View style={styles.sidebarCardTopRow}>
+                            <View style={styles.sidebarMenuIconContainer}>
+                              <MaterialIcons
+                                name={menuItemObj.icon || 'circle'}
+                                size={18}
+                                color={THEME.primary}
+                              />
+                            </View>
+                            {hasBadge && (
+                              <View style={styles.sidebarMenuBadge}>
+                                <Text style={styles.sidebarMenuBadgeText}>
+                                  {badgeCount}
+                                </Text>
+                              </View>
+                            )}
                           </View>
-                        )}
-                        <MaterialIcons
-                          name="chevron-right"
-                          size={18}
-                          color="rgba(15, 23, 42, 0.22)"
-                        />
-                      </TouchableOpacity>
-                    );
-                  })}
+                          <Text
+                            style={styles.sidebarCardTitle}
+                            numberOfLines={2}
+                          >
+                            {menuItemObj.title}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
                 </View>
               ))}
             </ScrollView>
@@ -3900,7 +4376,7 @@ const styles = StyleSheet.create({
 
   /* SIDEBAR DRAWER */
   sidebarContainer: {
-    width: '80%',
+    width: '85%',
     height: '100%',
     backgroundColor: '#FFFFFF',
     borderTopRightRadius: 24,
@@ -3916,17 +4392,17 @@ const styles = StyleSheet.create({
   sidebarHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 18,
     paddingTop: Platform.OS === 'ios' ? 56 : 40,
-    paddingBottom: 28,
+    paddingBottom: 24,
     borderBottomWidth: 1,
     borderBottomColor: THEME.line,
-    gap: 14,
+    gap: 12,
   },
   sidebarAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -3974,52 +4450,71 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
   },
-  sidebarMenuItem: {
+  sidebarGroupContainer: {
+    marginBottom: 16,
+  },
+  sidebarCategoryLabel: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: THEME.muted,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+    paddingHorizontal: 2,
+  },
+  sidebarGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 14,
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    rowGap: 8,
+  },
+  sidebarCardItem: {
+    width: '48%',
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: THEME.line,
-    gap: 12,
-    marginBottom: 8,
+    borderRadius: 14,
+    padding: 10,
+    minHeight: 76,
+    justifyContent: 'space-between',
     shadowColor: '#000',
     shadowOpacity: 0.02,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
     elevation: 1,
   },
+  sidebarCardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
   sidebarMenuIconContainer: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: 'rgba(79,70,229,0.06)',
+    width: 30,
+    height: 30,
+    borderRadius: 9,
+    backgroundColor: 'rgba(79,70,229,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sidebarMenuIcon: {
-    fontSize: 18,
-  },
-  sidebarMenuTitle: {
-    flex: 1,
-    fontSize: 14,
+  sidebarCardTitle: {
+    fontSize: 11.5,
     fontWeight: '800',
     color: THEME.ink,
+    lineHeight: 15,
   },
   sidebarMenuBadge: {
     backgroundColor: '#EF4444',
-    borderRadius: 99,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    minWidth: 22,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    minWidth: 18,
     alignItems: 'center',
     justifyContent: 'center',
   },
   sidebarMenuBadgeText: {
     color: '#FFFFFF',
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '900',
   },
   sidebarFooter: {
@@ -4214,17 +4709,6 @@ const styles = StyleSheet.create({
   breakdownChipText: {
     fontSize: 10,
     fontWeight: '800',
-  },
-
-  /* SIDEBAR CATEGORY LABEL */
-  sidebarCategoryLabel: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: THEME.muted,
-    letterSpacing: 1.2,
-    paddingHorizontal: 14,
-    paddingTop: 12,
-    paddingBottom: 4,
   },
 
   /* MONTH YEAR PICKER */

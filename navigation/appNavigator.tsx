@@ -40,6 +40,8 @@ import PermintaanHargaListScreen from '../screens/PermintaanHarga/permintaanHarg
 import PermintaanHargaDetailScreen from '../screens/PermintaanHarga/permintaanHargaDetailScreen';
 import PermintaanHargaFormScreen from '../screens/PermintaanHarga/permintaanHargaFormScreen';
 import TambahCustomerScreen from '../screens/PermintaanHarga/tambahCustomerScreen';
+import PotensiScreen from '../screens/Potensi/potensiScreen';
+import LaporanPotensiScreen from '../screens/Potensi/laporanPotensiScreen';
 
 export type RootStackParamList = {
   Home: undefined;
@@ -85,6 +87,8 @@ export type RootStackParamList = {
   TrackingPenawaran: { month?: number; year?: number } | undefined;
   TrackingMap: undefined;
   TrackingSPK: { month?: number; year?: number } | undefined;
+  Potensi: { month?: number; year?: number } | undefined;
+  LaporanPotensi: { month?: number; year?: number } | undefined;
   PermintaanHargaList: { month?: number; year?: number } | undefined;
   PermintaanHargaDetail: { nomor: string };
   PermintaanHargaForm: {
@@ -222,6 +226,14 @@ export default function AppNavigator() {
                 <Stack.Screen
                   name="TrackingSPK"
                   component={TrackingSpkScreen}
+                />
+                <Stack.Screen
+                  name="Potensi"
+                  component={PotensiScreen}
+                />
+                <Stack.Screen
+                  name="LaporanPotensi"
+                  component={LaporanPotensiScreen}
                 />
                 <Stack.Screen
                   name="PermintaanHargaList"

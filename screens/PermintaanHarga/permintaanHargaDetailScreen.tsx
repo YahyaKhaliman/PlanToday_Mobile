@@ -23,7 +23,7 @@ import {
   deletePermintaanHarga,
   getPermintaanHargaDetail,
 } from '../../services/permintaanHargaApi';
-import { PENAWARAN_THEME } from '../Penawaran/penawaranTheme';
+import { PENAWARAN_THEME, PENAWARAN_SHADOW } from '../Penawaran/penawaranTheme';
 import { COMPANY_STATUS_COLORS } from '../theme';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
@@ -138,61 +138,57 @@ const HasilKalkulasiSection = ({
   if (String(status || '').toUpperCase() !== 'DONE') return null;
   const parsed = parseKetKalkulasi(ket);
   return (
-    <>
-      <Text style={[styles.sectionTitle, styles.sectionTitleGap]}>
+    <View style={styles.kalkulasiCard}>
+      <Text
+        style={[styles.sectionTitle, { color: '#166534', marginBottom: 10 }]}
+      >
         Hasil Kalkulasi
       </Text>
-      <View style={styles.kalkulasiCard}>
-        <View style={styles.kalkulasiHeader}>
-          <View style={styles.kalkulasiHeaderLeft}>
-            <Text style={styles.kalkulasiLabel}>Harga Kalkulasi</Text>
-            <Text style={styles.kalkulasiPrice}>
-              Rp {formatNumber(harga || 0)}
-            </Text>
-          </View>
-          {parsed.ppnStatus && (
-            <View
+
+      <View style={styles.kalkulasiHeader}>
+        <View style={styles.kalkulasiHeaderLeft}>
+          <Text style={styles.kalkulasiLabel}>Harga Satuan Kalkulasi</Text>
+          <Text style={styles.kalkulasiPrice}>
+            Rp {formatNumber(harga || 0)}
+          </Text>
+        </View>
+        {parsed.ppnStatus && (
+          <View
+            style={[
+              styles.ppnBadge,
+              parsed.ppnStatus === 'INCLUDE'
+                ? styles.ppnBadgeInclude
+                : styles.ppnBadgeExclude,
+            ]}
+          >
+            <Text
               style={[
-                styles.ppnBadge,
+                styles.ppnBadgeText,
                 parsed.ppnStatus === 'INCLUDE'
-                  ? styles.ppnBadgeInclude
-                  : styles.ppnBadgeExclude,
+                  ? styles.ppnBadgeTextInclude
+                  : styles.ppnBadgeTextExclude,
               ]}
             >
-              <MaterialIcons
-                name={parsed.ppnStatus === 'INCLUDE' ? 'check-circle' : 'info'}
-                size={14}
-                color={parsed.ppnStatus === 'INCLUDE' ? '#15803D' : '#B45309'}
-              />
-              <Text
-                style={[
-                  styles.ppnBadgeText,
-                  parsed.ppnStatus === 'INCLUDE'
-                    ? styles.ppnBadgeTextInclude
-                    : styles.ppnBadgeTextExclude,
-                ]}
-              >
-                {parsed.ppnStatus === 'INCLUDE' ? 'Include PPN' : 'Exclude PPN'}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {parsed.items.length > 0 && (
-          <View style={styles.kalkulasiKetWrap}>
-            <Text style={styles.kalkulasiKetLabel}>Keterangan:</Text>
-            <View style={styles.kalkulasiItemList}>
-              {parsed.items.map((itemText, idx) => (
-                <View key={`ket-${idx}`} style={styles.kalkulasiItemRow}>
-                  <Text style={styles.kalkulasiBullet}>•</Text>
-                  <Text style={styles.kalkulasiItemText}>{itemText}</Text>
-                </View>
-              ))}
-            </View>
+              {parsed.ppnStatus === 'INCLUDE' ? 'Include PPN' : 'Exclude PPN'}
+            </Text>
           </View>
         )}
       </View>
-    </>
+
+      {parsed.items.length > 0 && (
+        <View style={styles.kalkulasiKetWrap}>
+          <Text style={styles.kalkulasiKetLabel}>Rincian Kalkulasi:</Text>
+          <View style={styles.kalkulasiItemList}>
+            {parsed.items.map((itemText, idx) => (
+              <View key={`ket-${idx}`} style={styles.kalkulasiItemRow}>
+                <Text style={styles.kalkulasiBullet}>-</Text>
+                <Text style={styles.kalkulasiItemText}>{itemText}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+    </View>
   );
 };
 
@@ -212,7 +208,7 @@ const getStatusDescription = (status: string) => {
   if (key === 'BELUM') return 'Tidak muncul di kalkulasi harga';
   if (key === 'MINTA') return 'Sedang dimintakan harga ke Finance';
   if (key === 'CANCEL') return 'Dibatalkan';
-  if (key === 'WAIT') return 'Sudah diproses, menunggu acc';
+  if (key === 'WAIT') return 'Sudah diproses, menunggu ACC';
   if (key === 'DONE') return 'Selesai';
   return '-';
 };
@@ -233,15 +229,11 @@ const normalizeImageUrl = (value: string): string => {
     .trim()
     .replace(/\/$/, '');
 
-  // Paksa semua URL image dari origin uploader lama (8182) ke origin read (8182)
-  // agar proses view selalu lewat host image read.
   const forcedReadUrl = trimmed.replace(
     /^http:\/\/103\.94\.238\.252:8182/i,
     baseOrigin,
   );
 
-  // Jika backend masih kirim path lama /image/mintaharga di port API,
-  // paksa ke host/path image publik agar konsisten.
   return forcedReadUrl
     .replace(
       /^http:\/\/103\.94\.238\.252:3005\/image\/mintaharga/i,
@@ -308,10 +300,34 @@ const buildFallbackImageUrl = (nomor: string, index: 1 | 2): string | null => {
   return `${base}${imageBasePath}/${encodeURIComponent(cleanedNomor)}${suffix}`;
 };
 
-const InfoRow = ({ label, value }: { label: string; value: any }) => (
-  <View style={styles.row}>
-    <Text style={styles.label}>{label}</Text>
-    <Text style={styles.value}>{String(value ?? '-')}</Text>
+// Compact Grid Cell Component focusing on clean typography
+const CompactCell = ({
+  label,
+  value,
+  flex = 1,
+  highlight = false,
+  fullWidth = false,
+}: {
+  label: string;
+  value: any;
+  flex?: number;
+  highlight?: boolean;
+  fullWidth?: boolean;
+}) => (
+  <View
+    style={[
+      styles.cellWrap,
+      { flex: fullWidth ? 1 : flex },
+      fullWidth && { width: '100%' },
+    ]}
+  >
+    <Text style={styles.cellLabel}>{label}</Text>
+    <Text
+      style={[styles.cellValue, highlight && styles.cellValueHighlight]}
+      numberOfLines={fullWidth ? 3 : 2}
+    >
+      {String(value ?? '-') || '-'}
+    </Text>
   </View>
 );
 
@@ -326,10 +342,13 @@ export default function PermintaanHargaDetailScreen({
   const [data, setData] = useState<any>(null);
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [previewModalUrl, setPreviewModalUrl] = useState<string | null>(null);
+
   const [image1AspectRatio, setImage1AspectRatio] = useState(16 / 9);
   const [image2AspectRatio, setImage2AspectRatio] = useState(16 / 9);
   const [image1Error, setImage1Error] = useState(false);
   const [image2Error, setImage2Error] = useState(false);
+
   const imageUrl1 = data
     ? pickImageUrl(data, 1)
     : buildFallbackImageUrl(nomor, 1);
@@ -355,6 +374,7 @@ export default function PermintaanHargaDetailScreen({
 
   const showImage1 = Boolean(imageUrl1WithBuster) && !image1Error;
   const showImage2 = Boolean(imageUrl2WithBuster) && !image2Error;
+
   const createdBy = useMemo(
     () => data?.user_create || data?.mh_user_create || data?.created_by || '-',
     [data],
@@ -431,17 +451,38 @@ export default function PermintaanHargaDetailScreen({
         translucent
         backgroundColor="transparent"
       />
+
+      {/* Top Navigation Bar */}
+      <View style={styles.topNav}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.7}
+        >
+          <MaterialIcons name="arrow-back-ios" size={18} color={THEME.ink} />
+        </TouchableOpacity>
+        <Text style={styles.navTitle} numberOfLines={1}>
+          Detail Permintaan Harga
+        </Text>
+        <View style={{ width: 36 }} />
+      </View>
+
       {loading ? (
         <View style={styles.loadingWrap}>
           <ActivityIndicator size="large" color={THEME.primary} />
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.content}>
-          <Text style={styles.title}>Detail Permintaan Harga</Text>
-
-          <View style={styles.card}>
-            <View style={styles.headerTopRow}>
-              <Text style={styles.nomorLabel}>Nomor</Text>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Card 1: Header Dokumen & Status */}
+          <View style={styles.headerCard}>
+            <View style={styles.headerCardTop}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.docLabel}>NOMOR PERMINTAAN</Text>
+                <Text style={styles.docNomor}>{nomor || '-'}</Text>
+              </View>
               <View
                 style={[
                   styles.statusBadge,
@@ -458,127 +499,194 @@ export default function PermintaanHargaDetailScreen({
                 </Text>
               </View>
             </View>
-            <Text style={styles.nomor}>{nomor || '-'}</Text>
-            <InfoRow
-              label="Tanggal Permintaan"
-              value={formatDateTimeLocal(data?.created_at_fmt)}
-            />
-            <InfoRow label="User Create" value={createdBy} />
-            <InfoRow
-              label="Keterangan Status Pengajuan"
-              value={statusDescription}
-            />
 
-            <InfoRow label="Nama Pekerjaan" value={data?.mh_nama || '-'} />
-            <InfoRow label="Customer" value={data?.mh_cus_nama || '-'} />
-            <InfoRow
-              label="Sales"
-              value={data?.sales_nama || data?.mh_sal_kode || '-'}
-            />
-            <InfoRow
-              label="Divisi Tujuan"
-              value={resolveDivisiLabel(data?.mh_divisi)}
-            />
-            <InfoRow
-              label="Terakhir Order"
-              value={formatDate(data?.mh_dateorder)}
-            />
-
-            <Text style={[styles.sectionTitle, styles.sectionTitleGap]}>
-              Spesifikasi
-            </Text>
-            <InfoRow label="Kain" value={data?.mh_kain || '-'} />
-            <InfoRow label="Gramasi" value={data?.mh_gramasi || '-'} />
-            <InfoRow label="Finishing" value={data?.mh_finishing || '-'} />
-            <View style={[styles.row, styles.rowInlineWrap]}>
-              <View style={styles.inlineField}>
-                <Text style={styles.label}>Panjang</Text>
-                <Text style={styles.value}>
-                  {formatNumber(data?.mh_panjang || 0)}
-                </Text>
-              </View>
-              <View style={styles.inlineField}>
-                <Text style={styles.label}>Lebar</Text>
-                <Text style={styles.value}>
-                  {formatNumber(data?.mh_lebar || 0)}
-                </Text>
-              </View>
+            {/* Status Description Box */}
+            <View style={styles.statusDescBox}>
+              <Text style={styles.statusDescText}>
+                Status:{' '}
+                <Text style={{ fontWeight: '800' }}>{statusDescription}</Text>
+              </Text>
             </View>
-            <InfoRow label="Ket. Ukuran" value={data?.mh_ukuran || '-'} />
 
-            <InfoRow
-              label="Jumlah Order"
-              value={formatNumber(data?.mh_jmlorder || 0)}
-            />
-            <InfoRow label="Keterangan" value={data?.mh_ket} />
+            {/* Meta Timestamp & Creator */}
+            <View style={styles.metaRow}>
+              <Text style={styles.metaText}>
+                Dibuat oleh: <Text style={styles.metaValue}>{createdBy}</Text>
+              </Text>
+              <Text style={styles.metaText}>
+                {formatDateTimeLocal(data?.created_at_fmt)}
+              </Text>
+            </View>
+          </View>
 
-            <HasilKalkulasiSection
-              status={data?.mh_status}
-              harga={data?.mh_harga_kalkulasi}
-              ket={data?.mh_ket_kalkulasi}
-            />
+          {/* Card 2: Informasi Customer & Pekerjaan */}
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Customer & Pekerjaan</Text>
 
-            <Text style={[styles.imageSectionTitle, styles.sectionTitleGap]}>
-              Gambar
-            </Text>
+            <View style={styles.gridRow}>
+              <CompactCell label="Customer" value={data?.mh_cus_nama} />
+              <CompactCell
+                label="Sales"
+                value={data?.sales_nama || data?.mh_sal_kode}
+              />
+            </View>
 
-            <Text style={styles.imageLabel}>Gambar 1</Text>
-            {showImage1 && imageUrl1WithBuster ? (
-              <View style={styles.imagePreviewFrame}>
-                <Image
-                  source={{ uri: imageUrl1WithBuster }}
-                  style={[
-                    styles.imagePreview,
-                    { aspectRatio: image1AspectRatio },
-                  ]}
-                  onLoad={e => {
-                    const width = e?.nativeEvent?.source?.width || 0;
-                    const height = e?.nativeEvent?.source?.height || 0;
-                    if (width > 0 && height > 0) {
-                      setImage1AspectRatio(width / height);
-                    }
-                  }}
-                  onError={() => setImage1Error(true)}
-                  resizeMode="contain"
+            <View style={[styles.gridRow, { marginTop: 8 }]}>
+              <CompactCell label="Nama Pekerjaan" value={data?.mh_nama} />
+              <CompactCell
+                label="Divisi Tujuan"
+                value={resolveDivisiLabel(data?.mh_divisi)}
+              />
+            </View>
+
+            <View style={[styles.gridRow, { marginTop: 8 }]}>
+              <CompactCell
+                label="Tanggal Order"
+                value={formatDate(data?.mh_dateorder)}
+                fullWidth
+              />
+            </View>
+          </View>
+
+          {/* Card 3: Spesifikasi Teknis & Dimensi */}
+          <View style={styles.card}>
+            <Text style={styles.sectionTitle}>Spesifikasi Fisik</Text>
+
+            <View style={styles.gridRow}>
+              <CompactCell label="Bahan / Kain" value={data?.mh_kain} />
+              <CompactCell label="Gramasi" value={data?.mh_gramasi} />
+            </View>
+
+            <View style={[styles.gridRow, { marginTop: 8 }]}>
+              <CompactCell
+                label="Ukuran (p x l)"
+                value={`${formatNumber(
+                  data?.mh_panjang || 0,
+                )} m x ${formatNumber(data?.mh_lebar || 0)} ${
+                  data?.mh_divisi === '1' ? 'cm' : 'm'
+                }`}
+              />
+              <CompactCell label="Ket. Ukuran" value={data?.mh_ukuran} />
+            </View>
+
+            <View style={[styles.gridRow, { marginTop: 8 }]}>
+              <CompactCell
+                label="Jumlah Order"
+                value={`${formatNumber(data?.mh_jmlorder || 0)} Pcs`}
+                highlight
+              />
+              <CompactCell label="Finishing" value={data?.mh_finishing} />
+            </View>
+
+            {data?.mh_sublim || data?.mh_warna ? (
+              <View style={[styles.gridRow, { marginTop: 8 }]}>
+                <CompactCell label="Sublim" value={data?.mh_sublim} />
+                <CompactCell
+                  label="Warna"
+                  value={
+                    data?.mh_warna
+                      ? data.mh_warna.charAt(0).toUpperCase() +
+                        data.mh_warna.slice(1).toLowerCase()
+                      : undefined
+                  }
                 />
               </View>
-            ) : (
-              <View style={styles.imagePlaceholder}>
-                <Text style={styles.imagePlaceholderText}>
-                  Belum ada gambar
-                </Text>
-              </View>
-            )}
+            ) : null}
 
-            {showImage2 && imageUrl2WithBuster ? (
-              <>
-                <Text style={[styles.imageLabel, styles.imageLabelSpacing]}>
-                  Gambar 2
-                </Text>
-                <View style={styles.imagePreviewFrame}>
-                  <Image
-                    source={{ uri: imageUrl2WithBuster }}
-                    style={[
-                      styles.imagePreview,
-                      { aspectRatio: image2AspectRatio },
-                    ]}
-                    onLoad={e => {
-                      const width = e?.nativeEvent?.source?.width || 0;
-                      const height = e?.nativeEvent?.source?.height || 0;
-                      if (width > 0 && height > 0) {
-                        setImage2AspectRatio(width / height);
-                      }
-                    }}
-                    onError={() => setImage2Error(true)}
-                    resizeMode="contain"
-                  />
-                </View>
-              </>
+            {data?.mh_ket ? (
+              <View style={styles.keteranganBox}>
+                <Text style={styles.keteranganLabel}>Keterangan:</Text>
+                <Text style={styles.keteranganText}>{data.mh_ket}</Text>
+              </View>
             ) : null}
           </View>
+
+          {/* Card 4: Hasil Kalkulasi (Jika Selesai) */}
+          <HasilKalkulasiSection
+            status={data?.mh_status}
+            harga={data?.mh_harga_kalkulasi}
+            ket={data?.mh_ket_kalkulasi}
+          />
+
+          {/* Card 5: Lampiran Gambar */}
+          {showImage1 || showImage2 ? (
+            <View style={styles.card}>
+              <Text style={styles.sectionTitle}>Lampiran Foto Produk</Text>
+
+              <View style={styles.imagesGrid}>
+                {showImage1 && imageUrl1WithBuster && (
+                  <View style={styles.imageColumn}>
+                    <Text style={styles.imageSublabel}>Foto Contoh 1</Text>
+                    <TouchableOpacity
+                      style={styles.imageCardBtn}
+                      activeOpacity={0.85}
+                      onPress={() => setPreviewModalUrl(imageUrl1WithBuster)}
+                    >
+                      <Image
+                        source={{ uri: imageUrl1WithBuster }}
+                        style={[
+                          styles.imagePreview,
+                          { aspectRatio: image1AspectRatio },
+                        ]}
+                        onLoad={e => {
+                          const w = e?.nativeEvent?.source?.width || 0;
+                          const h = e?.nativeEvent?.source?.height || 0;
+                          if (w > 0 && h > 0) setImage1AspectRatio(w / h);
+                        }}
+                        onError={() => setImage1Error(true)}
+                        resizeMode="cover"
+                      />
+                      <View style={styles.imageZoomBadge}>
+                        <Text style={styles.imageZoomText}>Lihat Foto</Text>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {showImage2 && imageUrl2WithBuster && (
+                  <View style={styles.imageColumn}>
+                    <Text style={styles.imageSublabel}>Foto Contoh 2</Text>
+                    <TouchableOpacity
+                      style={styles.imageCardBtn}
+                      activeOpacity={0.85}
+                      onPress={() => setPreviewModalUrl(imageUrl2WithBuster)}
+                    >
+                      <Image
+                        source={{ uri: imageUrl2WithBuster }}
+                        style={[
+                          styles.imagePreview,
+                          { aspectRatio: image2AspectRatio },
+                        ]}
+                        onLoad={e => {
+                          const w = e?.nativeEvent?.source?.width || 0;
+                          const h = e?.nativeEvent?.source?.height || 0;
+                          if (w > 0 && h > 0) setImage2AspectRatio(w / h);
+                        }}
+                        onError={() => setImage2Error(true)}
+                        resizeMode="cover"
+                      />
+                      <View style={styles.imageZoomBadge}>
+                        <Text style={styles.imageZoomText}>Lihat Foto</Text>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+            </View>
+          ) : (
+            <View style={[styles.card, { paddingVertical: 14 }]}>
+              <Text style={[styles.sectionTitle, { color: THEME.muted }]}>
+                Lampiran Gambar
+              </Text>
+              <Text style={styles.noImageText}>
+                Tidak ada foto lampiran yang diunggah.
+              </Text>
+            </View>
+          )}
         </ScrollView>
       )}
 
+      {/* Floating Action Buttons (Hanya saat status BELUM) */}
       {!loading && String(data?.mh_status || '').toUpperCase() === 'BELUM' ? (
         <View
           style={[
@@ -596,14 +704,14 @@ export default function PermintaanHargaDetailScreen({
                   initialData: data,
                 })
               }
-              activeOpacity={0.9}
+              activeOpacity={0.85}
             >
               <Text style={styles.editBtnText}>Edit</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.deleteBtn, styles.editBtnHalf]}
               onPress={remove}
-              activeOpacity={0.9}
+              activeOpacity={0.85}
             >
               <Text style={styles.editBtnText}>Hapus</Text>
             </TouchableOpacity>
@@ -611,7 +719,32 @@ export default function PermintaanHargaDetailScreen({
         </View>
       ) : null}
 
-      {/* Modal konfirmasi hapus */}
+      {/* Modal View Image Fullscreen */}
+      <Modal
+        visible={Boolean(previewModalUrl)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPreviewModalUrl(null)}
+      >
+        <View style={styles.fullImageModalOverlay}>
+          <TouchableOpacity
+            style={styles.closeFullImageBtn}
+            onPress={() => setPreviewModalUrl(null)}
+            activeOpacity={0.8}
+          >
+            <MaterialIcons name="close" size={24} color="#fff" />
+          </TouchableOpacity>
+          {previewModalUrl && (
+            <Image
+              source={{ uri: previewModalUrl }}
+              style={styles.fullModalImage}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Modal>
+
+      {/* Modal Konfirmasi Hapus */}
       <Modal
         visible={confirmVisible}
         transparent
@@ -661,140 +794,185 @@ export default function PermintaanHargaDetailScreen({
 const styles = StyleSheet.create({
   container: { flex: 1 },
   loadingWrap: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  content: { padding: 16, paddingBottom: 120 },
-  title: {
-    color: THEME.ink,
-    fontWeight: '800',
-    fontSize: 20,
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  nomorLabel: {
-    color: THEME.muted,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  nomor: {
-    color: THEME.primary,
-    fontWeight: '700',
-    marginTop: 4,
-    fontSize: 18,
-  },
-  editBtn: {
-    backgroundColor: THEME.primary,
-    borderColor: THEME.primary,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  editBtnFull: {
-    width: '100%',
-  },
-  editBtnHalf: {
-    flex: 1,
-  },
-  deleteBtn: {
-    backgroundColor: '#DC2626',
-    borderColor: '#B91C1C',
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  editBtnText: {
-    color: THEME.bgBottom,
-    fontWeight: '900',
-    fontSize: 12,
-    letterSpacing: 1,
-  },
-  bottomAction: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    backgroundColor: THEME.card,
-    borderTopWidth: 1,
-    borderTopColor: THEME.line,
-  },
-  bottomActionRow: {
+  topNav: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
-  headerTopRow: {
+  backBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...PENAWARAN_SHADOW.card,
+  },
+  navTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: THEME.ink,
+  },
+  content: {
+    paddingHorizontal: 14,
+    paddingTop: 4,
+    paddingBottom: 110,
+  },
+
+  // Header Card
+  headerCard: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    ...PENAWARAN_SHADOW.card,
+  },
+  headerCardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+  },
+  docLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: THEME.muted,
+    letterSpacing: 0.5,
+  },
+  docNomor: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: THEME.primary,
+    marginTop: 2,
   },
   statusBadge: {
     borderWidth: 1,
     borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
   },
   statusBadgeText: {
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 0.4,
-  },
-  card: {
-    backgroundColor: THEME.card,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: THEME.line,
-    padding: 14,
-    marginBottom: 12,
-  },
-  row: {
-    marginTop: 8,
-    paddingBottom: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: THEME.line,
-  },
-  rowInlineWrap: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  inlineField: {
-    flex: 1,
-  },
-  label: {
-    color: THEME.muted,
     fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.2,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
-  value: {
-    color: THEME.ink,
-    fontSize: 15,
+  statusDescBox: {
+    backgroundColor: '#f0f9ff',
+    borderWidth: 1,
+    borderColor: '#bae6fd',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginTop: 10,
+  },
+  statusDescText: {
+    fontSize: 12.5,
+    color: '#0369a1',
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+    marginTop: 10,
+    paddingTop: 10,
+  },
+  metaText: {
+    fontSize: 12,
+    color: THEME.muted,
+  },
+  metaValue: {
     fontWeight: '700',
-    marginTop: 4,
-    lineHeight: 21,
+    color: THEME.ink,
+  },
+
+  // General Card
+  card: {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    ...PENAWARAN_SHADOW.card,
   },
   sectionTitle: {
     color: THEME.ink,
     fontWeight: '800',
-    fontSize: 16,
-    marginBottom: 8,
+    fontSize: 15,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+    marginBottom: 10,
   },
-  sectionTitleGap: {
-    marginTop: 14,
+
+  // Grid Layout
+  gridRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
   },
+  cellWrap: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#edf2f7',
+  },
+  cellLabel: {
+    color: '#64748b',
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  cellValue: {
+    color: '#1e293b',
+    fontSize: 13.5,
+    fontWeight: '700',
+    lineHeight: 18,
+  },
+  cellValueHighlight: {
+    color: THEME.primary,
+    fontWeight: '900',
+    fontSize: 14.5,
+  },
+
+  keteranganBox: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    padding: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: THEME.primary,
+    marginTop: 10,
+  },
+  keteranganLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748b',
+    textTransform: 'uppercase',
+  },
+  keteranganText: {
+    fontSize: 13,
+    color: '#334155',
+    lineHeight: 18,
+    marginTop: 2,
+  },
+
+  // Hasil Kalkulasi
   kalkulasiCard: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#f0fdf4',
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#bbf7d0',
     padding: 14,
-    marginTop: 4,
-    marginBottom: 4,
+    marginBottom: 10,
+    ...PENAWARAN_SHADOW.card,
   },
   kalkulasiHeader: {
     flexDirection: 'row',
@@ -805,40 +983,37 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   kalkulasiLabel: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '700',
-    color: THEME.muted,
-    marginBottom: 2,
+    color: '#166534',
+    textTransform: 'uppercase',
   },
   kalkulasiPrice: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '900',
-    color: '#0F172A',
+    color: '#15803d',
+    marginTop: 2,
   },
   ppnBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 9,
+    paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 8,
+    borderRadius: 6,
     borderWidth: 1,
   },
   ppnBadgeExclude: {
-    backgroundColor: '#FEF3C7',
-    borderColor: '#FDE68A',
+    backgroundColor: '#fef3c7',
+    borderColor: '#fde68a',
   },
   ppnBadgeInclude: {
-    backgroundColor: '#DCFCE7',
-    borderColor: '#BBF7D0',
+    backgroundColor: '#dcfce7',
+    borderColor: '#86efac',
   },
   ppnBadgeText: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '800',
-    letterSpacing: 0.3,
   },
   ppnBadgeTextExclude: {
-    color: '#92400E',
+    color: '#92400e',
   },
   ppnBadgeTextInclude: {
     color: '#166534',
@@ -847,16 +1022,16 @@ const styles = StyleSheet.create({
     marginTop: 10,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
+    borderTopColor: '#dcfce7',
   },
   kalkulasiKetLabel: {
-    fontSize: 11,
+    fontSize: 11.5,
     fontWeight: '700',
-    color: THEME.muted,
+    color: '#166534',
     marginBottom: 6,
   },
   kalkulasiItemList: {
-    gap: 4,
+    gap: 3,
   },
   kalkulasiItemRow: {
     flexDirection: 'row',
@@ -865,59 +1040,131 @@ const styles = StyleSheet.create({
   },
   kalkulasiBullet: {
     fontSize: 14,
-    color: THEME.primary,
+    color: '#15803d',
     lineHeight: 18,
     fontWeight: '900',
   },
   kalkulasiItemText: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '600',
-    color: THEME.ink,
+    color: '#14532d',
     lineHeight: 18,
   },
-  imageSectionTitle: {
-    color: THEME.ink,
-    fontWeight: '800',
-    fontSize: 16,
-    marginBottom: 8,
+
+  // Images
+  imagesGrid: {
+    flexDirection: 'row',
+    gap: 10,
   },
-  imageLabel: {
+  imageColumn: {
+    flex: 1,
+  },
+  imageSublabel: {
+    fontSize: 11,
+    fontWeight: '700',
     color: THEME.muted,
-    fontSize: 12,
-    marginBottom: 6,
+    marginBottom: 5,
+    textTransform: 'uppercase',
   },
-  imageLabelSpacing: {
-    marginTop: 12,
-  },
-  imagePreviewFrame: {
-    width: '100%',
-    borderRadius: 12,
+  imageCardBtn: {
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: THEME.line,
-    backgroundColor: '#F8FAFC',
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
     overflow: 'hidden',
-    alignSelf: 'stretch',
+    height: 130,
+    justifyContent: 'center',
+    position: 'relative',
   },
   imagePreview: {
     width: '100%',
-    minHeight: 180,
-    maxWidth: '100%',
-    alignSelf: 'stretch',
+    height: '100%',
   },
-  imagePlaceholder: {
-    height: 180,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: THEME.line,
-    backgroundColor: '#F8FAFC',
+  imageZoomBadge: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    backgroundColor: 'rgba(15, 23, 42, 0.75)',
+    borderRadius: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  imageZoomText: {
+    color: '#fff',
+    fontSize: 10.5,
+    fontWeight: '700',
+  },
+  noImageText: {
+    fontSize: 12.5,
+    color: '#94a3b8',
+  },
+
+  // Full Image Modal
+  fullImageModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.94)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeFullImageBtn: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  fullModalImage: {
+    width: '95%',
+    height: '80%',
+  },
+
+  // Bottom Floating Actions
+  bottomAction: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+    ...PENAWARAN_SHADOW.card,
+  },
+  bottomActionRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  editBtn: {
+    backgroundColor: THEME.primary,
+    borderRadius: 10,
+    paddingVertical: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  imagePlaceholderText: {
-    color: THEME.muted,
-    fontWeight: '600',
+  deleteBtn: {
+    backgroundColor: '#dc2626',
+    borderRadius: 10,
+    paddingVertical: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  editBtnHalf: {
+    flex: 1,
+  },
+  editBtnText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 14,
+  },
+
+  // Confirmation Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(15,23,42,0.45)',
@@ -928,32 +1175,32 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     backgroundColor: '#FFF',
-    borderRadius: 22,
-    padding: 22,
+    borderRadius: 20,
+    padding: 20,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: THEME.line,
   },
   modalIndicator: {
-    width: 44,
+    width: 40,
     height: 4,
     backgroundColor: '#E5E7EB',
     borderRadius: 2,
-    marginBottom: 18,
+    marginBottom: 14,
   },
   modalTitle: {
     fontSize: 17,
     fontWeight: '900',
     color: THEME.ink,
-    marginBottom: 10,
+    marginBottom: 8,
   },
   modalBody: {
     fontSize: 13,
     color: THEME.muted,
     fontWeight: '600',
     textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 20,
+    lineHeight: 19,
+    marginBottom: 18,
   },
   modalActions: {
     flexDirection: 'row',
@@ -962,22 +1209,20 @@ const styles = StyleSheet.create({
   },
   modalBtnCancel: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingVertical: 11,
+    borderRadius: 10,
     backgroundColor: '#EEF2F7',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: THEME.line,
   },
   modalBtnCancelText: {
     color: THEME.muted,
-    fontWeight: '900',
+    fontWeight: '800',
     fontSize: 13,
   },
   modalBtnDelete: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
+    paddingVertical: 11,
+    borderRadius: 10,
     backgroundColor: '#DC2626',
     alignItems: 'center',
     justifyContent: 'center',
@@ -987,7 +1232,7 @@ const styles = StyleSheet.create({
   },
   modalBtnDeleteText: {
     color: '#FFF',
-    fontWeight: '900',
+    fontWeight: '800',
     fontSize: 13,
   },
 });
