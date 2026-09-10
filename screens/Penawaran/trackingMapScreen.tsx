@@ -462,16 +462,28 @@ export default function TrackingMapScreen() {
                       setIsFilterSjMap(false);
                     }}
                   >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
                       <MaterialIcons
                         name="format-list-bulleted"
                         size={14}
-                        color={(!isFilterBast && !isFilterSjMap) ? THEME.primary : THEME.muted}
+                        color={
+                          !isFilterBast && !isFilterSjMap
+                            ? THEME.primary
+                            : THEME.muted
+                        }
                       />
                       <Text
                         style={[
                           styles.chipLabel,
-                          !isFilterBast && !isFilterSjMap && styles.chipLabelActive,
+                          !isFilterBast &&
+                            !isFilterSjMap &&
+                            styles.chipLabelActive,
                         ]}
                       >
                         Semua ({rawItems.length})
@@ -487,8 +499,21 @@ export default function TrackingMapScreen() {
                     activeOpacity={0.8}
                     onPress={() => setIsFilterBast(prev => !prev)}
                   >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' }} />
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: 4,
+                          backgroundColor: '#10B981',
+                        }}
+                      />
                       <Text
                         style={[
                           styles.chipLabel,
@@ -508,8 +533,21 @@ export default function TrackingMapScreen() {
                     activeOpacity={0.8}
                     onPress={() => setIsFilterSjMap(prev => !prev)}
                   >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#3B82F6' }} />
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: 4,
+                          backgroundColor: '#3B82F6',
+                        }}
+                      />
                       <Text
                         style={[
                           styles.chipLabel,
@@ -641,6 +679,7 @@ const TrackingMapRow = memo(
               {item.no_map || '-'}
             </Text>
             <Text style={styles.rowCompany} numberOfLines={2}>
+              <MaterialIcons name="business" size={11} color={THEME.ink} />{' '}
               {item.customer || '-'}
             </Text>
             <Text style={styles.rowSub} numberOfLines={2}>

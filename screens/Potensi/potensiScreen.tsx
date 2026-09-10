@@ -12,6 +12,7 @@ import {
   StatusBar,
   BackHandler,
   Modal,
+  ScrollView,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import LinearGradient from 'react-native-linear-gradient';
@@ -25,6 +26,7 @@ import {
   CreatePotensiPayload,
 } from '../../services/potensiApi';
 import { useAuth } from '../../context/authContext';
+import { ListSkeleton } from '../../components/loadingSkeleton';
 import { THEME, SHADOWS } from '../theme';
 
 const formatRupiah = (val: number | string) => {
@@ -356,6 +358,16 @@ export default function PotensiScreen({ navigation }: any) {
           </Text>
         </View>
 
+        {/* Nama Customer */}
+        {Boolean(item.customer_nama || item.customer_kode) && (
+          <View style={styles.customerRow}>
+            <MaterialIcons name="business" size={13} color={THEME.muted} />
+            <Text style={styles.customerText} numberOfLines={1}>
+              {item.customer_nama || item.customer_kode}
+            </Text>
+          </View>
+        )}
+
         {/* Baris 3: Quantity Order & Sales */}
         <View style={styles.metaRow}>
           {Boolean(item.qty) && (
@@ -463,11 +475,6 @@ export default function PotensiScreen({ navigation }: any) {
               }}
               activeOpacity={0.8}
             >
-              <MaterialIcons
-                name="person"
-                size={14}
-                color={selectedSales ? THEME.primary : THEME.muted}
-              />
               <Text
                 style={[
                   styles.pickerChipText,
@@ -627,10 +634,17 @@ export default function PotensiScreen({ navigation }: any) {
       />
 
       {loading && !hasLoadedOnce ? (
-        <View style={styles.loadingBox}>
-          <ActivityIndicator size="large" color={THEME.primary} />
-          <Text style={styles.loadingText}>Memuat potensi...</Text>
-        </View>
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={[
+            styles.listContainer,
+            { paddingBottom: 90 + insets.bottom },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
+          {ListHeader}
+          <ListSkeleton />
+        </ScrollView>
       ) : (
         <FlatList
           data={filteredList}
@@ -1103,6 +1117,17 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: THEME.ink,
     lineHeight: 17,
+  },
+  customerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 6,
+  },
+  customerText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: THEME.muted,
   },
   specContainer: {
     flexDirection: 'row',

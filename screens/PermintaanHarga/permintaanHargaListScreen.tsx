@@ -125,9 +125,7 @@ const KalkulasiRowItem = ({
     <View style={styles.kalkulasiRow}>
       <View style={styles.kalkulasiRowLeft}>
         <Text style={styles.kalkulasiLabel}>Harga Kalkulasi:</Text>
-        <Text style={styles.kalkulasiValue}>
-          Rp {formatNumber(harga || 0)}
-        </Text>
+        <Text style={styles.kalkulasiValue}>Rp {formatNumber(harga || 0)}</Text>
       </View>
       {parsed.ppnStatus && (
         <View
@@ -164,9 +162,10 @@ export default function PermintaanHargaListScreen({ navigation, route }: any) {
       const start = new Date(pYear, pMonth - 1, 1);
       const end = new Date(pYear, pMonth, 0);
       const toYmd = (d: Date) =>
-        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-          d.getDate(),
-        ).padStart(2, '0')}`;
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+          2,
+          '0',
+        )}-${String(d.getDate()).padStart(2, '0')}`;
       return { startDate: toYmd(start), endDate: toYmd(end) };
     }
     return getCurrentMonth();
@@ -186,9 +185,10 @@ export default function PermintaanHargaListScreen({ navigation, route }: any) {
       const start = new Date(pYear, pMonth - 1, 1);
       const end = new Date(pYear, pMonth, 0);
       const toYmd = (d: Date) =>
-        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-          d.getDate(),
-        ).padStart(2, '0')}`;
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+          2,
+          '0',
+        )}-${String(d.getDate()).padStart(2, '0')}`;
       setStartDate(toYmd(start));
       setEndDate(toYmd(end));
     }
@@ -522,7 +522,8 @@ export default function PermintaanHargaListScreen({ navigation, route }: any) {
                   if (opt === 'minta') return COMPANY_STATUS_COLORS.MINTA.base;
                   if (opt === 'wait') return COMPANY_STATUS_COLORS.WAIT.base;
                   if (opt === 'belum') return COMPANY_STATUS_COLORS.BELUM.base;
-                  if (opt === 'cancel') return COMPANY_STATUS_COLORS.CANCEL.base;
+                  if (opt === 'cancel')
+                    return COMPANY_STATUS_COLORS.CANCEL.base;
                   return undefined;
                 };
                 const dotColor = getDotColor();
@@ -549,7 +550,13 @@ export default function PermintaanHargaListScreen({ navigation, route }: any) {
                       )
                     }
                   >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
                       {opt === 'all' ? (
                         <MaterialIcons
                           name="format-list-bulleted"
@@ -557,7 +564,14 @@ export default function PermintaanHargaListScreen({ navigation, route }: any) {
                           color={active ? THEME.primary : THEME.muted}
                         />
                       ) : (
-                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: dotColor }} />
+                        <View
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: 4,
+                            backgroundColor: dotColor,
+                          }}
+                        />
                       )}
                       <Text
                         style={[
@@ -570,7 +584,7 @@ export default function PermintaanHargaListScreen({ navigation, route }: any) {
                     </View>
                   </TouchableOpacity>
                 );
-              }
+              },
             )}
           </ScrollView>
         </View>
@@ -643,7 +657,8 @@ export default function PermintaanHargaListScreen({ navigation, route }: any) {
                 {item.nama || '-'}
               </Text>
               <Text style={styles.metaText} numberOfLines={1}>
-                Customer: {item.customer || '-'}
+                <MaterialIcons name="business" size={13} color={THEME.muted} />{' '}
+                {item.customer || '-'}
               </Text>
               <Text style={styles.metaText} numberOfLines={1}>
                 {formatDate(item.tanggal)} • {item.divisi || '-'}

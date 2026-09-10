@@ -125,7 +125,7 @@ const toReadableDivisi = (value?: number | string) => {
   return found?.label || kode;
 };
 
-export default function TrackingPenawaranScreen({ route, navigation }: Props) {
+export default function TrackingPenawaranScreen({ route }: Props) {
   const { token } = useAuth();
   const insets = useSafeAreaInsets();
   const initialRange = useMemo(() => {
@@ -135,9 +135,10 @@ export default function TrackingPenawaranScreen({ route, navigation }: Props) {
       const start = new Date(pYear, pMonth - 1, 1);
       const end = new Date(pYear, pMonth, 0);
       const toYmdLocal = (d: Date) =>
-        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-          d.getDate(),
-        ).padStart(2, '0')}`;
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+          2,
+          '0',
+        )}-${String(d.getDate()).padStart(2, '0')}`;
       return { startDate: toYmdLocal(start), endDate: toYmdLocal(end) };
     }
     return getCurrentMonth();
@@ -153,9 +154,10 @@ export default function TrackingPenawaranScreen({ route, navigation }: Props) {
       const start = new Date(pYear, pMonth - 1, 1);
       const end = new Date(pYear, pMonth, 0);
       const toYmdLocal = (d: Date) =>
-        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-          d.getDate(),
-        ).padStart(2, '0')}`;
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+          2,
+          '0',
+        )}-${String(d.getDate()).padStart(2, '0')}`;
       setStartDate(toYmdLocal(start));
       setEndDate(toYmdLocal(end));
     }
@@ -536,6 +538,7 @@ export default function TrackingPenawaranScreen({ route, navigation }: Props) {
 
         {/* Nama Perusahaan / Customer */}
         <Text style={styles.rowCompany} numberOfLines={1}>
+          <MaterialIcons name="business" size={12} color={THEME.ink} />{' '}
           {customerName}
         </Text>
 
@@ -578,8 +581,14 @@ export default function TrackingPenawaranScreen({ route, navigation }: Props) {
         <View style={styles.cardFooter}>
           <Text style={styles.cardFooterText}>
             {isOpened
-              ? `Tutup detail item ${getDocTypeLabel(noSpk).replace('No. ', '')}`
-              : `Lihat detail item ${getDocTypeLabel(noSpk).replace('No. ', '')}`}
+              ? `Tutup detail item ${getDocTypeLabel(noSpk).replace(
+                  'No. ',
+                  '',
+                )}`
+              : `Lihat detail item ${getDocTypeLabel(noSpk).replace(
+                  'No. ',
+                  '',
+                )}`}
           </Text>
           <MaterialIcons
             name={isOpened ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
@@ -595,12 +604,18 @@ export default function TrackingPenawaranScreen({ route, navigation }: Props) {
               <View style={styles.dropdownLoadingWrap}>
                 <ActivityIndicator size="small" color={THEME.primary} />
                 <Text style={styles.dropdownTextHint}>
-                  {`Memuat detail ${getDocTypeLabel(noSpk).replace('No. ', '')}...`}
+                  {`Memuat detail ${getDocTypeLabel(noSpk).replace(
+                    'No. ',
+                    '',
+                  )}...`}
                 </Text>
               </View>
             ) : (detailMapByPenawaran[item.no_penawaran] || []).length === 0 ? (
               <Text style={styles.dropdownTextHint}>
-                {`Belum ada detail ${getDocTypeLabel(noSpk).replace('No. ', '')}`}
+                {`Belum ada detail ${getDocTypeLabel(noSpk).replace(
+                  'No. ',
+                  '',
+                )}`}
               </Text>
             ) : (
               (detailMapByPenawaran[item.no_penawaran] || []).map(
@@ -610,13 +625,23 @@ export default function TrackingPenawaranScreen({ route, navigation }: Props) {
                     key={`${mapItem.pen_id}-${mapIndex}`}
                   >
                     <Text style={styles.mapItemTitle}>
-                      {mapIndex + 1}. {mapItem.no_map || `${getDocTypeLabel(noSpk).replace('No. ', '')} belum tersedia`}
+                      {mapIndex + 1}.{' '}
+                      {mapItem.no_map ||
+                        `${getDocTypeLabel(noSpk).replace(
+                          'No. ',
+                          '',
+                        )} belum tersedia`}
                     </Text>
                     <Text style={styles.dropdownText}>
                       Nama: {mapItem.map_nama || '-'}
                     </Text>
                     <Text style={styles.dropdownText}>
-                      Tanggal {getDocTypeLabel(mapItem.no_map || noSpk).replace('No. ', '')}: {formatDate(mapItem.tanggal_map)}
+                      Tanggal{' '}
+                      {getDocTypeLabel(mapItem.no_map || noSpk).replace(
+                        'No. ',
+                        '',
+                      )}
+                      : {formatDate(mapItem.tanggal_map)}
                     </Text>
                     <Text style={styles.dropdownText}>
                       Dateline: {formatDate(mapItem.map_deadline)}
@@ -923,7 +948,13 @@ export default function TrackingPenawaranScreen({ route, navigation }: Props) {
                           )
                         }
                       >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 6,
+                          }}
+                        >
                           {opt === 'all' ? (
                             <MaterialIcons
                               name="format-list-bulleted"
@@ -931,7 +962,14 @@ export default function TrackingPenawaranScreen({ route, navigation }: Props) {
                               color={active ? THEME.primary : THEME.muted}
                             />
                           ) : (
-                            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: dotColor }} />
+                            <View
+                              style={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: 4,
+                                backgroundColor: dotColor,
+                              }}
+                            />
                           )}
                           <Text
                             style={[

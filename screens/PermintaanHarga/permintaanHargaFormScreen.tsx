@@ -49,9 +49,9 @@ import { PENAWARAN_SHADOW, PENAWARAN_THEME } from '../Penawaran/penawaranTheme';
 const THEME = PENAWARAN_THEME;
 
 const DIVISI_OPTIONS = [
-  { kode: '1', label: '1 - SPANDUK' },
-  { kode: '5', label: '5 - MMT' },
-  { kode: '4', label: '4 - GARMEN' },
+  { kode: '1', label: 'SPANDUK' },
+  { kode: '5', label: 'MMT' },
+  { kode: '4', label: 'GARMEN' },
 ];
 
 const toYmd = (d: Date) => {
@@ -1514,7 +1514,7 @@ export default function PermintaanHargaFormScreen({ navigation, route }: any) {
                       </View>
                     ) : (
                       <Text style={styles.customerPlaceholderText}>
-                        Pilih customer dari database...
+                        Pilih customer...
                       </Text>
                     )}
                   </View>
@@ -1572,7 +1572,7 @@ export default function PermintaanHargaFormScreen({ navigation, route }: any) {
               {/* Divisi Selector */}
               <View style={styles.fieldWrap}>
                 <Text style={styles.label}>
-                  Divisi Produk <Text style={styles.req}>*</Text>
+                  Divisi<Text style={styles.req}>*</Text>
                 </Text>
                 <View style={styles.divisiRow}>
                   {DIVISI_OPTIONS.map(d => (
@@ -1587,7 +1587,7 @@ export default function PermintaanHargaFormScreen({ navigation, route }: any) {
                         if (d.kode === '1') {
                           setSpandukLebar(90);
                           setMhLebar('90');
-                          setMhKain(spandukJenisKain || 'POLYESTER 50/36');
+                          setMhKain(spandukJenisKain);
                         } else if (d.kode === '5') {
                           const activeMmt = masterOptions?.mmt?.find(
                             (m: any) =>
@@ -2021,7 +2021,7 @@ export default function PermintaanHargaFormScreen({ navigation, route }: any) {
                 {mh_divisi === '1' && (
                   <View style={styles.fieldWrap}>
                     <Text style={styles.label}>
-                      Lebar Kain Spanduk (cm) <Text style={styles.req}>*</Text>
+                      Lebar Spanduk (cm) <Text style={styles.req}>*</Text>
                     </Text>
                     <View style={styles.radioRow}>
                       {availableSpandukLebar.map(leb => {
@@ -2072,7 +2072,7 @@ export default function PermintaanHargaFormScreen({ navigation, route }: any) {
                 {/* Pilihan Kategori & Bahan MMT Dinamis (Divisi 5) */}
                 {mh_divisi === '5' && (
                   <View style={styles.fieldWrap}>
-                    <Text style={styles.label}>Kategori Mesin / Resolusi</Text>
+                    <Text style={styles.label}>Kategori Bahan</Text>
                     <View style={styles.radioRow}>
                       {availableMmtKategori.map(kat => (
                         <TouchableOpacity
