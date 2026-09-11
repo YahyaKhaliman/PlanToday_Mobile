@@ -516,9 +516,13 @@ export const getJenisKainMintaHargaApi = async (
   return response.data?.data || [];
 };
 
-export const getTambahanOptionsApi = async (token?: string | null) => {
+export const getTambahanOptionsApi = async (
+  token?: string | null,
+  params?: { jenisKain?: string; kategori?: string; kodeModel?: string },
+) => {
   const response = await api.get('/lookups/tambahan', {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    params,
   });
   return response.data?.data || [];
 };

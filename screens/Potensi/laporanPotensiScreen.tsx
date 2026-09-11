@@ -243,17 +243,17 @@ export default function LaporanPotensiScreen({ navigation, route }: any) {
       <View style={styles.card}>
         {/* Card Header */}
         <View style={styles.cardHeader}>
-          <View style={{ flex: 1 }}>
+          <View style={styles.headerLeftWrap}>
             <View style={styles.docRow}>
               <MaterialIcons
                 name="trending-up"
-                size={16}
+                size={14}
                 color={THEME.primary}
               />
               <Text style={styles.docNumber}>{item.pot_nomor}</Text>
             </View>
-            <View style={styles.dateRowItem}>
-              <MaterialIcons name="event" size={12} color={THEME.muted} />
+            <View style={styles.dateBadge}>
+              <MaterialIcons name="event" size={11} color={THEME.muted} />
               <Text style={styles.dateText}>{formatDate(tgl)}</Text>
             </View>
           </View>
@@ -278,15 +278,27 @@ export default function LaporanPotensiScreen({ navigation, route }: any) {
           {(Boolean(penNomor) || Boolean(mspkNomor)) && (
             <View style={styles.refContainer}>
               {Boolean(penNomor) && (
-                <View style={styles.refTag}>
-                  <Text style={styles.refTagLabel}>Penawaran:</Text>
-                  <Text style={styles.refTagValue}>{penNomor}</Text>
+                <View style={[styles.refTag, styles.refTagPenawaran]}>
+                  <Text
+                    style={[styles.refTagLabel, styles.refTagLabelPenawaran]}
+                  >
+                    Penawaran:
+                  </Text>
+                  <Text
+                    style={[styles.refTagValue, styles.refTagValuePenawaran]}
+                  >
+                    {penNomor}
+                  </Text>
                 </View>
               )}
               {Boolean(mspkNomor) && (
-                <View style={styles.refTag}>
-                  <Text style={styles.refTagLabel}>MAP:</Text>
-                  <Text style={styles.refTagValue}>{mspkNomor}</Text>
+                <View style={[styles.refTag, styles.refTagMap]}>
+                  <Text style={[styles.refTagLabel, styles.refTagLabelMap]}>
+                    MAP:
+                  </Text>
+                  <Text style={[styles.refTagValue, styles.refTagValueMap]}>
+                    {mspkNomor}
+                  </Text>
                 </View>
               )}
             </View>
@@ -296,11 +308,13 @@ export default function LaporanPotensiScreen({ navigation, route }: any) {
           <View style={styles.metaRow}>
             <View style={styles.metaItem}>
               <Text style={styles.metaText} numberOfLines={1}>
+                <MaterialIcons name="business" size={11} color={THEME.muted} />{' '}
                 {cusNama}
               </Text>
             </View>
             <View style={[styles.metaItem, { marginLeft: 12 }]}>
               <Text style={styles.metaText} numberOfLines={1}>
+                <MaterialIcons name="person" size={11} color={THEME.muted} />{' '}
                 {salNama}
               </Text>
             </View>
@@ -765,28 +779,42 @@ const styles = StyleSheet.create({
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 10,
+  },
+  headerLeftWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginRight: 8,
+    flexWrap: 'wrap',
   },
   docRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
   },
   docNumber: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: THEME.ink,
   },
-  dateRowItem: {
+  dateBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginTop: 2,
+    gap: 3.5,
+    paddingHorizontal: 6,
+    paddingVertical: 2.5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: THEME.line,
+    backgroundColor: '#FAFAFA',
   },
   dateText: {
-    fontSize: 12,
+    fontSize: 11,
     color: THEME.muted,
+    fontWeight: '500',
   },
   statusBadge: {
     flexDirection: 'row',
@@ -836,6 +864,26 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: THEME.ink,
     fontWeight: '700',
+  },
+  refTagPenawaran: {
+    backgroundColor: `${THEME.primary}12`,
+    borderColor: `${THEME.primary}30`,
+  },
+  refTagLabelPenawaran: {
+    color: THEME.primary,
+  },
+  refTagValuePenawaran: {
+    color: THEME.primary,
+  },
+  refTagMap: {
+    backgroundColor: '#E0F2FE',
+    borderColor: '#BAE6FD',
+  },
+  refTagLabelMap: {
+    color: '#0284C7',
+  },
+  refTagValueMap: {
+    color: '#0284C7',
   },
   metaRow: {
     flexDirection: 'row',

@@ -529,6 +529,12 @@ export default function PermintaanHargaFormScreen({ navigation, route }: any) {
   const [searchGarmenCetak, setSearchGarmenCetak] = useState<string>('');
   const [selectedCetakMasterItem, setSelectedCetakMasterItem] =
     useState<any>(null);
+  const [cetakActiveCategory, setCetakActiveCategory] = useState<
+    'SABLON' | 'SUBLIM'
+  >('SABLON');
+  const [sablonSubCategory, setSablonSubCategory] = useState<
+    'ALL' | 'MEDIUM' | 'RUBBER'
+  >('ALL');
 
   const [garmenTambahanMaster, setGarmenTambahanMaster] = useState<any[]>([]);
   const [garmenCetakMaster, setGarmenCetakMaster] = useState<any[]>([]);
@@ -739,21 +745,22 @@ export default function PermintaanHargaFormScreen({ navigation, route }: any) {
               (item: any) =>
                 (item.mhk_kain || item.Jeniskain || item.nama) === currentKain,
             );
-            if (!exists) {
-              const first = list[0];
-              const kainName =
-                first.mhk_kain || first.Jeniskain || first.nama || '';
+            if (exists) {
               setGarmenKategoriKain(
-                first.mhk_ktg || first.Kategori || 'cotton',
+                exists.mhk_ktg || exists.Kategori || 'COTTON',
               );
-              setMhKain(kainName);
-              const autoGram = getGramasiByKain(kainName);
-              if (autoGram) {
-                setMhGramasi(autoGram);
-              }
-              return kainName;
+              return currentKain;
             }
-            return currentKain;
+            const first = list[0];
+            const kainName =
+              first.mhk_kain || first.Jeniskain || first.nama || '';
+            setGarmenKategoriKain(first.mhk_ktg || first.Kategori || 'COTTON');
+            setMhKain(kainName);
+            const autoGram = getGramasiByKain(kainName);
+            if (autoGram) {
+              setMhGramasi(autoGram);
+            }
+            return kainName;
           });
         }
       })
@@ -768,28 +775,58 @@ export default function PermintaanHargaFormScreen({ navigation, route }: any) {
     };
   }, [garmenKodeModel, mh_divisi, token]);
 
+  // Helper tarif tambahan murni mengambil hasil kalkulasi filter dari backend
   const getTambahanTarif = (tItem: any) => {
-    let tarif = Number(tItem.mht_cotton || tItem.tarif || 0);
-    if (garmenKategoriKain === 'lacost' && tItem.mht_lacost) {
-      tarif = Number(tItem.mht_lacost);
-    } else if (garmenKategoriKain === 'pe' && tItem.mht_pe) {
-      tarif = Number(tItem.mht_pe);
-    }
-    return tarif;
+    if (!tItem) return 0;
+    return Number(tItem.tarif ?? tItem.biaya ?? tItem.mht_cotton ?? 0);
   };
 
-  // Otomatis memuat master tambahan dan master cetak
+  // Memuat opsi tambahan dari backend yang otomatis terfilter berdasarkan jenis kain & kategori
   useEffect(() => {
     if (mh_divisi !== '4') return;
     let isMounted = true;
-    Promise.all([
-      getTambahanOptionsApi(token).catch(() => []),
-      getCetakOptionsApi(token).catch(() => []),
-    ]).then(([tambahan, cetak]) => {
-      if (!isMounted) return;
-      if (Array.isArray(tambahan)) setGarmenTambahanMaster(tambahan);
-      if (Array.isArray(cetak)) setGarmenCetakMaster(cetak);
-    });
+    getTambahanOptionsApi(token, {
+      jenisKain: garmenJenisKain,
+      kodeModel: garmenKodeModel,
+      kategori: garmenKategoriKain,
+    })
+      .then((data: any[]) => {
+        if (!isMounted) return;
+        const list = Array.isArray(data) ? data : [];
+        setGarmenTambahanMaster(list);
+        setGarmenSelectedTambahan(prev =>
+          prev.map(selected => {
+            const masterItem = list.find(
+              (m: any) =>
+                (m.mht_ket || m.mht_keterangan || m.nama || '') ===
+                selected.ket,
+            );
+            if (masterItem) {
+              return {
+                ...selected,
+                tarif: Number(masterItem.tarif ?? masterItem.biaya ?? 0),
+              };
+            }
+            return selected;
+          }),
+        );
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, [mh_divisi, garmenJenisKain, garmenKodeModel, token, garmenKategoriKain]);
+
+  // Memuat master cetak / sablon
+  useEffect(() => {
+    if (mh_divisi !== '4') return;
+    let isMounted = true;
+    getCetakOptionsApi(token)
+      .then((cetak: any[]) => {
+        if (!isMounted) return;
+        if (Array.isArray(cetak)) setGarmenCetakMaster(cetak);
+      })
+      .catch(() => {});
     return () => {
       isMounted = false;
     };
@@ -2501,9 +2538,7 @@ export default function PermintaanHargaFormScreen({ navigation, route }: any) {
                       size={20}
                       color={THEME.primary}
                     />
-                    <Text style={styles.engineCardTitle}>
-                      Kalkulator Pabrik Spanduk
-                    </Text>
+                    <Text style={styles.engineCardTitle}>Kalkulasi Harga</Text>
                   </View>
                   <TouchableOpacity
                     style={[
@@ -3072,14 +3107,6 @@ export default function PermintaanHargaFormScreen({ navigation, route }: any) {
                         size={22}
                         color="#b45309"
                       />
-                      <View style={{ marginLeft: 8, flex: 1 }}>
-                        {/* <Text style={styles.staleNoticeTitle}>
-                          Data Spesifikasi Berubah!
-                        </Text>
-                        <Text style={styles.staleNoticeSub}>
-                          Tekan di sini untuk menghitung ulang tarif terbaru
-                        </Text> */}
-                      </View>
                     </View>
                     <View style={styles.staleRecalcBtn}>
                       <MaterialIcons name="refresh" size={15} color="#fff" />
@@ -3996,7 +4023,7 @@ export default function PermintaanHargaFormScreen({ navigation, route }: any) {
                     {/* Total Order Keseluruhan */}
                     <View style={styles.resultRow}>
                       <Text style={[styles.resultLabel, { fontSize: 11 }]}>
-                        Total Kalkulasi All({mh_jmlorder || 0} pcs):
+                        Total Order Keseluruhan ({mh_jmlorder || 0} pcs):
                       </Text>
                       <Text
                         style={[
@@ -4041,7 +4068,12 @@ export default function PermintaanHargaFormScreen({ navigation, route }: any) {
                           color={THEME.primary}
                         />
                         <Text style={styles.strataAccordionTitle}>
-                          Tabel Master Bahan
+                          Tabel Master Bahan (
+                          {garmenKodeModel === 'KH-0001'
+                            ? '1 Warna'
+                            : '2 Warna'}
+                          {' - '}
+                          {garmenWarna})
                         </Text>
                       </View>
                       <MaterialIcons
@@ -5256,7 +5288,7 @@ export default function PermintaanHargaFormScreen({ navigation, route }: any) {
         </View>
       </Modal>
 
-      {/* MODAL PEMILIHAN CETAK / SABLON GARMEN */}
+      {/* MODAL PEMILIHAN CETAK / SABLON GARMEN (MINIMALIS & CLEAN) */}
       <Modal
         visible={modalGarmenCetakVisible}
         animationType="slide"
@@ -5268,77 +5300,237 @@ export default function PermintaanHargaFormScreen({ navigation, route }: any) {
             style={[
               styles.modalContentCard,
               {
-                paddingTop: insets.top + 10,
-                paddingBottom: insets.bottom + 16,
+                paddingTop: insets.top + 8,
+                paddingBottom: insets.bottom + 12,
+                maxHeight: '85%',
               },
             ]}
           >
-            <View style={styles.modalHeaderRow}>
-              <View
-                style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
-              >
-                <View
-                  style={[
-                    styles.modalHeaderIconWrap,
-                    { backgroundColor: '#faf5ff' },
-                  ]}
+            {/* Header Bersih Tanpa Ikon Berlebih */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingHorizontal: 16,
+                paddingBottom: 10,
+                borderBottomWidth: 1,
+                borderBottomColor: '#f1f5f9',
+              }}
+            >
+              <View>
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: '700',
+                    color: THEME.ink,
+                  }}
                 >
-                  <MaterialIcons
-                    name="format-paint"
-                    size={20}
-                    color="#9333ea"
-                  />
-                </View>
-                <View>
-                  <Text style={styles.modalHeaderTitle}>
-                    Pilih Jenis Cetak / Sablon
-                  </Text>
-                  <Text style={styles.modalHeaderSub}>
-                    Katalog sablon, bordir, dan sublimasi
-                  </Text>
-                </View>
+                  Pilih Sablon / Sublim
+                </Text>
               </View>
               <TouchableOpacity
-                style={styles.modalCloseBtn}
                 onPress={() => setModalGarmenCetakVisible(false)}
+                style={{ padding: 4 }}
               >
-                <MaterialIcons name="close" size={22} color={THEME.ink} />
+                <MaterialIcons name="close" size={22} color="#64748b" />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.modalSearchArea}>
-              <View style={styles.modalSearchBox}>
-                <MaterialIcons
-                  name="search"
-                  size={20}
-                  color="#64748b"
-                  style={{ marginRight: 6 }}
-                />
-                <TextInput
-                  style={styles.modalSearchInput}
-                  placeholder="Cari jenis cetak (misal: A4, A3, Sablon)..."
-                  placeholderTextColor="#94a3b8"
-                  value={searchGarmenCetak}
-                  onChangeText={setSearchGarmenCetak}
-                />
-                {searchGarmenCetak ? (
-                  <TouchableOpacity onPress={() => setSearchGarmenCetak('')}>
-                    <MaterialIcons name="cancel" size={18} color="#94a3b8" />
-                  </TouchableOpacity>
-                ) : null}
-              </View>
+            {/* Tab Kategori Minimalis (Sablon vs Sublim) */}
+            <View
+              style={{
+                flexDirection: 'row',
+                backgroundColor: '#f1f5f9',
+                borderRadius: 8,
+                padding: 3,
+                marginHorizontal: 16,
+                marginTop: 10,
+                marginBottom: 8,
+              }}
+            >
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  paddingVertical: 7,
+                  borderRadius: 6,
+                  backgroundColor:
+                    cetakActiveCategory === 'SABLON'
+                      ? '#ffffff'
+                      : 'transparent',
+                  alignItems: 'center',
+                  shadowColor:
+                    cetakActiveCategory === 'SABLON' ? '#000' : 'transparent',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.08,
+                  shadowRadius: 2,
+                  elevation: cetakActiveCategory === 'SABLON' ? 1 : 0,
+                }}
+                onPress={() => {
+                  setCetakActiveCategory('SABLON');
+                  setSearchGarmenCetak('');
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight:
+                      cetakActiveCategory === 'SABLON' ? '700' : '500',
+                    color:
+                      cetakActiveCategory === 'SABLON' ? THEME.ink : '#64748b',
+                  }}
+                >
+                  Sablon
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  paddingVertical: 7,
+                  borderRadius: 6,
+                  backgroundColor:
+                    cetakActiveCategory === 'SUBLIM'
+                      ? '#ffffff'
+                      : 'transparent',
+                  alignItems: 'center',
+                  shadowColor:
+                    cetakActiveCategory === 'SUBLIM' ? '#000' : 'transparent',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.08,
+                  shadowRadius: 2,
+                  elevation: cetakActiveCategory === 'SUBLIM' ? 1 : 0,
+                }}
+                onPress={() => {
+                  setCetakActiveCategory('SUBLIM');
+                  setSearchGarmenCetak('');
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight:
+                      cetakActiveCategory === 'SUBLIM' ? '700' : '500',
+                    color:
+                      cetakActiveCategory === 'SUBLIM' ? THEME.ink : '#64748b',
+                  }}
+                >
+                  Sublim
+                </Text>
+              </TouchableOpacity>
             </View>
 
+            {/* Sub-filter sederhana khusus Sablon */}
+            {cetakActiveCategory === 'SABLON' && (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  paddingHorizontal: 16,
+                  gap: 6,
+                  marginBottom: 8,
+                }}
+              >
+                {(
+                  [
+                    { key: 'ALL', label: 'Semua' },
+                    { key: 'MEDIUM', label: 'Medium' },
+                    { key: 'RUBBER', label: 'Rubber' },
+                  ] as const
+                ).map(sub => {
+                  const isActive = sablonSubCategory === sub.key;
+                  return (
+                    <TouchableOpacity
+                      key={sub.key}
+                      onPress={() => setSablonSubCategory(sub.key)}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 4,
+                        borderRadius: 6,
+                        backgroundColor: isActive ? '#f5f3ff' : '#ffffff',
+                        borderWidth: 1,
+                        borderColor: isActive ? '#c4b5fd' : '#e2e8f0',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontWeight: isActive ? '700' : '500',
+                          color: isActive ? '#6d28d9' : '#64748b',
+                        }}
+                      >
+                        {sub.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+
+            {/* Kotak Pencarian Sederhana */}
+            <View
+              style={{
+                marginHorizontal: 16,
+                marginBottom: 6,
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: '#f8fafc',
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: '#e2e8f0',
+                paddingHorizontal: 10,
+                height: 36,
+              }}
+            >
+              <TextInput
+                style={{
+                  flex: 1,
+                  fontSize: 12,
+                  color: THEME.ink,
+                  paddingVertical: 0,
+                }}
+                placeholder="Cari jenis atau ukuran..."
+                placeholderTextColor="#94a3b8"
+                value={searchGarmenCetak}
+                onChangeText={setSearchGarmenCetak}
+              />
+              {searchGarmenCetak ? (
+                <TouchableOpacity onPress={() => setSearchGarmenCetak('')}>
+                  <MaterialIcons name="close" size={16} color="#94a3b8" />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            {/* List Item Bersih & Ringan */}
             <FlatList
               data={garmenCetakMaster.filter((cItem: any) => {
-                const searchStr = `${cItem.mhb_jenis || cItem.jenis || ''} ${
-                  cItem.mhb_ket || cItem.ket || cItem.nama || ''
-                }`.toLowerCase();
-                return searchStr.includes(searchGarmenCetak.toLowerCase());
+                const j = (cItem.mhb_jenis || cItem.jenis || '').toUpperCase();
+                if (j !== cetakActiveCategory) return false;
+
+                const ket = (
+                  cItem.mhb_ket ||
+                  cItem.ket ||
+                  cItem.nama ||
+                  ''
+                ).toUpperCase();
+
+                if (
+                  cetakActiveCategory === 'SABLON' &&
+                  sablonSubCategory !== 'ALL'
+                ) {
+                  if (!ket.includes(sablonSubCategory)) return false;
+                }
+
+                if (searchGarmenCetak.trim()) {
+                  return ket
+                    .toLowerCase()
+                    .includes(searchGarmenCetak.toLowerCase());
+                }
+
+                return true;
               })}
               keyExtractor={(item, index) => String(item.mhb_id || index)}
+              contentContainerStyle={{ paddingHorizontal: 16 }}
               renderItem={({ item }) => {
-                const jenis = item.mhb_jenis || item.jenis || 'CETAK';
                 const ket = item.mhb_ket || item.ket || item.nama || '';
                 const biaya = Number(item.mhb_biaya || item.biaya || 0);
 
@@ -5348,74 +5540,42 @@ export default function PermintaanHargaFormScreen({ navigation, route }: any) {
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      paddingVertical: 12,
-                      paddingHorizontal: 16,
+                      paddingVertical: 11,
                       borderBottomWidth: 1,
                       borderBottomColor: '#f1f5f9',
-                      backgroundColor: '#ffffff',
                     }}
                     onPress={() => {
                       setSelectedCetakMasterItem(item);
                       setModalGarmenCetakVisible(false);
                     }}
                   >
-                    <View style={{ flex: 1, marginRight: 8 }}>
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 6,
-                          marginBottom: 2,
-                        }}
-                      >
-                        <View
-                          style={{
-                            paddingHorizontal: 6,
-                            paddingVertical: 2,
-                            borderRadius: 4,
-                            backgroundColor: '#ede9fe',
-                          }}
-                        >
-                          <Text
-                            style={{
-                              fontSize: 10,
-                              fontWeight: '700',
-                              color: '#6d28d9',
-                            }}
-                          >
-                            {jenis}
-                          </Text>
-                        </View>
-                        <Text
-                          style={{
-                            fontSize: 14,
-                            fontWeight: '600',
-                            color: THEME.ink,
-                          }}
-                        >
-                          {ket}
-                        </Text>
-                      </View>
-                    </View>
+                    <Text
+                      style={{
+                        flex: 1,
+                        fontSize: 13,
+                        fontWeight: '500',
+                        color: THEME.ink,
+                        marginRight: 12,
+                      }}
+                    >
+                      {ket}
+                    </Text>
                     <Text
                       style={{
                         fontSize: 13,
                         fontWeight: '700',
-                        color: '#7c3aed',
+                        color: '#6d28d9',
                       }}
                     >
-                      Rp {biaya.toLocaleString('id-ID')}/pcs
+                      Rp {biaya.toLocaleString('id-ID')}
                     </Text>
                   </TouchableOpacity>
                 );
               }}
               ListEmptyComponent={
-                <View style={styles.modalEmptyWrap}>
-                  <Text style={styles.modalEmptyTitle}>
-                    Cetak tidak ditemukan
-                  </Text>
-                  <Text style={styles.modalEmptySub}>
-                    Coba gunakan kata kunci pencarian yang lain
+                <View style={{ paddingVertical: 24, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 13, color: '#94a3b8' }}>
+                    Item tidak ditemukan
                   </Text>
                 </View>
               }
