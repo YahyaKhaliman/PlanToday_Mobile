@@ -443,9 +443,21 @@ export default function RekapCalonCustomerScreen({ navigation }: any) {
 
   const ListHeader = (
     <View style={styles.headerWrap}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Customer</Text>
-        <Text style={styles.subtitle}>Rekap daftar customer</Text>
+      <View style={styles.headerTop}>
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => navigation.navigate('Home')}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.backBtnText}>Kembali</Text>
+          </TouchableOpacity>
+          <View style={styles.headerTitleWrap}>
+            <Text style={styles.title}>Customer</Text>
+            <Text style={styles.subtitle}>Rekap daftar customer</Text>
+          </View>
+          <View style={styles.headerRightSpacer} />
+        </View>
       </View>
 
       {SearchBox}
@@ -723,6 +735,30 @@ const styles = StyleSheet.create({
   },
 
   header: { alignItems: 'center', marginBottom: 10 },
+  headerTop: { marginBottom: 10 },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitleWrap: { flex: 1, alignItems: 'center' },
+  backBtn: {
+    backgroundColor: THEME.soft,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: THEME.line,
+  },
+  backBtnText: {
+    color: THEME.primary,
+    fontWeight: '900',
+    fontSize: 12,
+    letterSpacing: 0.2,
+  },
+  headerRightSpacer: {
+    minWidth: 70,
+  },
   title: {
     fontSize: 25,
     fontWeight: '900',

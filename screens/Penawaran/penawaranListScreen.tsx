@@ -358,12 +358,20 @@ export default function PenawaranListScreen({ navigation }: any) {
     <View style={styles.headerWrap}>
       <View style={styles.headerTop}>
         <View style={styles.headerTopRow}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => navigation.navigate('Home')}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.backBtnText}>Kembali</Text>
+          </TouchableOpacity>
           <View style={styles.headerTitleWrap}>
             <Text style={styles.title}>Penawaran</Text>
             <Text style={styles.subtitle}>
               Periode {startDateLabel} - {endDateLabel}
             </Text>
           </View>
+          <View style={styles.headerRightSpacer} />
         </View>
       </View>
 
@@ -792,7 +800,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitleWrap: {
+    flex: 1,
     alignItems: 'center',
+  },
+  backBtn: {
+    backgroundColor: THEME.soft,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: THEME.line,
+  },
+  backBtnText: {
+    color: THEME.primary,
+    fontWeight: '900',
+    fontSize: 12,
+    letterSpacing: 0.2,
+  },
+  headerRightSpacer: {
+    minWidth: 70,
   },
   title: {
     fontSize: 25,

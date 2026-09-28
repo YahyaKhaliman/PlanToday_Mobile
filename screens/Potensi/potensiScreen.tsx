@@ -410,8 +410,18 @@ export default function PotensiScreen({ navigation }: any) {
     <View style={styles.headerWrap}>
       {/* Top Title & Navigation */}
       <View style={styles.headerTop}>
-        <View style={styles.headerTitleWrap}>
-          <Text style={styles.title}>Potensi</Text>
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => navigation.navigate('Home')}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.backBtnText}>Kembali</Text>
+          </TouchableOpacity>
+          <View style={styles.headerTitleWrap}>
+            <Text style={styles.title}>Potensi</Text>
+          </View>
+          <View style={styles.headerRightSpacer} />
         </View>
       </View>
 
@@ -807,21 +817,27 @@ const styles = StyleSheet.create({
   headerTop: {
     marginBottom: 12,
   },
+  backBtn: {
+    backgroundColor: THEME.soft,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: THEME.line,
+  },
+  backBtnText: {
+    color: THEME.primary,
+    fontWeight: '900',
+    fontSize: 12,
+    letterSpacing: 0.2,
+  },
+  headerRightSpacer: {
+    minWidth: 70,
+  },
   headerTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: THEME.line,
-    ...SHADOWS.softCard,
   },
   headerTitleWrap: {
     flex: 1,

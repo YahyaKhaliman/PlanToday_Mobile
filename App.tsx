@@ -22,6 +22,7 @@ import {
   AppUpdateManifest,
   checkAppUpdate,
   downloadUpdateApk,
+  getValidExistingApk,
 } from './services/appUpdate';
 
 const THEME = {
@@ -39,6 +40,7 @@ export default function App() {
     null,
   );
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isLocalApkReady, setIsLocalApkReady] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const modalTranslateY = useRef(new Animated.Value(28)).current;
   const modalOpacity = useRef(new Animated.Value(0)).current;
@@ -103,8 +105,16 @@ export default function App() {
 
   useEffect(() => {
     if (!pendingUpdate) {
+      setIsLocalApkReady(false);
       return;
     }
+
+    let isMounted = true;
+    getValidExistingApk(pendingUpdate).then(validPath => {
+      if (isMounted) {
+        setIsLocalApkReady(Boolean(validPath));
+      }
+    });
 
     modalTranslateY.setValue(28);
     modalOpacity.setValue(0);
@@ -123,6 +133,10 @@ export default function App() {
         useNativeDriver: true,
       }),
     ]).start();
+
+    return () => {
+      isMounted = false;
+    };
   }, [pendingUpdate, modalOpacity, modalTranslateY]);
 
   const handleUpdatePress = async () => {
@@ -132,11 +146,20 @@ export default function App() {
 
     setIsUpdating(true);
     setDownloadProgress(0);
+
     const downloadResult = await downloadUpdateApk(pendingUpdate, percent => {
       setDownloadProgress(percent);
     });
 
-    if (downloadResult.status === 'opened-download-location') {
+    if (downloadResult.status === 'installed-intent-opened') {
+      setIsLocalApkReady(true);
+      Toast.show({
+        type: 'glassSuccess',
+        text1: 'Membuka Penginstal',
+        text2: 'Silakan tekan "Install" atau "Update" pada layar instalasi.',
+      });
+    } else if (downloadResult.status === 'opened-download-location') {
+      setIsLocalApkReady(true);
       Toast.show({
         type: 'glassSuccess',
         text1: 'Download Selesai',
@@ -144,18 +167,26 @@ export default function App() {
           'Membuka daftar download. Silakan pilih file APK untuk instalasi.',
       });
     } else if (downloadResult.status === 'downloaded-no-installer') {
+      setIsLocalApkReady(true);
       Toast.show({
         type: 'glassSuccess',
         text1: 'Download Selesai',
         text2:
-          'File update sudah diunduh. Buka file APK dari download manager untuk instalasi.',
+          'File update sudah siap di penyimpanan. Buka file APK untuk instalasi.',
+      });
+    } else if (downloadResult.status === 'failed-incomplete') {
+      setIsLocalApkReady(false);
+      Toast.show({
+        type: 'glassError',
+        text1: 'Unduhan Tidak Lengkap',
+        text2: 'File unduhan rusak atau belum komplit. Silakan coba unduh lagi.',
       });
     } else if (downloadResult.status === 'failed-network') {
       await Linking.openURL(pendingUpdate.apkUrl);
       Toast.show({
         type: 'glassInfo',
         text1: 'Jaringan Bermasalah',
-        text2: 'Membuka link update di browser sebagai fallback.',
+        text2: 'Membuka link update di browser sebagai alternatif.',
       });
     } else {
       Toast.show({
@@ -166,8 +197,6 @@ export default function App() {
     }
 
     setIsUpdating(false);
-    setDownloadProgress(0);
-    setPendingUpdate(null);
   };
 
   const showSkipButton = useMemo(
@@ -233,7 +262,9 @@ export default function App() {
               <Text style={styles.badge}>SYSTEM</Text>
               <Text style={styles.title}>Update Tersedia</Text>
               <Text style={styles.subtitle}>
-                Versi {pendingUpdate?.versionName} siap diunduh.
+                {isLocalApkReady
+                  ? `Versi ${pendingUpdate?.versionName} sudah siap dipasang.`
+                  : `Versi ${pendingUpdate?.versionName} siap diunduh.`}
               </Text>
             </LinearGradient>
 
@@ -255,10 +286,20 @@ export default function App() {
                   'Performa dan stabilitas aplikasi ditingkatkan.'}
               </Text>
 
+              {isLocalApkReady && !isUpdating && (
+                <View style={styles.warningBox}>
+                  <Text style={styles.warningText}>
+                    ✓ File update versi terbaru sudah siap di penyimpanan.
+                  </Text>
+                </View>
+              )}
+
               {isUpdating && (
                 <View style={styles.progressSection}>
                   <View style={styles.progressMetaRow}>
-                    <Text style={styles.progressLabel}>Downloading...</Text>
+                    <Text style={styles.progressLabel}>
+                      {downloadProgress >= 100 ? 'Memverifikasi...' : 'Mengunduh...'}
+                    </Text>
                     <Text style={styles.progressPercent}>
                       {downloadProgress}%
                     </Text>
@@ -306,10 +347,14 @@ export default function App() {
                 {isUpdating ? (
                   <View style={styles.updatingWrap}>
                     <ActivityIndicator color="#FFFFFF" size="small" />
-                    <Text style={styles.primaryButtonText}>Downloading...</Text>
+                    <Text style={styles.primaryButtonText}>
+                      {downloadProgress >= 100 ? 'Memverifikasi...' : 'Mengunduh...'}
+                    </Text>
                   </View>
                 ) : (
-                  <Text style={styles.primaryButtonText}>Update Sekarang</Text>
+                  <Text style={styles.primaryButtonText}>
+                    {isLocalApkReady ? 'Pasang Sekarang' : 'Update Sekarang'}
+                  </Text>
                 )}
               </Pressable>
             </View>

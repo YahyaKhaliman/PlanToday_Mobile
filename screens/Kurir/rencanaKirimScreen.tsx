@@ -231,11 +231,23 @@ export default function KurirRencanaKirimScreen({ navigation }: any) {
 
   const ListHeader = (
     <View style={styles.headerWrap}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Rencana Kirim</Text>
-        <Text style={styles.subtitle}>
-          Daftar rencana pengiriman per periode
-        </Text>
+      <View style={styles.headerTop}>
+        <View style={styles.headerTopRow}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => navigation.navigate('KurirMenu')}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.backBtnText}>Kembali</Text>
+          </TouchableOpacity>
+          <View style={styles.headerTitleWrap}>
+            <Text style={styles.title}>Rencana Kirim</Text>
+            <Text style={styles.subtitle}>
+              Daftar rencana pengiriman per periode
+            </Text>
+          </View>
+          <View style={styles.headerRightSpacer} />
+        </View>
       </View>
 
       <View style={styles.row2}>
@@ -415,6 +427,30 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 4,
     paddingBottom: 120,
+  },
+  headerTop: { marginBottom: 10 },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitleWrap: { flex: 1, alignItems: 'center' },
+  backBtn: {
+    backgroundColor: THEME.soft,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: THEME.line,
+  },
+  backBtnText: {
+    color: THEME.primary,
+    fontWeight: '900',
+    fontSize: 12,
+    letterSpacing: 0.2,
+  },
+  headerRightSpacer: {
+    minWidth: 70,
   },
   headerWrap: {
     backgroundColor: THEME.bgBottom,

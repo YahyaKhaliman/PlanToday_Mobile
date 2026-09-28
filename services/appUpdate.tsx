@@ -4,6 +4,7 @@ import ReactNativeBlobUtil from 'react-native-blob-util';
 
 const UPDATE_MANIFEST_URL = 'http://103.94.238.252:8182/releases/latest.json';
 const UPDATE_FETCH_TIMEOUT_MS = 15000;
+const MIN_VALID_APK_BYTES = 5 * 1024 * 1024; // Minimal 5 MB untuk file APK React Native
 
 export type AppUpdateManifest = {
   versionCode: number;
@@ -21,23 +22,12 @@ export type AppUpdateCheckResult = {
 };
 
 export type DownloadUpdateResult =
+  | { status: 'installed-intent-opened' }
   | { status: 'opened-download-location' }
   | { status: 'downloaded-no-installer' }
   | { status: 'failed-network' }
+  | { status: 'failed-incomplete' }
   | { status: 'failed-other' };
-
-const openDownloadedApkLocation = async (): Promise<boolean> => {
-  if (Platform.OS !== 'android') {
-    return false;
-  }
-
-  try {
-    await Linking.sendIntent('android.intent.action.VIEW_DOWNLOADS');
-    return true;
-  } catch {
-    return false;
-  }
-};
 
 const toNumber = (value: string | number | undefined) => {
   const parsed = Number(value);
@@ -47,6 +37,127 @@ const toNumber = (value: string | number | undefined) => {
 const buildManifestRequestUrl = () => {
   const separator = UPDATE_MANIFEST_URL.includes('?') ? '&' : '?';
   return `${UPDATE_MANIFEST_URL}${separator}t=${Date.now()}`;
+};
+
+export const getApkFilePaths = (manifest: AppUpdateManifest) => {
+  const rawFileName =
+    manifest.apkUrl.split('/').pop() || `PlanToday-v${manifest.versionName}.apk`;
+  const cleanFileName = rawFileName.includes('.apk')
+    ? rawFileName
+    : `PlanToday-v${manifest.versionName}.apk`;
+
+  const downloadDir =
+    ReactNativeBlobUtil.fs.dirs.DownloadDir ||
+    ReactNativeBlobUtil.fs.dirs.DocumentDir;
+
+  const finalPath = `${downloadDir}/${cleanFileName}`;
+  const tempPath = `${downloadDir}/${cleanFileName}.tmp`;
+
+  return { cleanFileName, finalPath, tempPath };
+};
+
+/**
+ * Memvalidasi apakah file APK ada, utuh, dan tidak korup.
+ * - Ukuran file harus memenuhi syarat minimum (> 5MB).
+ * - Jika hash SHA256 disediakan manifest, verifikasi hash file.
+ * - Jika file rusak/setengah unduh, file akan otomatis dihapus.
+ */
+export const isApkFileValid = async (
+  filePath: string,
+  expectedSha256?: string,
+): Promise<boolean> => {
+  if (Platform.OS !== 'android' || !filePath) {
+    return false;
+  }
+
+  try {
+    const exists = await ReactNativeBlobUtil.fs.exists(filePath);
+    if (!exists) {
+      return false;
+    }
+
+    const stat = await ReactNativeBlobUtil.fs.stat(filePath);
+    const size = Number(stat?.size || 0);
+
+    if (size < MIN_VALID_APK_BYTES) {
+      console.warn('[AppUpdate] File APK tidak komplit/terlalu kecil', {
+        filePath,
+        size,
+        minRequired: MIN_VALID_APK_BYTES,
+      });
+      try {
+        await ReactNativeBlobUtil.fs.unlink(filePath);
+      } catch {}
+      return false;
+    }
+
+    if (expectedSha256 && typeof expectedSha256 === 'string' && expectedSha256.trim()) {
+      try {
+        const fileHash = await ReactNativeBlobUtil.fs.hash(filePath, 'sha256');
+        const isMatch =
+          String(fileHash).trim().toLowerCase() ===
+          String(expectedSha256).trim().toLowerCase();
+
+        if (!isMatch) {
+          console.warn('[AppUpdate] SHA-256 Hash tidak cocok (File korup/berbeda)', {
+            calculated: fileHash,
+            expected: expectedSha256,
+          });
+          try {
+            await ReactNativeBlobUtil.fs.unlink(filePath);
+          } catch {}
+          return false;
+        }
+      } catch (hashErr) {
+        console.warn('[AppUpdate] Gagal menghitung hash APK', hashErr);
+      }
+    }
+
+    return true;
+  } catch (err) {
+    console.warn('[AppUpdate] Gagal validasi APK', err);
+    return false;
+  }
+};
+
+/**
+ * Mengecek apakah APK versi target sudah pernah terunduh secara komplit & valid sebelumnya di penyimpanan.
+ */
+export const getValidExistingApk = async (
+  manifest: AppUpdateManifest,
+): Promise<string | null> => {
+  if (Platform.OS !== 'android') return null;
+  const { finalPath } = getApkFilePaths(manifest);
+  const isValid = await isApkFileValid(finalPath, manifest.sha256);
+  return isValid ? finalPath : null;
+};
+
+/**
+ * Menjalankan Package Installer sistem Android secara otomatis untuk menginstal APK.
+ */
+export const installDownloadedApk = async (
+  apkFilePath: string,
+): Promise<boolean> => {
+  if (Platform.OS !== 'android') {
+    return false;
+  }
+
+  try {
+    console.info('[AppUpdate] Membuka Android Package Installer', { apkFilePath });
+    await ReactNativeBlobUtil.android.actionViewIntent(
+      apkFilePath,
+      'application/vnd.android.package-archive',
+    );
+    return true;
+  } catch (intentErr) {
+    console.warn('[AppUpdate] actionViewIntent gagal, mencoba fallback VIEW_DOWNLOADS', intentErr);
+    try {
+      await Linking.sendIntent('android.intent.action.VIEW_DOWNLOADS');
+      return true;
+    } catch {
+      return false;
+    }
+  }
 };
 
 const fetchLatestManifest = async (): Promise<{
@@ -172,6 +283,13 @@ export const checkAppUpdateWithStatus =
     }
   };
 
+/**
+ * Mengunduh APK dengan sistem pengaman:
+ * 1. Simpan ke file temporary (.tmp) terlebih dahulu.
+ * 2. Lakukan validasi ukuran dan integritas file saat selesai.
+ * 3. Jika valid, rename ke file final .apk dan langsung trigger Package Installer otomatis.
+ * 4. Jika gagal/terputus di tengah jalan, bersihkan file .tmp agar tidak korup.
+ */
 export const downloadUpdateApk = async (
   manifest: AppUpdateManifest,
   onProgress?: (percent: number) => void,
@@ -180,26 +298,36 @@ export const downloadUpdateApk = async (
     return { status: 'failed-other' };
   }
 
+  const { finalPath, tempPath } = getApkFilePaths(manifest);
+
   try {
-    console.info('[AppUpdate] Download update started', {
+    // 1. Cek apakah sudah ada file final yang valid sebelumnya
+    const isAlreadyValid = await isApkFileValid(finalPath, manifest.sha256);
+    if (isAlreadyValid) {
+      console.info('[AppUpdate] File APK sudah komplit tersedia di penyimpanan, langsung install');
+      onProgress?.(100);
+      const opened = await installDownloadedApk(finalPath);
+      return { status: opened ? 'installed-intent-opened' : 'downloaded-no-installer' };
+    }
+
+    // 2. Bersihkan file temp lama jika ada sisa unduhan yang macet
+    try {
+      const tempExists = await ReactNativeBlobUtil.fs.exists(tempPath);
+      if (tempExists) {
+        await ReactNativeBlobUtil.fs.unlink(tempPath);
+      }
+    } catch {}
+
+    console.info('[AppUpdate] Memulai download APK ke temporary file', {
       versionName: manifest.versionName,
       versionCode: manifest.versionCode,
+      tempPath,
     });
     onProgress?.(0);
 
-    const fileName =
-      manifest.apkUrl.split('/').pop() ||
-      `PlanToday-v${manifest.versionName}.apk`;
-
     const task = ReactNativeBlobUtil.config({
-      addAndroidDownloads: {
-        useDownloadManager: true,
-        notification: true,
-        mediaScannable: true,
-        title: fileName,
-        description: `Mengunduh update ${manifest.versionName}`,
-        mime: 'application/vnd.android.package-archive',
-      },
+      fileCache: true,
+      path: tempPath,
     }).fetch('GET', manifest.apkUrl);
 
     task.progress({ interval: 150 }, (received, total) => {
@@ -208,32 +336,60 @@ export const downloadUpdateApk = async (
       }
 
       const percent = Math.min(
-        100,
+        99,
         Math.max(0, Math.round((received / total) * 100)),
       );
       onProgress?.(percent);
     });
 
     const response = await task;
-    onProgress?.(100);
+    const downloadedTempPath =
+      typeof response?.path === 'function' ? response.path() : tempPath;
 
-    const downloadedPath =
-      typeof response?.path === 'function' ? response.path() : '';
-
-    if (downloadedPath) {
-      console.info('[AppUpdate] Download finished', { downloadedPath });
-      const openedLocation = await openDownloadedApkLocation();
-
-      if (openedLocation) {
-        return { status: 'opened-download-location' };
-      }
-
-      return { status: 'downloaded-no-installer' };
+    // 3. Verifikasi integritas file yang baru diunduh
+    const isValid = await isApkFileValid(downloadedTempPath, manifest.sha256);
+    if (!isValid) {
+      console.error('[AppUpdate] File hasil download tidak valid / belum komplit');
+      try {
+        await ReactNativeBlobUtil.fs.unlink(downloadedTempPath);
+      } catch {}
+      return { status: 'failed-incomplete' };
     }
 
-    // Download manager may finish without a resolvable path on some devices.
+    onProgress?.(100);
+
+    // 4. Rename dari .tmp ke file final .apk
+    try {
+      const finalExists = await ReactNativeBlobUtil.fs.exists(finalPath);
+      if (finalExists) {
+        await ReactNativeBlobUtil.fs.unlink(finalPath);
+      }
+      await ReactNativeBlobUtil.fs.mv(downloadedTempPath, finalPath);
+    } catch (mvErr) {
+      console.warn('[AppUpdate] Gagal rename file, menggunakan file download langsung', mvErr);
+    }
+
+    const installPath = (await ReactNativeBlobUtil.fs.exists(finalPath))
+      ? finalPath
+      : downloadedTempPath;
+
+    console.info('[AppUpdate] Download selesai & diverifikasi, meluncurkan installer', { installPath });
+    const openedInstaller = await installDownloadedApk(installPath);
+
+    if (openedInstaller) {
+      return { status: 'installed-intent-opened' };
+    }
+
     return { status: 'downloaded-no-installer' };
   } catch (error: any) {
+    // Bersihkan file temp jika download gagal di tengah jalan
+    try {
+      const tempExists = await ReactNativeBlobUtil.fs.exists(tempPath);
+      if (tempExists) {
+        await ReactNativeBlobUtil.fs.unlink(tempPath);
+      }
+    } catch {}
+
     const message = String(error?.message || '').toLowerCase();
     const isNetworkError =
       message.includes('network') ||

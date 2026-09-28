@@ -150,6 +150,8 @@ const HasilKalkulasiSection = ({
   userKalkulasi,
   salesNama,
   userCreate,
+  kalRpSales,
+  kalPpn,
 }: {
   status?: string;
   hargaKalkulasi?: number;
@@ -162,6 +164,8 @@ const HasilKalkulasiSection = ({
   userKalkulasi?: string;
   salesNama?: string;
   userCreate?: string;
+  kalRpSales?: number;
+  kalPpn?: number;
 }) => {
   const normStatus = String(status || '')
     .trim()
@@ -177,7 +181,16 @@ const HasilKalkulasiSection = ({
     ? salesNama || userCreate || 'Sales'
     : userKalkulasi || 'Finance';
 
-  const calcPrice = Number(hargaKalkulasi || 0);
+  const rawSalesKal = Number(kalRpSales || 0);
+  const ppnVal = Number(kalPpn || 0);
+  const calculatedFromSales =
+    rawSalesKal > 0
+      ? ppnVal > 0
+        ? Math.round(rawSalesKal * (1 + ppnVal / 100))
+        : rawSalesKal
+      : 0;
+
+  const calcPrice = calculatedFromSales > 0 ? calculatedFromSales : Number(hargaKalkulasi || 0);
   const reqPrice = Number(hargaPengajuan || 0);
   const qty = Number(jmlOrder || 0);
 
@@ -1034,6 +1047,8 @@ export default function PermintaanHargaDetailScreen({
             userKalkulasi={data?.user_kalkulasi || data?.mh_apv_usr}
             salesNama={data?.sales_nama}
             userCreate={data?.user_create}
+            kalRpSales={data?.kal_rpsales}
+            kalPpn={data?.kal_ppn}
           />
 
           {/* Card 5: Lampiran Gambar */}

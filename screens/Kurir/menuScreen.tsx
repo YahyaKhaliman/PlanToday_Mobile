@@ -141,9 +141,17 @@ export default function KurirMenuScreen({ navigation }: any) {
             style={styles.hero}
           >
             <View style={styles.headerRow}>
+              <TouchableOpacity
+                style={styles.backBtn}
+                onPress={() => navigation.navigate('Home')}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.backBtnText}>Kembali</Text>
+              </TouchableOpacity>
               <View style={styles.headerCenter}>
                 <Text style={styles.brandTextBig}>PlanToday</Text>
               </View>
+              <View style={styles.headerRightSpacer} />
             </View>
 
             <View style={styles.profileCard}>
@@ -314,6 +322,23 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   headerCenter: { flex: 1, alignItems: 'center' },
+  backBtn: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: THEME.line,
+  },
+  backBtnText: {
+    color: THEME.primary,
+    fontWeight: '900',
+    fontSize: 12,
+    letterSpacing: 0.2,
+  },
+  headerRightSpacer: {
+    minWidth: 70,
+  },
   brandTextBig: {
     fontSize: 26,
     fontWeight: '900',

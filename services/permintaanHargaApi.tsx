@@ -55,6 +55,10 @@ export type PermintaanHargaDetail = {
   mh_ket_kalkulasi: string;
   mh_nomor_kalkulasi?: string;
   mh_date_kalkulasi?: string;
+  kal_rpsales?: number;
+  kal_ppn?: number;
+  kal_rpsesuai?: number;
+  kal_rpsesuaippn?: number;
   mh_apv_usr?: string;
   user_kalkulasi?: string;
   sales_nama?: string;

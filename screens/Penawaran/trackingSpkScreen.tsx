@@ -61,7 +61,7 @@ const formatDate = (ymd?: string) => {
   });
 };
 
-export default function TrackingSpkScreen({ route }: any) {
+export default function TrackingSpkScreen({ route, navigation }: any) {
   const { token } = useAuth();
   const [filterStatus, setFilterStatus] = useState<
     'all' | 'belum' | 'proses' | 'sudah'
@@ -333,7 +333,21 @@ export default function TrackingSpkScreen({ route }: any) {
         }
         ListHeaderComponent={
           <View style={styles.headerWrap}>
-            <Text style={styles.title}>Tracking SPK</Text>
+            <View style={styles.headerTop}>
+              <View style={styles.headerTopRow}>
+                <TouchableOpacity
+                  style={styles.backBtn}
+                  onPress={() => navigation.navigate('Home')}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.backBtnText}>Kembali</Text>
+                </TouchableOpacity>
+                <View style={styles.headerTitleWrap}>
+                  <Text style={styles.title}>Tracking SPK</Text>
+                </View>
+                <View style={styles.headerRightSpacer} />
+              </View>
+            </View>
 
             <View style={styles.filterCard}>
               {/* Compact date row */}
@@ -687,6 +701,30 @@ const styles = StyleSheet.create({
   listContainer: {
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'android' ? 44 : 14,
+  },
+  headerTop: { marginBottom: 10 },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitleWrap: { flex: 1, alignItems: 'center' },
+  backBtn: {
+    backgroundColor: THEME.soft,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: THEME.line,
+  },
+  backBtnText: {
+    color: THEME.primary,
+    fontWeight: '900',
+    fontSize: 12,
+    letterSpacing: 0.2,
+  },
+  headerRightSpacer: {
+    minWidth: 70,
   },
   headerWrap: { marginBottom: 10 },
   title: {
