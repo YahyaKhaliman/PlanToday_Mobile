@@ -23,6 +23,7 @@ import {
 import {
   deletePermintaanHarga,
   getPermintaanHargaDetail,
+  KalkulasiDetailData,
 } from '../../services/permintaanHargaApi';
 import { PENAWARAN_THEME, PENAWARAN_SHADOW } from '../Penawaran/penawaranTheme';
 import { COMPANY_STATUS_COLORS } from '../theme';
@@ -151,7 +152,9 @@ const HasilKalkulasiSection = ({
   salesNama,
   userCreate,
   kalRpSales,
+  kalRpSistem,
   kalPpn,
+  kalkulasiDetail,
 }: {
   status?: string;
   hargaKalkulasi?: number;
@@ -165,8 +168,11 @@ const HasilKalkulasiSection = ({
   salesNama?: string;
   userCreate?: string;
   kalRpSales?: number;
+  kalRpSistem?: number;
   kalPpn?: number;
+  kalkulasiDetail?: KalkulasiDetailData | null;
 }) => {
+  const [showBreakdown, setShowBreakdown] = useState(false);
   const normStatus = String(status || '')
     .trim()
     .toUpperCase();
@@ -177,12 +183,29 @@ const HasilKalkulasiSection = ({
 
   const parsed = parseKetKalkulasi(ket);
   const cardBadgeCode = nomorKalkulasi || (isNego ? 'KALS' : 'KAL');
-  const userText = isNego
-    ? salesNama || userCreate || 'Sales'
-    : userKalkulasi || 'Finance';
+  const userText = isNego ? salesNama || userCreate : userKalkulasi;
 
-  const rawSalesKal = Number(kalRpSales || 0);
-  const ppnVal = Number(kalPpn || 0);
+  const rawSistemKal = Number(
+    kalRpSistem !== undefined
+      ? kalRpSistem
+      : kalkulasiDetail?.hdr?.kal_rpsistem || 0,
+  );
+  const rawSalesKal = Number(
+    kalRpSales !== undefined
+      ? kalRpSales
+      : kalkulasiDetail?.hdr?.kal_rpsales || 0,
+  );
+  const ppnVal = Number(
+    kalPpn !== undefined ? kalPpn : kalkulasiDetail?.hdr?.kal_ppn || 0,
+  );
+
+  const calculatedFromSistem =
+    rawSistemKal > 0
+      ? ppnVal > 0
+        ? Math.round(rawSistemKal * (1 + ppnVal / 100))
+        : rawSistemKal
+      : 0;
+
   const calculatedFromSales =
     rawSalesKal > 0
       ? ppnVal > 0
@@ -190,8 +213,18 @@ const HasilKalkulasiSection = ({
         : rawSalesKal
       : 0;
 
-  const calcPrice = calculatedFromSales > 0 ? calculatedFromSales : Number(hargaKalkulasi || 0);
-  const reqPrice = Number(hargaPengajuan || 0);
+  const calcPrice =
+    calculatedFromSistem > 0
+      ? calculatedFromSistem
+      : Number(hargaKalkulasi || 0);
+
+  const reqPrice =
+    Number(hargaPengajuan || 0) > 0
+      ? Number(hargaPengajuan || 0)
+      : calculatedFromSales > 0
+      ? calculatedFromSales
+      : 0;
+
   const qty = Number(jmlOrder || 0);
 
   const hasBothPrices = calcPrice > 0 && reqPrice > 0;
@@ -222,6 +255,47 @@ const HasilKalkulasiSection = ({
         bulletColor: '#15803d',
         itemTextColor: '#14532d',
       };
+
+  const hasKomponen = Boolean(
+    kalkulasiDetail?.komponen && kalkulasiDetail.komponen.length > 0,
+  );
+  const dtl = kalkulasiDetail?.dtl;
+  const hasDtl = Boolean(
+    dtl &&
+      (Number(dtl.kald_rpjahit || 0) > 0 ||
+        Number(dtl.kald_rppotong || 0) > 0 ||
+        Number(dtl.kald_rpfinishing || 0) > 0 ||
+        Number(dtl.kald_rptenagacetak || 0) > 0 ||
+        Number(dtl.kald_rpbiayaobat || 0) > 0 ||
+        Number(dtl.kald_rpraglan || 0) > 0),
+  );
+  const cetak = kalkulasiDetail?.cetak;
+  const sublim = kalkulasiDetail?.sublim;
+  const dtf = kalkulasiDetail?.dtf;
+  const bordir = kalkulasiDetail?.bordir;
+  const polyflex = kalkulasiDetail?.polyflex;
+  const hasVariasi = Boolean(
+    Number(cetak?.kald_rpcetak || 0) > 0 ||
+      Number(sublim?.kald_rpsublim || 0) > 0 ||
+      Number(dtf?.kald_rpdtf || 0) > 0 ||
+      Number(bordir?.kald_rpbordir || 0) > 0 ||
+      Number(polyflex?.kald_rppolyflex || 0) > 0,
+  );
+  const hasAksesoris = Boolean(
+    kalkulasiDetail?.aksesories && kalkulasiDetail.aksesories.length > 0,
+  );
+  const hdr = kalkulasiDetail?.hdr;
+  const hasHdrDetails = Boolean(
+    hdr &&
+      (Number(hdr.kal_rpallowance || 0) > 0 ||
+        Number(hdr.kal_rplaba || 0) > 0 ||
+        Number(hdr.kal_allowance || 0) > 0 ||
+        Number(hdr.kal_laba || 0) > 0 ||
+        Boolean(hdr.kal_ketbeli)),
+  );
+
+  const hasAnyBreakdown =
+    hasKomponen || hasDtl || hasVariasi || hasAksesoris || hasHdrDetails;
 
   return (
     <View
@@ -510,7 +584,661 @@ const HasilKalkulasiSection = ({
         </View>
       ) : null}
 
-      {/* 5. Rincian Keterangan Kalkulasi */}
+      {/* 5. Rincian Perhitungan Kalkulasi Lengkap (Collapsible Breakdown) */}
+      {hasAnyBreakdown && (
+        <View
+          style={{
+            marginTop: 10,
+            borderTopWidth: 1,
+            borderColor: themeColors.subBorderColor,
+            paddingTop: 8,
+          }}
+        >
+          <TouchableOpacity
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              backgroundColor: isNego ? '#f3e8ff' : '#dcfce7',
+              borderRadius: 8,
+              paddingHorizontal: 10,
+              paddingVertical: 7,
+            }}
+            activeOpacity={0.75}
+            onPress={() => setShowBreakdown(!showBreakdown)}
+          >
+            <View
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
+            >
+              <MaterialIcons
+                name="receipt-long"
+                size={16}
+                color={themeColors.titleColor}
+              />
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: '800',
+                  color: themeColors.titleColor,
+                }}
+              >
+                Rincian Kalkulasi Lengkap
+              </Text>
+            </View>
+            <MaterialIcons
+              name={showBreakdown ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+              size={20}
+              color={themeColors.titleColor}
+            />
+          </TouchableOpacity>
+
+          {showBreakdown && (
+            <View
+              style={{
+                marginTop: 8,
+                backgroundColor: '#ffffff',
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: '#e2e8f0',
+                padding: 10,
+                gap: 10,
+              }}
+            >
+              {/* Komponen Bahan / Kain */}
+              {hasKomponen && (
+                <View>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: '800',
+                      color: '#334155',
+                      marginBottom: 6,
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    1. Komponen Bahan / Kain
+                  </Text>
+                  <View style={{ gap: 6 }}>
+                    {kalkulasiDetail?.komponen?.map((k, idx) => (
+                      <View
+                        key={`komp-${idx}`}
+                        style={{
+                          backgroundColor: '#f8fafc',
+                          borderRadius: 6,
+                          padding: 8,
+                          borderWidth: 1,
+                          borderColor: '#f1f5f9',
+                        }}
+                      >
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              fontWeight: '800',
+                              color: '#1e293b',
+                            }}
+                          >
+                            {k.kk_komponen || 'BAHAN'}
+                          </Text>
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              fontWeight: '800',
+                              color: '#16a34a',
+                            }}
+                          >
+                            Rp {formatNumber(k.kk_pcs || 0)} / pcs
+                          </Text>
+                        </View>
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            color: '#64748b',
+                            marginTop: 2,
+                          }}
+                        >
+                          {k.kk_jeniskain || '-'}
+                          {k.kk_warna ? ` (${k.kk_warna})` : ''}
+                        </Text>
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                            marginTop: 4,
+                            paddingTop: 4,
+                            borderTopWidth: 0.5,
+                            borderTopColor: '#e2e8f0',
+                          }}
+                        >
+                          <Text style={{ fontSize: 10.5, color: '#94a3b8' }}>
+                            Harga Kain: Rp {formatNumber(k.kk_harga || 0)}
+                          </Text>
+                          <Text style={{ fontSize: 10.5, color: '#94a3b8' }}>
+                            Babaran: {k.kk_babaran || 0} pcs/kg
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* Biaya Konveksi / Jahit */}
+              {hasDtl && dtl && (
+                <View>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: '800',
+                      color: '#334155',
+                      marginBottom: 6,
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    2. Biaya Jahit & Operasional
+                  </Text>
+                  <View
+                    style={{
+                      backgroundColor: '#f8fafc',
+                      borderRadius: 6,
+                      padding: 8,
+                      borderWidth: 1,
+                      borderColor: '#f1f5f9',
+                      gap: 4,
+                    }}
+                  >
+                    {Number(dtl.kald_rpjahit || 0) > 0 && (
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, color: '#475569' }}>
+                          Biaya Jahit{' '}
+                          {dtl.kald_jahit ? `(${dtl.kald_jahit})` : ''}
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 11.5,
+                            fontWeight: '700',
+                            color: '#1e293b',
+                          }}
+                        >
+                          Rp {formatNumber(dtl.kald_rpjahit)}
+                        </Text>
+                      </View>
+                    )}
+                    {Number(dtl.kald_rppotong || 0) > 0 && (
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, color: '#475569' }}>
+                          Biaya Potong
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 11.5,
+                            fontWeight: '700',
+                            color: '#1e293b',
+                          }}
+                        >
+                          Rp {formatNumber(dtl.kald_rppotong)}
+                        </Text>
+                      </View>
+                    )}
+                    {Number(dtl.kald_rpfinishing || 0) > 0 && (
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, color: '#475569' }}>
+                          Biaya Finishing
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 11.5,
+                            fontWeight: '700',
+                            color: '#1e293b',
+                          }}
+                        >
+                          Rp {formatNumber(dtl.kald_rpfinishing)}
+                        </Text>
+                      </View>
+                    )}
+                    {Number(dtl.kald_rptenagacetak || 0) > 0 && (
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, color: '#475569' }}>
+                          Tenaga Cetak
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 11.5,
+                            fontWeight: '700',
+                            color: '#1e293b',
+                          }}
+                        >
+                          Rp {formatNumber(dtl.kald_rptenagacetak)}
+                        </Text>
+                      </View>
+                    )}
+                    {Number(dtl.kald_rpbiayaobat || 0) > 0 && (
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, color: '#475569' }}>
+                          Biaya Obat Sablon
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 11.5,
+                            fontWeight: '700',
+                            color: '#1e293b',
+                          }}
+                        >
+                          Rp {formatNumber(dtl.kald_rpbiayaobat)}
+                        </Text>
+                      </View>
+                    )}
+                    {Number(dtl.kald_rpraglan || 0) > 0 && (
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, color: '#475569' }}>
+                          Biaya Raglan
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 11.5,
+                            fontWeight: '700',
+                            color: '#1e293b',
+                          }}
+                        >
+                          Rp {formatNumber(dtl.kald_rpraglan)}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              )}
+
+              {/* Biaya Cetak / Sablon / Sublim / DTF / Bordir / Polyflex */}
+              {hasVariasi && (
+                <View>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: '800',
+                      color: '#334155',
+                      marginBottom: 6,
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    3. Biaya Cetak & Variasi
+                  </Text>
+                  <View
+                    style={{
+                      backgroundColor: '#f8fafc',
+                      borderRadius: 6,
+                      padding: 8,
+                      borderWidth: 1,
+                      borderColor: '#f1f5f9',
+                      gap: 4,
+                    }}
+                  >
+                    {Number(cetak?.kald_rpcetak || 0) > 0 && (
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, color: '#475569' }}>
+                          Sablon Manual
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 11.5,
+                            fontWeight: '700',
+                            color: '#1e293b',
+                          }}
+                        >
+                          Rp {formatNumber(cetak?.kald_rpcetak)}
+                        </Text>
+                      </View>
+                    )}
+                    {Number(dtf?.kald_rpdtf || 0) > 0 && (
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, color: '#475569' }}>
+                          Cetak DTF{' '}
+                          {Number(dtf?.kald_cmdtf || 0) > 0
+                            ? `(${dtf?.kald_cmdtf} cm²)`
+                            : ''}
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 11.5,
+                            fontWeight: '700',
+                            color: '#1e293b',
+                          }}
+                        >
+                          Rp {formatNumber(dtf?.kald_rpdtf)}
+                        </Text>
+                      </View>
+                    )}
+                    {Number(bordir?.kald_rpbordir || 0) > 0 && (
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, color: '#475569' }}>
+                          Bordir Komputer{' '}
+                          {Number(bordir?.kald_cmbordir || 0) > 0
+                            ? `(${bordir?.kald_cmbordir} cm²)`
+                            : ''}
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 11.5,
+                            fontWeight: '700',
+                            color: '#1e293b',
+                          }}
+                        >
+                          Rp {formatNumber(bordir?.kald_rpbordir)}
+                        </Text>
+                      </View>
+                    )}
+                    {Number(sublim?.kald_rpsublim || 0) > 0 && (
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, color: '#475569' }}>
+                          Sublimasi
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 11.5,
+                            fontWeight: '700',
+                            color: '#1e293b',
+                          }}
+                        >
+                          Rp {formatNumber(sublim?.kald_rpsublim)}
+                        </Text>
+                      </View>
+                    )}
+                    {Number(polyflex?.kald_rppolyflex || 0) > 0 && (
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, color: '#475569' }}>
+                          Polyflex
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 11.5,
+                            fontWeight: '700',
+                            color: '#1e293b',
+                          }}
+                        >
+                          Rp {formatNumber(polyflex?.kald_rppolyflex)}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+              )}
+
+              {/* Aksesoris Tambahan */}
+              {hasAksesoris && (
+                <View>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: '800',
+                      color: '#334155',
+                      marginBottom: 6,
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    4. Aksesoris Tambahan
+                  </Text>
+                  <View
+                    style={{
+                      backgroundColor: '#f8fafc',
+                      borderRadius: 6,
+                      padding: 8,
+                      borderWidth: 1,
+                      borderColor: '#f1f5f9',
+                      gap: 4,
+                    }}
+                  >
+                    {kalkulasiDetail?.aksesories?.map((a, idx) => (
+                      <View
+                        key={`aks-${idx}`}
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, color: '#475569' }}>
+                          {a.ka_aksesories}
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 11.5,
+                            fontWeight: '700',
+                            color: '#1e293b',
+                          }}
+                        >
+                          Rp {formatNumber(a.ka_biaya || 0)}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* Allowance, Laba Margin & Parameter */}
+              {hasHdrDetails && hdr && (
+                <View>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: '800',
+                      color: '#334155',
+                      marginBottom: 6,
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    5. Allowance & Margin
+                  </Text>
+                  <View
+                    style={{
+                      backgroundColor: '#f8fafc',
+                      borderRadius: 6,
+                      padding: 8,
+                      borderWidth: 1,
+                      borderColor: '#f1f5f9',
+                      gap: 4,
+                    }}
+                  >
+                    {Number(hdr.kal_rencanaorder || 0) > 0 && (
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, color: '#475569' }}>
+                          Rencana Order
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 11.5,
+                            fontWeight: '700',
+                            color: '#1e293b',
+                          }}
+                        >
+                          {formatNumber(hdr.kal_rencanaorder)} pcs
+                        </Text>
+                      </View>
+                    )}
+                    {Number(hdr.kal_allowance || 0) > 0 && (
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, color: '#475569' }}>
+                          Allowance ({hdr.kal_allowance}%)
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 11.5,
+                            fontWeight: '700',
+                            color: '#1e293b',
+                          }}
+                        >
+                          +Rp {formatNumber(hdr.kal_rpallowance || 0)}
+                        </Text>
+                      </View>
+                    )}
+                    {Number(hdr.kal_laba || 0) > 0 && (
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, color: '#475569' }}>
+                          Margin Laba ({hdr.kal_laba}%)
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 11.5,
+                            fontWeight: '700',
+                            color: '#15803d',
+                          }}
+                        >
+                          +Rp {formatNumber(hdr.kal_rplaba || 0)}
+                        </Text>
+                      </View>
+                    )}
+                    {Number(hdr.kal_rpsistem || 0) > 0 && (
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          marginTop: 4,
+                          paddingTop: 4,
+                          borderTopWidth: 0.5,
+                          borderTopColor: '#e2e8f0',
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontWeight: '700',
+                            color: '#334155',
+                          }}
+                        >
+                          Kalkulasi Sistem (Exc PPN)
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: '800',
+                            color: '#15803d',
+                          }}
+                        >
+                          Rp {formatNumber(hdr.kal_rpsistem)}
+                        </Text>
+                      </View>
+                    )}
+                    {Number(hdr.kal_rpsales || 0) > 0 && (
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          marginTop: 3,
+                          paddingTop: Number(hdr.kal_rpsistem || 0) > 0 ? 0 : 4,
+                          borderTopWidth:
+                            Number(hdr.kal_rpsistem || 0) > 0 ? 0 : 0.5,
+                          borderTopColor: '#e2e8f0',
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontWeight: '700',
+                            color: '#334155',
+                          }}
+                        >
+                          Pengajuan Sales (Exc PPN)
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: '800',
+                            color: '#6b21a8',
+                          }}
+                        >
+                          Rp {formatNumber(hdr.kal_rpsales)}
+                        </Text>
+                      </View>
+                    )}
+                    {hdr.kal_ketbeli ? (
+                      <View style={{ marginTop: 4 }}>
+                        <Text style={{ fontSize: 10.5, color: '#94a3b8' }}>
+                          Spesifikasi Beli: {hdr.kal_ketbeli}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                </View>
+              )}
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* 6. Rincian Keterangan Kalkulasi */}
       {parsed.items.length > 0 && (
         <View
           style={[
@@ -769,7 +1497,7 @@ export default function PermintaanHargaDetailScreen({
   const showImage1 = Boolean(imageUrl1WithBuster) && !image1Error;
   const showImage2 = Boolean(imageUrl2WithBuster) && !image2Error;
 
-  const createdBy = useMemo(() => data?.user_kalkulasi || '-', [data]);
+  const createdBy = useMemo(() => data?.user_create || '-', [data]);
   const statusMeta = useMemo(
     () => statusBadgeStyle(String(data?.mh_status || '')),
     [data?.mh_status],
@@ -852,7 +1580,11 @@ export default function PermintaanHargaDetailScreen({
           onPress={() => navigation.goBack()}
           activeOpacity={0.8}
         >
-          <Text style={styles.backBtnText}>Kembali</Text>
+          <MaterialIcons
+            name="arrow-back-ios-new"
+            size={18}
+            color={THEME.primary}
+          />
         </TouchableOpacity>
         <View style={styles.headerTextWrap}>
           <Text style={styles.navTitle} numberOfLines={2}>
@@ -1047,8 +1779,22 @@ export default function PermintaanHargaDetailScreen({
             userKalkulasi={data?.user_kalkulasi || data?.mh_apv_usr}
             salesNama={data?.sales_nama}
             userCreate={data?.user_create}
-            kalRpSales={data?.kal_rpsales}
-            kalPpn={data?.kal_ppn}
+            kalRpSales={
+              data?.kal_rpsales !== undefined
+                ? data.kal_rpsales
+                : data?.kalkulasi_detail?.hdr?.kal_rpsales
+            }
+            kalRpSistem={
+              data?.kal_rpsistem !== undefined
+                ? data.kal_rpsistem
+                : data?.kalkulasi_detail?.hdr?.kal_rpsistem
+            }
+            kalPpn={
+              data?.kal_ppn !== undefined
+                ? data.kal_ppn
+                : data?.kalkulasi_detail?.hdr?.kal_ppn
+            }
+            kalkulasiDetail={data?.kalkulasi_detail}
           />
 
           {/* Card 5: Lampiran Gambar */}
@@ -1250,20 +1996,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerRightSpacer: {
-    minWidth: 74,
+    width: 38,
   },
   backBtn: {
-    backgroundColor: THEME.soft,
+    width: 38,
+    height: 38,
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: THEME.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: THEME.line,
   },
   navTitle: {
-    fontSize: 17,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: '900',
     color: THEME.ink,
+    letterSpacing: 0.2,
     textAlign: 'center',
   },
   content: {

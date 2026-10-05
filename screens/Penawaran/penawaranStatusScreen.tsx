@@ -13,6 +13,7 @@ import {
 import ModalConfirm from 'react-native-modal';
 import LinearGradient from 'react-native-linear-gradient';
 import Toast from 'react-native-toast-message';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { PenawaranStackParamList } from '../../navigation/appNavigator';
 import {
@@ -280,10 +281,16 @@ export default function PenawaranStatusScreen({ route, navigation }: Props) {
           style={styles.backBtn}
           onPress={() => navigation.goBack()}
           disabled={submitting}
+          activeOpacity={0.8}
         >
-          <Text style={styles.backBtnText}>Kembali</Text>
+          <MaterialIcons
+            name="arrow-back-ios-new"
+            size={18}
+            color={THEME.primary}
+          />
         </TouchableOpacity>
         <Text style={styles.title}>Ubah Status Item</Text>
+        <View style={styles.headerRightSpacer} />
       </View>
 
       <ScrollView style={styles.scrollView}>
@@ -510,24 +517,25 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   backBtn: {
-    backgroundColor: THEME.soft,
+    width: 38,
+    height: 38,
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: THEME.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: THEME.line,
   },
-  backBtnText: {
-    color: THEME.primary,
-    fontWeight: '900',
-    fontSize: 12,
-    letterSpacing: 0.2,
+  headerRightSpacer: {
+    width: 38,
   },
   title: {
     flex: 1,
     color: THEME.ink,
     fontWeight: '900',
-    fontSize: 18,
+    fontSize: 20,
+    letterSpacing: 0.2,
+    textAlign: 'center',
   },
   scrollView: {
     flex: 1,

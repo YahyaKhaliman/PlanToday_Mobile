@@ -101,6 +101,12 @@ const menus: MenuItem[] = [
     icon: 'people',
   },
   {
+    title: 'Achievement',
+    route: 'Achievement',
+    roles: ['SALES', 'MANAGER'],
+    icon: 'stars',
+  },
+  {
     title: 'Visit Plan',
     route: 'VisitPlan',
     roles: ['SALES', 'MANAGER'],
@@ -111,12 +117,6 @@ const menus: MenuItem[] = [
     route: 'Visit',
     roles: ['SALES', 'MANAGER'],
     icon: 'place',
-  },
-  {
-    title: 'Achievement',
-    route: 'Achievement',
-    roles: ['SALES', 'MANAGER'],
-    icon: 'stars',
   },
   {
     title: 'Permintaan Harga',
@@ -996,7 +996,7 @@ export default function HomeScreen({ navigation }: any) {
                   {getGreeting()},
                 </Text>
                 <Text style={styles.welcomeGreeting}>
-                  {(user?.nama || 'Sales').toUpperCase()}
+                  {(user?.nama || '-').toUpperCase()}
                 </Text>
                 {user?.jabatan || user?.cabang ? (
                   <Text
@@ -1012,7 +1012,7 @@ export default function HomeScreen({ navigation }: any) {
                   </Text>
                 ) : null}
               </View>
-              <View style={{ alignItems: 'flex-end', gap: 3, marginLeft: 8 }}>
+              <View style={{ alignItems: 'flex-end', gap: 3, marginLeft: 5 }}>
                 <Text
                   style={{
                     fontSize: 10,
@@ -1676,12 +1676,13 @@ export default function HomeScreen({ navigation }: any) {
                   </View>
                 ) : (
                   <View style={{ marginTop: 6, gap: 12 }}>
-                    <View style={{ flexDirection: 'row', gap: 16 }}>
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
                       <View
                         style={{
                           flex: 1,
                           backgroundColor: '#F8FAFC',
-                          padding: 12,
+                          paddingHorizontal: 10,
+                          paddingVertical: 10,
                           borderRadius: 12,
                           borderWidth: 1,
                           borderColor: THEME.line,
@@ -1697,26 +1698,31 @@ export default function HomeScreen({ navigation }: any) {
                           Target Bulan Ini
                         </Text>
                         <Text
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.75}
                           style={{
-                            fontSize: 15,
+                            fontSize: 13,
                             fontWeight: '900',
                             color: THEME.ink,
                             marginTop: 4,
                           }}
                         >
-                          Rp{' '}
-                          {myAchievement.target
-                            ? Number(myAchievement.target).toLocaleString(
-                                'id-ID',
-                              )
-                            : '0'}
+                          {`Rp ${
+                            myAchievement.target
+                              ? Number(myAchievement.target).toLocaleString(
+                                  'id-ID',
+                                )
+                              : '0'
+                          }`}
                         </Text>
                       </View>
                       <View
                         style={{
                           flex: 1,
                           backgroundColor: '#F8FAFC',
-                          padding: 12,
+                          paddingHorizontal: 10,
+                          paddingVertical: 10,
                           borderRadius: 12,
                           borderWidth: 1,
                           borderColor: THEME.line,
@@ -1732,19 +1738,23 @@ export default function HomeScreen({ navigation }: any) {
                           Realisasi Bulan Ini
                         </Text>
                         <Text
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.75}
                           style={{
-                            fontSize: 15,
+                            fontSize: 13,
                             fontWeight: '900',
                             color: '#10B981',
                             marginTop: 4,
                           }}
                         >
-                          Rp{' '}
-                          {myAchievement.realisasi
-                            ? Number(myAchievement.realisasi).toLocaleString(
-                                'id-ID',
-                              )
-                            : '0'}
+                          {`Rp ${
+                            myAchievement.realisasi
+                              ? Number(myAchievement.realisasi).toLocaleString(
+                                  'id-ID',
+                                )
+                              : '0'
+                          }`}
                         </Text>
                       </View>
                     </View>
@@ -4251,7 +4261,7 @@ const styles = StyleSheet.create({
     borderColor: THEME.line,
   },
   brandTextBig: {
-    fontSize: 26,
+    fontSize: 20,
     fontWeight: '900',
     color: THEME.ink,
     letterSpacing: 0.5,

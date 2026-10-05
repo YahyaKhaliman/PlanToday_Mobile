@@ -31,6 +31,7 @@ import {
 } from '../../services/penawaranApi';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import ModalConfirm from 'react-native-modal';
+import PenawaranApprovalModal from './penawaranApprovalModal';
 import { useAuth } from '../../context/authContext';
 import {
   PENAWARAN_SHADOW,
@@ -340,6 +341,7 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
   const [unapprovedModalVisible, setUnapprovedModalVisible] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [approvalModalVisible, setApprovalModalVisible] = useState(false);
+  const [pengajuanModalVisible, setPengajuanModalVisible] = useState(false);
   const [previewHtml, setPreviewHtml] = useState<string>('');
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [submittingApproval, setSubmittingApproval] = useState(false);
@@ -1873,8 +1875,13 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
         <TouchableOpacity
           style={styles.backBtn}
           onPress={() => navigation.goBack()}
+          activeOpacity={0.8}
         >
-          <Text style={styles.backBtnText}>Kembali</Text>
+          <MaterialIcons
+            name="arrow-back-ios-new"
+            size={18}
+            color={THEME.primary}
+          />
         </TouchableOpacity>
         <View style={styles.titleWrap}>
           <Text style={styles.title}>Detail Penawaran</Text>
@@ -1900,7 +1907,7 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
           keyExtractor={(item, idx) => `${item.id}-${idx}`}
           contentContainerStyle={[
             styles.listContainer,
-            { paddingBottom: 85 + insets.bottom },
+            { paddingBottom: (isManager ? 85 : 145) + insets.bottom },
           ]}
           ListHeaderComponent={
             <View style={styles.sectionCard}>
@@ -2058,30 +2065,30 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
             { paddingBottom: Math.max(insets.bottom, 12) },
           ]}
         >
-          <View style={styles.bottomActionRow}>
-            <TouchableOpacity
-              style={[
-                styles.actionBtn,
-                isManager ? styles.actionBtnHalf : styles.actionBtnFull,
-                styles.actionBtnPrimary,
-                (!isSigned || exportingPdf) && styles.actionBtnDimmed,
-              ]}
-              onPress={handleExportPdf}
-              disabled={exportingPdf}
-              activeOpacity={0.8}
-            >
-              <Text
+          {isManager ? (
+            <View style={styles.bottomActionRow}>
+              <TouchableOpacity
                 style={[
-                  styles.bottomActionText,
-                  !isSigned && styles.bottomActionTextDimmed,
+                  styles.actionBtn,
+                  styles.actionBtnHalf,
+                  styles.actionBtnPrimary,
+                  (!isSigned || exportingPdf) && styles.actionBtnDimmed,
                 ]}
+                onPress={handleExportPdf}
+                disabled={exportingPdf}
+                activeOpacity={0.8}
               >
-                {exportingPdf ? 'Export PDF...' : 'Eksport PDF'}
-              </Text>
-            </TouchableOpacity>
+                <Text
+                  style={[
+                    styles.bottomActionText,
+                    !isSigned && styles.bottomActionTextDimmed,
+                  ]}
+                >
+                  {exportingPdf ? 'Export PDF...' : 'Eksport PDF'}
+                </Text>
+              </TouchableOpacity>
 
-            {isManager &&
-              (isSigned ? (
+              {isSigned ? (
                 <View
                   style={[
                     styles.actionBtn,
@@ -2107,10 +2114,83 @@ export default function PenawaranDetailScreen({ navigation, route }: any) {
                   <MaterialIcons name="done-all" size={16} color="#FFFFFF" />
                   <Text style={styles.actionBtnApproveText}>Approve</Text>
                 </TouchableOpacity>
-              ))}
-          </View>
+              )}
+            </View>
+          ) : (
+            <View style={styles.bottomActionCol}>
+              <View style={styles.bottomActionRow}>
+                <TouchableOpacity
+                  style={[
+                    styles.actionBtn,
+                    styles.actionBtnHalf,
+                    styles.actionBtnOutline,
+                  ]}
+                  onPress={() => setPengajuanModalVisible(true)}
+                  activeOpacity={0.8}
+                >
+                  <MaterialIcons
+                    name="edit-note"
+                    size={18}
+                    color={THEME.primary}
+                  />
+                  <Text style={styles.actionBtnOutlineText}>
+                    Ajukan Perubahan
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.actionBtn,
+                    styles.actionBtnHalf,
+                    styles.actionBtnStatus,
+                  ]}
+                  onPress={() =>
+                    navigation.navigate('PenawaranStatus', { nomor })
+                  }
+                  activeOpacity={0.8}
+                >
+                  <MaterialIcons
+                    name="published-with-changes"
+                    size={18}
+                    color="#FFFFFF"
+                  />
+                  <Text style={styles.actionBtnStatusText}>Ubah Status</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.actionBtn,
+                  styles.actionBtnFull,
+                  styles.actionBtnPrimary,
+                  styles.actionBtnSpacingTop,
+                  (!isSigned || exportingPdf) && styles.actionBtnDimmed,
+                ]}
+                onPress={handleExportPdf}
+                disabled={exportingPdf}
+                activeOpacity={0.8}
+              >
+                <Text
+                  style={[
+                    styles.bottomActionText,
+                    !isSigned && styles.bottomActionTextDimmed,
+                  ]}
+                >
+                  {exportingPdf ? 'Export PDF...' : 'Eksport PDF'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       )}
+
+      {/* Modal Pengajuan Perubahan Data (User / Sales) */}
+      <PenawaranApprovalModal
+        visible={pengajuanModalVisible}
+        nomor={nomor}
+        onClose={() => setPengajuanModalVisible(false)}
+        onSuccess={() => loadDetail()}
+      />
 
       {isManager && (
         <Modal
@@ -2224,23 +2304,20 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   backBtn: {
-    backgroundColor: THEME.soft,
+    width: 38,
+    height: 38,
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: THEME.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: THEME.line,
-  },
-  backBtnText: {
-    color: THEME.primary,
-    fontWeight: '900',
-    fontSize: 12,
-    letterSpacing: 0.2,
   },
   title: {
     color: THEME.ink,
     fontWeight: '900',
-    fontSize: 17,
+    fontSize: 20,
+    letterSpacing: 0.2,
     textAlign: 'center',
   },
   titleWrap: {
@@ -2256,7 +2333,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   headerSpacer: {
-    width: 74,
+    width: 38,
   },
   actionButtonDisabled: {
     opacity: 0.55,
@@ -2433,6 +2510,9 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: THEME.line,
   },
+  bottomActionCol: {
+    width: '100%',
+  },
   bottomActionRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2450,12 +2530,37 @@ const styles = StyleSheet.create({
   actionBtnFull: {
     width: '100%',
   },
+  actionBtnSpacingTop: {
+    marginTop: 8,
+  },
   actionBtnHalf: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
+  },
+  actionBtnOutline: {
+    backgroundColor: '#FFFFFF',
+    borderColor: THEME.primary,
+    borderWidth: 1.2,
+  },
+  actionBtnOutlineText: {
+    color: THEME.primary,
+    fontWeight: '800',
+    fontSize: 12.5,
+    letterSpacing: 0.2,
+  },
+  actionBtnStatus: {
+    backgroundColor: '#0284c7',
+    borderColor: '#0369a1',
+    borderWidth: 1,
+  },
+  actionBtnStatusText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 12.5,
+    letterSpacing: 0.2,
   },
   actionBtnPrimary: {
     backgroundColor: THEME.primary,

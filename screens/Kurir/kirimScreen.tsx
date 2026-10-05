@@ -224,7 +224,11 @@ export default function KurirKirimScreen({ navigation }: any) {
             onPress={() => navigation.navigate('KurirMenu')}
             activeOpacity={0.85}
           >
-            <Text style={styles.backBtnText}>Kembali</Text>
+            <MaterialIcons
+              name="arrow-back-ios-new"
+              size={18}
+              color={THEME.primary}
+            />
           </TouchableOpacity>
           <View style={styles.headerTitleWrap}>
             <Text style={styles.title}>Rekap Kiriman</Text>
@@ -414,21 +418,17 @@ const styles = StyleSheet.create({
   },
   headerTitleWrap: { flex: 1, alignItems: 'center' },
   backBtn: {
-    backgroundColor: THEME.soft,
+    width: 38,
+    height: 38,
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: THEME.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: THEME.line,
   },
-  backBtnText: {
-    color: THEME.primary,
-    fontWeight: '900',
-    fontSize: 12,
-    letterSpacing: 0.2,
-  },
   headerRightSpacer: {
-    minWidth: 70,
+    width: 38,
   },
   headerWrap: {
     backgroundColor: THEME.bgBottom,
@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
   },
   header: { alignItems: 'center', marginBottom: 10 },
   title: {
-    fontSize: 25,
+    fontSize: 20,
     fontWeight: '900',
     color: THEME.ink,
     letterSpacing: 0.2,

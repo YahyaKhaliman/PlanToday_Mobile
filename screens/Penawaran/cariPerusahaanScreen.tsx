@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
   },
   header: { alignItems: 'center', marginBottom: 10 },
   title: {
-    fontSize: 25,
+    fontSize: 20,
     fontWeight: '900',
     color: THEME.ink,
     letterSpacing: 0.2,

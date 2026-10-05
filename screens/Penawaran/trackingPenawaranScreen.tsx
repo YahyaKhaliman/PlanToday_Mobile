@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable react-native/no-inline-styles */
 import React, {
   useCallback,
@@ -21,7 +22,7 @@ import {
   View,
   Modal,
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateRangePickerModal from '../../components/DateRangePickerModal';
 import LinearGradient from 'react-native-linear-gradient';
 import Toast from 'react-native-toast-message';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -74,13 +75,6 @@ const formatDate = (ymd?: string) => {
   });
 };
 
-const parseYmd = (ymd: string) => {
-  const [y, m, d] = String(ymd || '')
-    .split('-')
-    .map(Number);
-  return new Date(y, (m || 1) - 1, d || 1);
-};
-
 const toReadableCloseStatus = (value?: string) => {
   const v = String(value || '')
     .trim()
@@ -126,7 +120,20 @@ const toReadableDivisi = (value?: number | string) => {
 };
 
 export default function TrackingPenawaranScreen({ route, navigation }: any) {
-  const { token } = useAuth();
+  const { user, token } = useAuth();
+  const isManager = useMemo(
+    () =>
+      String(user?.jabatan || '')
+        .trim()
+        .toUpperCase()
+        .split(/[\s/_-]+/)
+        .includes('MANAGER'),
+    [user?.jabatan],
+  );
+  const loginSalesName = useMemo(
+    () => String(user?.nama || '').trim(),
+    [user?.nama],
+  );
   const insets = useSafeAreaInsets();
   const initialRange = useMemo(() => {
     const pMonth = route?.params?.month;
@@ -162,8 +169,7 @@ export default function TrackingPenawaranScreen({ route, navigation }: any) {
       setEndDate(toYmdLocal(end));
     }
   }, [route?.params?.month, route?.params?.year]);
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [showRangePicker, setShowRangePicker] = useState(false);
   const [search, setSearch] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
   const [salesSearch, setSalesSearch] = useState('');
@@ -288,6 +294,7 @@ export default function TrackingPenawaranScreen({ route, navigation }: any) {
   const [pickerSearch, setPickerSearch] = useState('');
 
   const openPicker = (type: 'sales' | 'customer') => {
+    if (type === 'sales' && !isManager) return;
     setPickerType(type);
     setPickerSearch('');
     setPickerVisible(true);
@@ -310,7 +317,7 @@ export default function TrackingPenawaranScreen({ route, navigation }: any) {
               startDate,
               endDate,
               search: appliedSearch.trim() || undefined,
-              sales: appliedSalesSearch.trim() || undefined,
+              sales: isManager ? appliedSalesSearch.trim() || undefined : undefined,
               customer: appliedCustomerSearch.trim() || undefined,
               limit: 100,
             },
@@ -339,6 +346,7 @@ export default function TrackingPenawaranScreen({ route, navigation }: any) {
       appliedSalesSearch,
       appliedCustomerSearch,
       endDate,
+      isManager,
       startDate,
       token,
     ],
@@ -353,7 +361,7 @@ export default function TrackingPenawaranScreen({ route, navigation }: any) {
 
     const nextSearch = search.trim();
     const currentAppliedSearch = appliedSearch.trim();
-    const nextSales = salesSearch.trim();
+    const nextSales = isManager ? salesSearch.trim() : '';
     const currentAppliedSales = appliedSalesSearch.trim();
     const nextCustomer = customerSearch.trim();
     const currentAppliedCustomer = appliedCustomerSearch.trim();
@@ -361,7 +369,7 @@ export default function TrackingPenawaranScreen({ route, navigation }: any) {
     // Hindari loading menggantung jika tombol ditekan saat filter tidak berubah.
     if (
       nextSearch === currentAppliedSearch &&
-      nextSales === currentAppliedSales &&
+      (!isManager || nextSales === currentAppliedSales) &&
       nextCustomer === currentAppliedCustomer
     ) {
       setIsSearchSubmitting(false);
@@ -370,17 +378,20 @@ export default function TrackingPenawaranScreen({ route, navigation }: any) {
 
     setIsSearchSubmitting(true);
     setAppliedSearch(nextSearch);
-    setAppliedSalesSearch(nextSales);
+    if (isManager) {
+      setAppliedSalesSearch(nextSales);
+    }
     setAppliedCustomerSearch(nextCustomer);
   }, [
     appliedSearch,
     appliedSalesSearch,
     appliedCustomerSearch,
+    customerSearch,
+    isManager,
     isSearchSubmitting,
     loading,
-    search,
     salesSearch,
-    customerSearch,
+    search,
   ]);
 
   const onChangeSearch = useCallback((value: string) => {
@@ -430,22 +441,6 @@ export default function TrackingPenawaranScreen({ route, navigation }: any) {
     },
     [detailMapByPenawaran, token],
   );
-
-  const onChangeStartDate = (_: any, selectedDate?: Date) => {
-    if (Platform.OS !== 'ios') setShowStartPicker(false);
-    if (!selectedDate) return;
-    const ymd = toYmd(selectedDate);
-    setStartDate(ymd);
-    if (ymd > endDate) setEndDate(ymd);
-  };
-
-  const onChangeEndDate = (_: any, selectedDate?: Date) => {
-    if (Platform.OS !== 'ios') setShowEndPicker(false);
-    if (!selectedDate) return;
-    const ymd = toYmd(selectedDate);
-    if (ymd < startDate) setStartDate(ymd);
-    setEndDate(ymd);
-  };
 
   const getTrackingStatusStyle = (item: TrackingPenawaranListItem) => {
     const status = item.status_tracking || 'OPEN';
@@ -720,7 +715,11 @@ export default function TrackingPenawaranScreen({ route, navigation }: any) {
                   onPress={() => navigation.navigate('Home')}
                   activeOpacity={0.85}
                 >
-                  <Text style={styles.backBtnText}>Kembali</Text>
+                  <MaterialIcons
+                    name="arrow-back-ios-new"
+                    size={18}
+                    color={THEME.primary}
+                  />
                 </TouchableOpacity>
                 <View style={styles.headerTitleWrap}>
                   <Text style={styles.title}>Tracking Penawaran</Text>
@@ -730,34 +729,109 @@ export default function TrackingPenawaranScreen({ route, navigation }: any) {
             </View>
 
             <View style={styles.filterCard}>
-              {/* Compact date row */}
-              <View style={styles.dateRow}>
+              {/* Sales + Customer picker row */}
+              <View style={styles.searchRow}>
                 <TouchableOpacity
-                  style={styles.dateChip}
-                  onPress={() => setShowStartPicker(true)}
-                  activeOpacity={0.85}
+                  style={[
+                    styles.pickerChip,
+                    isManager && salesSearch ? styles.pickerChipActive : null,
+                  ]}
+                  onPress={isManager ? () => openPicker('sales') : undefined}
+                  activeOpacity={isManager ? 0.8 : 1}
+                  disabled={!isManager}
                 >
-                  <Text style={styles.dateChipLabel}>Dari</Text>
-                  <Text style={styles.dateChipValue}>
-                    {formatDate(startDate)}
+                  <MaterialIcons
+                    name="person"
+                    size={14}
+                    color={
+                      isManager
+                        ? salesSearch
+                          ? THEME.primary
+                          : THEME.muted
+                        : THEME.primary
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.pickerChipText,
+                      isManager && salesSearch && styles.pickerChipTextActive,
+                      !isManager && styles.pickerChipTextActive,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {isManager
+                      ? salesSearch || 'Semua Sales'
+                      : loginSalesName || 'Sales'}
                   </Text>
+                  {isManager &&
+                    (salesSearch.trim() ? (
+                      <TouchableOpacity
+                        style={styles.clearSearchButton}
+                        onPress={() => {
+                          setSalesSearch('');
+                          setAppliedSalesSearch('');
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <MaterialIcons name="close" size={12} color={THEME.ink} />
+                      </TouchableOpacity>
+                    ) : (
+                      <MaterialIcons
+                        name="keyboard-arrow-down"
+                        size={14}
+                        color={THEME.primary}
+                      />
+                    ))}
                 </TouchableOpacity>
-                <Text style={styles.dateSeparator}>—</Text>
                 <TouchableOpacity
-                  style={styles.dateChip}
-                  onPress={() => setShowEndPicker(true)}
-                  activeOpacity={0.85}
+                  style={[
+                    styles.pickerChip,
+                    customerSearch ? styles.pickerChipActive : null,
+                  ]}
+                  onPress={() => openPicker('customer')}
+                  activeOpacity={0.8}
                 >
-                  <Text style={styles.dateChipLabel}>Sampai</Text>
-                  <Text style={styles.dateChipValue}>
-                    {formatDate(endDate)}
+                  <MaterialIcons
+                    name="business"
+                    size={14}
+                    color={THEME.muted}
+                  />
+                  <Text
+                    style={[
+                      styles.pickerChipText,
+                      customerSearch && styles.pickerChipTextActive,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {customerSearch || 'Customer'}
                   </Text>
+
+                  {customerSearch.trim() ? (
+                    <TouchableOpacity
+                      style={styles.clearSearchButton}
+                      onPress={() => {
+                        setCustomerSearch('');
+                        setAppliedCustomerSearch('');
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <MaterialIcons name="close" size={12} color={THEME.ink} />
+                    </TouchableOpacity>
+                  ) : (
+                    <MaterialIcons
+                      name="keyboard-arrow-down"
+                      size={14}
+                      color={THEME.muted}
+                    />
+                  )}
                 </TouchableOpacity>
               </View>
 
               {/* Search inline with Cari button */}
               <View style={styles.searchRow}>
                 <View style={styles.searchBox}>
+                  <MaterialIcons name="search" size={20} color={THEME.muted} />
+
                   <TextInput
                     value={search}
                     onChangeText={onChangeSearch}
@@ -798,77 +872,30 @@ export default function TrackingPenawaranScreen({ route, navigation }: any) {
                 </TouchableOpacity>
               </View>
 
-              {/* Sales + Customer picker row */}
-              <View style={styles.searchRow}>
+              {/* Date Range Setting Field */}
+              <View style={{ marginTop: 8 }}>
                 <TouchableOpacity
-                  style={[
-                    styles.pickerChip,
-                    salesSearch ? styles.pickerChipActive : null,
-                  ]}
-                  onPress={() => openPicker('sales')}
+                  style={styles.datePickerCard}
+                  onPress={() => setShowRangePicker(true)}
                   activeOpacity={0.8}
                 >
-                  <MaterialIcons
-                    name="person"
-                    size={14}
-                    color={salesSearch ? THEME.primary : THEME.muted}
-                  />
-                  <Text
-                    style={[
-                      styles.pickerChipText,
-                      salesSearch && styles.pickerChipTextActive,
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {salesSearch || 'Sales'}
-                  </Text>
-                  {salesSearch.trim() ? (
-                    <TouchableOpacity
-                      style={styles.clearSearchButton}
-                      onPress={() => {
-                        setSalesSearch('');
-                        setAppliedSalesSearch('');
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <MaterialIcons name="close" size={12} color={THEME.ink} />
-                    </TouchableOpacity>
-                  ) : null}
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.pickerChip,
-                    customerSearch ? styles.pickerChipActive : null,
-                  ]}
-                  onPress={() => openPicker('customer')}
-                  activeOpacity={0.8}
-                >
-                  <MaterialIcons
-                    name="business"
-                    size={14}
-                    color={customerSearch ? THEME.primary : THEME.muted}
-                  />
-                  <Text
-                    style={[
-                      styles.pickerChipText,
-                      customerSearch && styles.pickerChipTextActive,
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {customerSearch || 'Customer'}
-                  </Text>
-                  {customerSearch.trim() ? (
-                    <TouchableOpacity
-                      style={styles.clearSearchButton}
-                      onPress={() => {
-                        setCustomerSearch('');
-                        setAppliedCustomerSearch('');
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <MaterialIcons name="close" size={12} color={THEME.ink} />
-                    </TouchableOpacity>
-                  ) : null}
+                  <View style={styles.datePickerCol}>
+                    <Text style={styles.datePickerDateText} numberOfLines={1}>
+                      {formatDate(startDate)}
+                    </Text>
+                  </View>
+                  <View style={styles.datePickerArrowWrap}>
+                    <MaterialIcons
+                      name="arrow-forward"
+                      size={14}
+                      color={THEME.muted}
+                    />
+                  </View>
+                  <View style={styles.datePickerCol}>
+                    <Text style={styles.datePickerDateText} numberOfLines={1}>
+                      {formatDate(endDate)}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               </View>
 
@@ -1026,22 +1053,19 @@ export default function TrackingPenawaranScreen({ route, navigation }: any) {
         }
       />
 
-      {showStartPicker && (
-        <DateTimePicker
-          value={parseYmd(startDate)}
-          mode="date"
-          display="default"
-          onChange={onChangeStartDate}
-        />
-      )}
-      {showEndPicker && (
-        <DateTimePicker
-          value={parseYmd(endDate)}
-          mode="date"
-          display="default"
-          onChange={onChangeEndDate}
-        />
-      )}
+      {/* Modal Kalender Pemilihan Rentang Tanggal */}
+      <DateRangePickerModal
+        visible={showRangePicker}
+        onClose={() => setShowRangePicker(false)}
+        initialStartDate={startDate}
+        initialEndDate={endDate}
+        primaryColor={THEME.primary}
+        rangeBgColor="rgba(79, 70, 229, 0.12)"
+        onConfirm={(start, end) => {
+          setStartDate(start);
+          setEndDate(end);
+        }}
+      />
 
       <Modal
         visible={pickerVisible}
@@ -1216,26 +1240,22 @@ const styles = StyleSheet.create({
   },
   headerTitleWrap: { flex: 1, alignItems: 'center' },
   backBtn: {
-    backgroundColor: THEME.soft,
+    width: 38,
+    height: 38,
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: THEME.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: THEME.line,
   },
-  backBtnText: {
-    color: THEME.primary,
-    fontWeight: '900',
-    fontSize: 12,
-    letterSpacing: 0.2,
-  },
   headerRightSpacer: {
-    minWidth: 70,
+    width: 38,
   },
   headerWrap: { marginBottom: 10 },
   title: {
     textAlign: 'center',
-    fontSize: 25,
+    fontSize: 20,
     fontWeight: '900',
     color: THEME.ink,
     letterSpacing: 0.2,
@@ -1249,36 +1269,52 @@ const styles = StyleSheet.create({
     padding: 14,
     ...PENAWARAN_SHADOW.card,
   },
-  dateRow: {
+  label: {
+    color: THEME.muted,
+    fontSize: 11,
+    fontWeight: '800',
+    marginLeft: 4,
+    marginBottom: 4,
+    marginTop: 6,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  // Date Range Card – Interactive Field
+  datePickerCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginTop: 10,
-  },
-  dateSeparator: {
-    color: THEME.muted,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  dateChip: {
-    flex: 1,
-    borderRadius: 14,
+    justifyContent: 'center',
+    backgroundColor: THEME.soft,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: THEME.line,
     paddingHorizontal: 10,
-    paddingVertical: 9,
-    backgroundColor: THEME.soft,
+    height: 44,
   },
-  dateChipLabel: {
-    color: THEME.muted,
-    fontSize: 11,
+  datePickerCol: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  datePickerLabel: {
+    fontSize: 9.5,
     fontWeight: '700',
+    color: THEME.muted,
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+    textAlign: 'center',
   },
-  dateChipValue: {
-    color: THEME.ink,
-    marginTop: 2,
+  datePickerDateText: {
     fontSize: 13,
     fontWeight: '800',
+    color: THEME.ink,
+    textAlign: 'center',
+  },
+  datePickerArrowWrap: {
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   searchRow: {
     marginTop: 10,

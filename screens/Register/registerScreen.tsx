@@ -12,7 +12,12 @@ import {
   StyleSheet,
   StatusBar,
 } from 'react-native';
-import Svg, { Defs, LinearGradient as SvgGradient, Stop, Text as SvgText } from 'react-native-svg';
+import Svg, {
+  Defs,
+  LinearGradient as SvgGradient,
+  Stop,
+  Text as SvgText,
+} from 'react-native-svg';
 import DeviceInfo from 'react-native-device-info';
 import LinearGradient from 'react-native-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -321,7 +326,7 @@ const styles = StyleSheet.create({
 
   header: { alignItems: 'center', marginBottom: 14 },
   welcomeText: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: '900',
     color: THEME.ink,
     letterSpacing: 0.5,

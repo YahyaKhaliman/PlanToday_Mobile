@@ -24,6 +24,7 @@ import Toast from 'react-native-toast-message';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePressGuard } from '../../utils/usePressGuard';
 import ModalPicker from 'react-native-modal';
+import CircularProgress from './circularProgress';
 
 import api from '../../services/api';
 import { useAuth } from '../../context/authContext';
@@ -51,7 +52,20 @@ const THEME = {
   warn: '#F59E0B',
 };
 
-const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+const SHORT_MONTHS = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'Mei',
+  'Jun',
+  'Jul',
+  'Agu',
+  'Sep',
+  'Okt',
+  'Nov',
+  'Des',
+];
 
 const MONTHS = [
   { label: 'Jan', value: '1' },
@@ -91,15 +105,6 @@ const formatMonthYear = (month: number, year: number) => {
   return `${mLabel} ${year}`;
 };
 
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.row}>
-      <Text style={styles.key}>{label}</Text>
-      <Text style={styles.val}>{value}</Text>
-    </View>
-  );
-}
-
 type PickerTarget = 'start' | 'end';
 type PickerMode = 'inline' | 'modal';
 
@@ -133,7 +138,8 @@ export default function AchievementOmsetScreen({ navigation }: any) {
   const [draftToMonth, setDraftToMonth] = useState(nowMonth);
 
   /** PICKERS */
-  const [isMonthYearPickerVisible, setIsMonthYearPickerVisible] = useState(false);
+  const [isMonthYearPickerVisible, setIsMonthYearPickerVisible] =
+    useState(false);
   const [tempMonth, setTempMonth] = useState(nowMonth);
   const [tempYear, setTempYear] = useState(nowYear);
   const [pickerTarget, setPickerTarget] = useState<PickerTarget>('start');
@@ -442,7 +448,8 @@ export default function AchievementOmsetScreen({ navigation }: any) {
     if (!isManager) return null;
     return (
       <View style={styles.searchBox}>
-        <Text style={styles.searchIcon}>🔍</Text>
+        <MaterialIcons name="search" size={20} color={THEME.muted} />
+
         <TextInput
           value={keyword}
           onChangeText={setKeyword}
@@ -497,12 +504,16 @@ export default function AchievementOmsetScreen({ navigation }: any) {
                     onPress={() => navigation.navigate('Home')}
                     activeOpacity={0.85}
                   >
-                    <Text style={styles.backBtnText}>Kembali</Text>
+                    <MaterialIcons
+                      name="arrow-back-ios-new"
+                      size={18}
+                      color={THEME.primary}
+                    />
                   </TouchableOpacity>
                   <View style={styles.headerTitleWrap}>
                     <Text style={styles.title}>Achievement</Text>
                     <Text style={styles.subTitle}>
-                      {isManager ? 'Rekap Semua User' : 'Rekap Achievement Saya'}
+                      {isManager ? 'Rekap Achievement' : 'Rekap Achievement'}
                     </Text>
                   </View>
                   <View style={styles.headerRightSpacer} />
@@ -511,60 +522,93 @@ export default function AchievementOmsetScreen({ navigation }: any) {
             </View>
 
             <View style={styles.card}>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  marginBottom: 6,
-                }}
-              >
-                <Text style={styles.heroLabel}>Progress Pencapaian</Text>
-
-                <View style={[styles.chip, { marginTop: 0 }]}>
-                  <MaterialIcons
-                    name={summary.isMet ? 'check-circle' : 'schedule'}
-                    size={14}
-                    color={summary.isMet ? THEME.ok : THEME.warn}
+              {/* Bagian Atas: Circular Progress + Ringkasan Metrik Berdampingan */}
+              <View style={styles.cardTopRow}>
+                {/* Sisi Kiri: Circular Progress */}
+                <View style={styles.circleWrap}>
+                  <CircularProgress
+                    size={78}
+                    strokeWidth={8}
+                    progress={summary.prog}
+                    color={summary.isMet ? THEME.ok : THEME.accent}
+                    bgColor="rgba(15,23,42,0.08)"
+                    textColor={THEME.ink}
                   />
-                  <Text
-                    style={[
-                      styles.chipText,
-                      { color: summary.isMet ? THEME.ok : THEME.warn },
-                    ]}
-                  >
-                    {summary.isMet ? 'TARGET TERCAPAI' : 'BELUM TERCAPAI'}
-                  </Text>
+                </View>
+
+                {/* Sisi Kanan: Informasi & Statistik Ringkas */}
+                <View style={styles.cardTopInfo}>
+                  <View style={styles.infoTopHeader}>
+                    <Text style={styles.infoTitle}>Progress Pencapaian</Text>
+                    <View
+                      style={[
+                        styles.statusBadge,
+                        {
+                          backgroundColor: summary.isMet
+                            ? 'rgba(22,163,74,0.10)'
+                            : 'rgba(245,158,11,0.10)',
+                          borderColor: summary.isMet
+                            ? 'rgba(22,163,74,0.22)'
+                            : 'rgba(245,158,11,0.22)',
+                        },
+                      ]}
+                    >
+                      <MaterialIcons
+                        name={summary.isMet ? 'check-circle' : 'schedule'}
+                        size={12}
+                        color={summary.isMet ? THEME.ok : THEME.warn}
+                      />
+                      <Text
+                        style={[
+                          styles.statusBadgeText,
+                          { color: summary.isMet ? THEME.ok : THEME.warn },
+                        ]}
+                      >
+                        {summary.isMet ? 'TERCAPAI' : 'BELUM'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.statListWrap}>
+                    <View style={styles.statRowItem}>
+                      <Text style={styles.statRowLabel}>Target</Text>
+                      <Text style={styles.statRowColon}>:</Text>
+                      <Text style={styles.statRowValue} numberOfLines={1}>
+                        {rupiahFull(summary.totalTarget)}
+                      </Text>
+                    </View>
+
+                    <View style={styles.statRowItem}>
+                      <Text style={styles.statRowLabel}>Realisasi</Text>
+                      <Text style={styles.statRowColon}>:</Text>
+                      <Text
+                        style={[
+                          styles.statRowValue,
+                          { color: summary.isMet ? THEME.ok : THEME.primary },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {rupiahFull(summary.totalReal)}
+                      </Text>
+                    </View>
+
+                    {isManager && (
+                      <View style={styles.statRowItem}>
+                        <Text style={styles.statRowLabel}>User</Text>
+                        <Text style={styles.statRowColon}>:</Text>
+                        <Text style={styles.statRowValue} numberOfLines={1}>
+                          {loading ? '...' : `${filteredRows.length}`}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
               </View>
 
-              <Text style={styles.heroValue}>{summary.prog.toFixed(2)}%</Text>
-
-              <View style={styles.progressTrack}>
-                <View
-                  style={[styles.progressFill, { width: `${summary.fill}%` }]}
-                />
-              </View>
-
-              <View style={styles.line} />
-
+              {/* Rentang Periode Ramping */}
               {PeriodRowInline}
 
-              <View style={[styles.moneyBlock, { marginTop: 12 }]}>
-                <Row
-                  label="Total Target"
-                  value={rupiahFull(summary.totalTarget)}
-                />
-                <Row
-                  label="Total Realisasi"
-                  value={rupiahFull(summary.totalReal)}
-                />
-                <Row
-                  label="Jumlah User"
-                  value={loading ? '...' : `${filteredRows.length}`}
-                />
-              </View>
-              <View style={styles.line} />
+              {/* Pencarian (Khusus Manager) */}
               {SearchBox}
             </View>
           </View>
@@ -797,8 +841,7 @@ export default function AchievementOmsetScreen({ navigation }: any) {
       >
         <View style={styles.periodModalCard}>
           <Text style={styles.periodModalTitle}>
-            Pilih Periode{' '}
-            {pickerTarget === 'start' ? 'Awal' : 'Akhir'}
+            Pilih Periode {pickerTarget === 'start' ? 'Awal' : 'Akhir'}
           </Text>
 
           <Text style={styles.periodSectionTitle}>Bulan</Text>
@@ -893,24 +936,20 @@ const styles = StyleSheet.create({
   },
   headerTitleWrap: { flex: 1, alignItems: 'center' },
   backBtn: {
-    backgroundColor: THEME.soft,
+    width: 38,
+    height: 38,
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: THEME.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: THEME.line,
   },
-  backBtnText: {
-    color: THEME.primary,
-    fontWeight: '900',
-    fontSize: 12,
-    letterSpacing: 0.2,
-  },
   headerRightSpacer: {
-    minWidth: 70,
+    width: 38,
   },
   title: {
-    fontSize: 25,
+    fontSize: 20,
     fontWeight: '900',
     color: THEME.ink,
     letterSpacing: 0.2,
@@ -925,30 +964,82 @@ const styles = StyleSheet.create({
 
   card: {
     backgroundColor: THEME.card,
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 12,
     borderWidth: 1,
     borderColor: THEME.line,
+    gap: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 1.5,
   },
 
-  heroLabel: { color: THEME.muted, fontSize: 12, fontWeight: '800' },
-  heroValue: {
-    color: THEME.ink,
-    fontSize: 22,
+  cardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 2,
+    gap: 12,
+  },
+  circleWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardTopInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  infoTopHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  infoTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: THEME.muted,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 7,
+    borderWidth: 1,
+    gap: 3,
+  },
+  statusBadgeText: {
+    fontSize: 9,
     fontWeight: '900',
-    marginVertical: 4,
+    letterSpacing: 0.3,
   },
-
-  progressTrack: {
-    height: 6,
-    borderRadius: 999,
-    backgroundColor: 'rgba(15,23,42,0.08)',
-    overflow: 'hidden',
+  statListWrap: {
+    gap: 3,
   },
-  progressFill: {
-    height: 6,
-    borderRadius: 999,
-    backgroundColor: 'rgba(6,182,212,0.75)',
+  statRowItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statRowLabel: {
+    width: 60,
+    fontSize: 11,
+    fontWeight: '700',
+    color: THEME.muted,
+  },
+  statRowColon: {
+    width: 10,
+    fontSize: 11,
+    fontWeight: '700',
+    color: THEME.muted,
+  },
+  statRowValue: {
+    flex: 1,
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: THEME.ink,
+    textAlign: 'right',
   },
 
   chip: { marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -1004,8 +1095,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1,
     borderColor: THEME.line,
-    paddingHorizontal: 12,
-    height: 45,
+    paddingHorizontal: 10,
+    height: 40,
   },
   searchIcon: { marginRight: 8 },
   searchInput: { flex: 1, fontWeight: '900', color: THEME.ink },

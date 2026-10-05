@@ -14,7 +14,7 @@ import {
   Modal,
   ScrollView,
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateRangePickerModal from '../../components/DateRangePickerModal';
 import LinearGradient from 'react-native-linear-gradient';
 import Toast from 'react-native-toast-message';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -44,13 +44,6 @@ const getCurrentMonth = () => {
   };
 };
 
-const parseYmd = (ymd: string) => {
-  const [y, m, d] = String(ymd || '')
-    .split('-')
-    .map(Number);
-  return new Date(y, (m || 1) - 1, d || 1);
-};
-
 const formatDate = (ymd?: string) => {
   if (!ymd) return '-';
   const [y, m, d] = ymd.split('-').map(Number);
@@ -73,7 +66,20 @@ const splitNotes = (value?: string) => {
 };
 
 export default function TrackingMapScreen({ navigation }: any) {
-  const { token } = useAuth();
+  const { user, token } = useAuth();
+  const isManager = useMemo(
+    () =>
+      String(user?.jabatan || '')
+        .trim()
+        .toUpperCase()
+        .split(/[\s/_-]+/)
+        .includes('MANAGER'),
+    [user?.jabatan],
+  );
+  const loginSalesName = useMemo(
+    () => String(user?.nama || '').trim(),
+    [user?.nama],
+  );
   const [salesSearch, setSalesSearch] = useState('');
   const [appliedSalesSearch, setAppliedSalesSearch] = useState('');
   const [masterSales, setMasterSales] = useState<string[]>([]);
@@ -87,8 +93,7 @@ export default function TrackingMapScreen({ navigation }: any) {
   const initialRange = useMemo(() => getCurrentMonth(), []);
   const [startDate, setStartDate] = useState(initialRange.startDate);
   const [endDate, setEndDate] = useState(initialRange.endDate);
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [showRangePicker, setShowRangePicker] = useState(false);
   const [search, setSearch] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
   const [rawItems, setRawItems] = useState<TrackingMapListItem[]>([]);
@@ -151,7 +156,9 @@ export default function TrackingMapScreen({ navigation }: any) {
             startDate,
             endDate,
             search: appliedSearch.trim() || undefined,
-            sales: appliedSalesSearch.trim() || undefined,
+            sales: isManager
+              ? appliedSalesSearch.trim() || undefined
+              : undefined,
           },
           token,
         );
@@ -175,7 +182,7 @@ export default function TrackingMapScreen({ navigation }: any) {
         setIsSearchSubmitting(false);
       }
     },
-    [appliedSearch, appliedSalesSearch, endDate, startDate, token],
+    [appliedSearch, appliedSalesSearch, endDate, isManager, startDate, token],
   );
 
   useEffect(() => {
@@ -186,20 +193,29 @@ export default function TrackingMapScreen({ navigation }: any) {
     if (isBusy) return;
     const nextSearch = search.trim();
     const currentAppliedSearch = appliedSearch.trim();
-    const nextSales = salesSearch.trim();
+    const nextSales = isManager ? salesSearch.trim() : '';
     const currentAppliedSales = appliedSalesSearch.trim();
 
     if (
       nextSearch === currentAppliedSearch &&
-      nextSales === currentAppliedSales
+      (!isManager || nextSales === currentAppliedSales)
     ) {
       setIsSearchSubmitting(false);
       return;
     }
     setIsSearchSubmitting(true);
     setAppliedSearch(nextSearch);
-    setAppliedSalesSearch(nextSales);
-  }, [appliedSearch, appliedSalesSearch, isBusy, search, salesSearch]);
+    if (isManager) {
+      setAppliedSalesSearch(nextSales);
+    }
+  }, [
+    appliedSearch,
+    appliedSalesSearch,
+    isBusy,
+    isManager,
+    search,
+    salesSearch,
+  ]);
 
   const onChangeSearch = useCallback((value: string) => {
     setSearch(value);
@@ -216,22 +232,6 @@ export default function TrackingMapScreen({ navigation }: any) {
     if (loading || isSearchSubmitting) return;
     loadList(true);
   }, [isSearchSubmitting, loadList, loading]);
-
-  const onChangeStartDate = (_: any, selectedDate?: Date) => {
-    if (Platform.OS !== 'ios') setShowStartPicker(false);
-    if (!selectedDate) return;
-    const ymd = toYmd(selectedDate);
-    setStartDate(ymd);
-    if (ymd > endDate) setEndDate(ymd);
-  };
-
-  const onChangeEndDate = (_: any, selectedDate?: Date) => {
-    if (Platform.OS !== 'ios') setShowEndPicker(false);
-    if (!selectedDate) return;
-    const ymd = toYmd(selectedDate);
-    if (ymd < startDate) setStartDate(ymd);
-    setEndDate(ymd);
-  };
 
   const renderItem = useCallback(
     ({ item, index }: { item: TrackingMapListItem; index: number }) => {
@@ -338,7 +338,11 @@ export default function TrackingMapScreen({ navigation }: any) {
                   onPress={() => navigation.navigate('Home')}
                   activeOpacity={0.85}
                 >
-                  <Text style={styles.backBtnText}>Kembali</Text>
+                  <MaterialIcons
+                    name="arrow-back-ios-new"
+                    size={18}
+                    color={THEME.primary}
+                  />
                 </TouchableOpacity>
                 <View style={styles.headerTitleWrap}>
                   <Text style={styles.title}>Tracking MAP</Text>
@@ -348,34 +352,72 @@ export default function TrackingMapScreen({ navigation }: any) {
             </View>
 
             <View style={styles.filterCard}>
-              {/* Compact date row */}
-              <View style={styles.dateRow}>
+              {/* Sales picker row + countBadge */}
+              <View style={styles.searchRow}>
                 <TouchableOpacity
-                  style={styles.dateChip}
-                  onPress={() => setShowStartPicker(true)}
-                  activeOpacity={0.85}
+                  style={[
+                    styles.pickerChip,
+                    isManager && salesSearch ? styles.pickerChipActive : null,
+                  ]}
+                  onPress={isManager ? () => setPickerVisible(true) : undefined}
+                  activeOpacity={isManager ? 0.8 : 1}
+                  disabled={!isManager}
                 >
-                  <Text style={styles.dateChipLabel}>Dari</Text>
-                  <Text style={styles.dateChipValue}>
-                    {formatDate(startDate)}
+                  <MaterialIcons
+                    name="person"
+                    size={14}
+                    color={
+                      isManager
+                        ? salesSearch
+                          ? THEME.primary
+                          : THEME.muted
+                        : THEME.primary
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.pickerChipText,
+                      isManager && salesSearch && styles.pickerChipTextActive,
+                      !isManager && styles.pickerChipTextActive,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {isManager
+                      ? salesSearch || 'Semua Sales'
+                      : loginSalesName || 'Sales'}
                   </Text>
+                  {isManager &&
+                    (salesSearch.trim() ? (
+                      <TouchableOpacity
+                        style={styles.clearSearchButton}
+                        onPress={() => {
+                          setSalesSearch('');
+                          setAppliedSalesSearch('');
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <MaterialIcons
+                          name="close"
+                          size={12}
+                          color={THEME.ink}
+                        />
+                      </TouchableOpacity>
+                    ) : (
+                      <MaterialIcons
+                        name="keyboard-arrow-down"
+                        size={14}
+                        color={THEME.primary}
+                      />
+                    ))}
                 </TouchableOpacity>
-                <Text style={styles.dateSeparator}>—</Text>
-                <TouchableOpacity
-                  style={styles.dateChip}
-                  onPress={() => setShowEndPicker(true)}
-                  activeOpacity={0.85}
-                >
-                  <Text style={styles.dateChipLabel}>Sampai</Text>
-                  <Text style={styles.dateChipValue}>
-                    {formatDate(endDate)}
-                  </Text>
-                </TouchableOpacity>
+                <Text style={styles.countBadge}>{rawItems.length}</Text>
               </View>
 
               {/* Search inline with Cari button */}
               <View style={styles.searchRow}>
                 <View style={styles.searchBox}>
+                  <MaterialIcons name="search" size={20} color={THEME.muted} />
+
                   <TextInput
                     value={search}
                     onChangeText={onChangeSearch}
@@ -418,44 +460,31 @@ export default function TrackingMapScreen({ navigation }: any) {
                 </TouchableOpacity>
               </View>
 
-              {/* Sales picker row + countBadge */}
-              <View style={styles.searchRow}>
+              {/* Date Range Setting Field */}
+              <View style={styles.datePickerWrap}>
                 <TouchableOpacity
-                  style={[
-                    styles.pickerChip,
-                    salesSearch ? styles.pickerChipActive : null,
-                  ]}
-                  onPress={() => setPickerVisible(true)}
+                  style={styles.datePickerCard}
+                  onPress={() => setShowRangePicker(true)}
                   activeOpacity={0.8}
                 >
-                  <MaterialIcons
-                    name="person"
-                    size={14}
-                    color={salesSearch ? THEME.primary : THEME.muted}
-                  />
-                  <Text
-                    style={[
-                      styles.pickerChipText,
-                      salesSearch && styles.pickerChipTextActive,
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {salesSearch || 'Sales'}
-                  </Text>
-                  {salesSearch.trim() ? (
-                    <TouchableOpacity
-                      style={styles.clearSearchButton}
-                      onPress={() => {
-                        setSalesSearch('');
-                        setAppliedSalesSearch('');
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <MaterialIcons name="close" size={12} color={THEME.ink} />
-                    </TouchableOpacity>
-                  ) : null}
+                  <View style={styles.datePickerCol}>
+                    <Text style={styles.datePickerDateText} numberOfLines={1}>
+                      {formatDate(startDate)}
+                    </Text>
+                  </View>
+                  <View style={styles.datePickerArrowWrap}>
+                    <MaterialIcons
+                      name="arrow-forward"
+                      size={14}
+                      color={THEME.muted}
+                    />
+                  </View>
+                  <View style={styles.datePickerCol}>
+                    <Text style={styles.datePickerDateText} numberOfLines={1}>
+                      {formatDate(endDate)}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
-                <Text style={styles.countBadge}>{rawItems.length}</Text>
               </View>
 
               {/* Status filter chip row (Scrollable horizontal) */}
@@ -588,84 +617,84 @@ export default function TrackingMapScreen({ navigation }: any) {
         ListEmptyComponent={listEmptyComponent}
       />
 
-      {showStartPicker && (
-        <DateTimePicker
-          value={parseYmd(startDate)}
-          mode="date"
-          display="default"
-          onChange={onChangeStartDate}
-        />
-      )}
-      {showEndPicker && (
-        <DateTimePicker
-          value={parseYmd(endDate)}
-          mode="date"
-          display="default"
-          onChange={onChangeEndDate}
-        />
-      )}
+      <DateRangePickerModal
+        visible={showRangePicker}
+        onClose={() => setShowRangePicker(false)}
+        initialStartDate={startDate}
+        initialEndDate={endDate}
+        primaryColor={THEME.primary}
+        rangeBgColor="rgba(79, 70, 229, 0.12)"
+        onConfirm={(start, end) => {
+          setStartDate(start);
+          setEndDate(end);
+        }}
+      />
 
-      <Modal
-        visible={pickerVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPickerVisible(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalBackdrop}
-          activeOpacity={1}
-          onPress={() => setPickerVisible(false)}
+      {isManager && (
+        <Modal
+          visible={pickerVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setPickerVisible(false)}
         >
-          <TouchableOpacity activeOpacity={1} style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Pilih Sales</Text>
-            <View style={styles.modalSearchWrap}>
-              <TextInput
-                style={styles.modalSearchInput}
-                placeholder="Cari..."
-                placeholderTextColor={THEME.muted}
-                value={pickerSearch}
-                onChangeText={setPickerSearch}
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setPickerVisible(false)}
+          >
+            <TouchableOpacity activeOpacity={1} style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Pilih Sales</Text>
+              <View style={styles.modalSearchWrap}>
+                <TextInput
+                  style={styles.modalSearchInput}
+                  placeholder="Cari..."
+                  placeholderTextColor={THEME.muted}
+                  value={pickerSearch}
+                  onChangeText={setPickerSearch}
+                />
+              </View>
+              <FlatList
+                data={masterSales.filter(opt =>
+                  (opt || '')
+                    .toLowerCase()
+                    .includes(pickerSearch.toLowerCase()),
+                )}
+                keyExtractor={(_, idx) => String(idx)}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.modalOption}
+                    onPress={() => {
+                      setSalesSearch(item);
+                      setAppliedSalesSearch(item);
+                      setPickerVisible(false);
+                    }}
+                  >
+                    <Text style={styles.modalOptionText}>{item}</Text>
+                  </TouchableOpacity>
+                )}
+                ListEmptyComponent={
+                  <Text
+                    style={{
+                      textAlign: 'center',
+                      marginTop: 20,
+                      color: THEME.muted,
+                    }}
+                  >
+                    Data tidak ditemukan
+                  </Text>
+                }
+                style={{ maxHeight: 300 }}
               />
-            </View>
-            <FlatList
-              data={masterSales.filter(opt =>
-                (opt || '').toLowerCase().includes(pickerSearch.toLowerCase()),
-              )}
-              keyExtractor={(_, idx) => String(idx)}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.modalOption}
-                  onPress={() => {
-                    setSalesSearch(item);
-                    setAppliedSalesSearch(item);
-                    setPickerVisible(false);
-                  }}
-                >
-                  <Text style={styles.modalOptionText}>{item}</Text>
-                </TouchableOpacity>
-              )}
-              ListEmptyComponent={
-                <Text
-                  style={{
-                    textAlign: 'center',
-                    marginTop: 20,
-                    color: THEME.muted,
-                  }}
-                >
-                  Data tidak ditemukan
-                </Text>
-              }
-              style={{ maxHeight: 300 }}
-            />
-            <TouchableOpacity
-              style={styles.modalCloseBtn}
-              onPress={() => setPickerVisible(false)}
-            >
-              <Text style={styles.modalCloseBtnText}>Batal</Text>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setPickerVisible(false)}
+              >
+                <Text style={styles.modalCloseBtnText}>Batal</Text>
+              </TouchableOpacity>
             </TouchableOpacity>
           </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
+        </Modal>
+      )}
     </LinearGradient>
   );
 }
@@ -783,26 +812,22 @@ const styles = StyleSheet.create({
   },
   headerTitleWrap: { flex: 1, alignItems: 'center' },
   backBtn: {
-    backgroundColor: THEME.soft,
+    width: 38,
+    height: 38,
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: THEME.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: THEME.line,
   },
-  backBtnText: {
-    color: THEME.primary,
-    fontWeight: '900',
-    fontSize: 12,
-    letterSpacing: 0.2,
-  },
   headerRightSpacer: {
-    minWidth: 70,
+    width: 38,
   },
   headerWrap: { marginBottom: 10 },
   title: {
     textAlign: 'center',
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '900',
     color: THEME.ink,
     letterSpacing: 0.2,
@@ -816,36 +841,55 @@ const styles = StyleSheet.create({
     padding: 14,
     ...PENAWARAN_SHADOW.card,
   },
-  dateRow: {
+  label: {
+    color: THEME.muted,
+    fontSize: 11,
+    fontWeight: '800',
+    marginLeft: 4,
+    marginBottom: 4,
+    marginTop: 6,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  datePickerWrap: {
+    marginTop: 8,
+  },
+  // Date Range Card – Interactive Field
+  datePickerCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginTop: 10,
-  },
-  dateSeparator: {
-    color: THEME.muted,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  dateChip: {
-    flex: 1,
-    borderRadius: 14,
+    justifyContent: 'center',
+    backgroundColor: THEME.soft,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: THEME.line,
     paddingHorizontal: 10,
-    paddingVertical: 9,
-    backgroundColor: THEME.soft,
+    height: 44,
   },
-  dateChipLabel: {
-    color: THEME.muted,
-    fontSize: 11,
+  datePickerCol: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  datePickerLabel: {
+    fontSize: 9.5,
     fontWeight: '700',
+    color: THEME.muted,
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+    textAlign: 'center',
   },
-  dateChipValue: {
-    color: THEME.ink,
-    marginTop: 2,
+  datePickerDateText: {
     fontSize: 13,
     fontWeight: '800',
+    color: THEME.ink,
+    textAlign: 'center',
+  },
+  datePickerArrowWrap: {
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   searchRow: {
     marginTop: 10,

@@ -27,6 +27,83 @@ export type PermintaanHargaItem = {
   user_create: string;
 };
 
+export type KalkulasiKomponenItem = {
+  kk_komponen: string;
+  kk_jeniskain: string;
+  kk_warna: string;
+  kk_harga: number;
+  kk_babaran: number;
+  kk_pcs: number;
+  kk_kg?: string;
+  kk_pabrik?: string;
+  kk_nourut?: number;
+};
+
+export type KalkulasiAksesoriesItem = {
+  ka_aksesories: string;
+  ka_biaya: number;
+  ka_nourut?: number;
+};
+
+export type KalkulasiDetailData = {
+  hdr?: {
+    kal_nomor: string;
+    kal_mh_nomor: string;
+    kal_project?: string;
+    kal_tanggal?: string;
+    kal_cus?: string;
+    kal_kh_kode?: string;
+    kal_order?: number;
+    kal_rencanaorder?: number;
+    kal_rpallowance?: number;
+    kal_allowance?: number;
+    kal_rplaba?: number;
+    kal_laba?: number;
+    kal_persen?: string;
+    kal_pakaiobat?: string;
+    kal_ppn?: number;
+    kal_rpsesuai?: number;
+    kal_rpsesuaippn?: number;
+    kal_rpsales?: number;
+    kal_rpsistem?: number;
+    kal_rpsales_inc_ppn?: number;
+    kal_rpsistem_inc_ppn?: number;
+    kal_ket?: string;
+    kal_ketbeli?: string;
+    user_create?: string;
+    date_create?: string;
+  };
+  dtl?: {
+    kald_rpbody?: number;
+    kald_rplengan?: number;
+    kald_rprib?: number;
+    kald_rpkrah?: number;
+    kald_rpmanset?: number;
+    kald_rppotong?: number;
+    kald_rpjahit?: number;
+    kald_rpraglan?: number;
+    kald_rpfinishing?: number;
+    kald_rptenagacetak?: number;
+    kald_rpbiayaobat?: number;
+    kald_rpkirim?: number;
+    kald_jahit?: string;
+    kald_body?: string;
+    kald_lengan?: string;
+    kald_rib?: string;
+    kald_krah?: string;
+    kald_manset?: string;
+    kald_babaranbody?: number;
+    kald_babaranlengan?: number;
+  } | null;
+  komponen?: KalkulasiKomponenItem[];
+  aksesories?: KalkulasiAksesoriesItem[];
+  cetak?: { kald_rpcetak?: number } | null;
+  sublim?: { kald_rpsublim?: number; kald_cmsublim?: number } | null;
+  dtf?: { kald_rpdtf?: number; kald_cmdtf?: number } | null;
+  bordir?: { kald_rpbordir?: number; kald_cmbordir?: number } | null;
+  polyflex?: { kald_rppolyflex?: number; kald_cmpolyflex?: number } | null;
+};
+
 export type PermintaanHargaDetail = {
   mh_nomor: string;
   mh_tanggal: string;
@@ -49,6 +126,7 @@ export type PermintaanHargaDetail = {
   mh_sublim?: string;
   mh_warna?: string;
   mh_workshop?: string;
+  mh_pro_nomor?: string;
   mh_ket: string;
   mh_status: string;
   mh_harga_kalkulasi: number;
@@ -56,6 +134,9 @@ export type PermintaanHargaDetail = {
   mh_nomor_kalkulasi?: string;
   mh_date_kalkulasi?: string;
   kal_rpsales?: number;
+  kal_rpsistem?: number;
+  kal_rpsales_inc_ppn?: number;
+  kal_rpsistem_inc_ppn?: number;
   kal_ppn?: number;
   kal_rpsesuai?: number;
   kal_rpsesuaippn?: number;
@@ -68,10 +149,12 @@ export type PermintaanHargaDetail = {
   created_at_fmt?: string;
   gambar_1_url?: string;
   gambar_2_url?: string;
+  kalkulasi_detail?: KalkulasiDetailData | null;
 };
 
 export type PermintaanHargaPayload = {
   mh_tanggal?: string;
+  mh_pro_nomor?: string;
   mh_divisi: string;
   mh_cus_kode: string;
   mh_cus_nama: string;
@@ -435,12 +518,23 @@ export const saveKalkulasiData = async (
 
 // --- KALKULASI ENGINE API (SPANDUK & MMT) ---
 
+export interface SpandukFinishingItem {
+  id: number;
+  nama: string;
+  tipe_hitung: string;
+  tarif: number;
+  satuan?: string;
+  biayaPerPcs?: number;
+  totalBiaya?: number;
+}
+
 export interface SpandukCalculatePayload {
   metode: string;
   lebar: number;
   jenisKain: string;
   panjang: number;
   qty: number;
+  finishingIds?: number[];
 }
 
 export interface MmtCalculatePayload {
@@ -650,4 +744,68 @@ export const getCustomerSoHistoryApi = async (
     pagination: response.data?.pagination,
   };
 };
+
+export interface PraOrderItem {
+  nomor: string;
+  namaPekerjaan: string;
+  cusNama: string;
+  cusKode: string;
+  salKode?: string;
+  salesNama?: string;
+  tanggal: string;
+  status: string;
+  statusPpic: string;
+  qtyRencana: number;
+  divisi: string;
+  divisiNama?: string;
+  finishing?: string;
+  sudahDipakaiOleh?: string | null;
+}
+
+export interface PraOrderDetail {
+  nomor: string;
+  cusKode: string;
+  cusNama: string;
+  salKode: string;
+  salNama: string;
+  namaPekerjaan: string;
+  divisi: string;
+  divisiNama: string;
+  finishing: string;
+  spesifikasi: string;
+  sampel: string;
+  rencanaOrder: number;
+  kain: string;
+  ukuran: string;
+  keterangan: string;
+  catatanDeadline: string;
+  imageUrl: string | null;
+  sudahDipakaiOleh: string | null;
+}
+
+export const getPraOrderListApi = async (
+  keyword: string = '',
+  token?: string | null,
+): Promise<PraOrderItem[]> => {
+  const response = await api.get('/permintaan-harga/pra-order', {
+    params: { q: keyword, limit: 30 },
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  const raw = response.data?.data;
+  return Array.isArray(raw) ? raw : [];
+};
+
+export const getPraOrderDetailApi = async (
+  nomor: string,
+  token?: string | null,
+): Promise<PraOrderDetail | null> => {
+  const response = await api.get(
+    `/permintaan-harga/pra-order/${encodeURIComponent(nomor)}`,
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    },
+  );
+  return response.data?.data || null;
+};
+
 

@@ -1,5 +1,11 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+} from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -15,7 +21,7 @@ import {
   Animated,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateRangePickerModal from '../../components/DateRangePickerModal';
 import api from '../../services/api';
 import { useAuth } from '../../context/authContext';
 import { Linking } from 'react-native';
@@ -46,13 +52,6 @@ type RekapVisitItem = {
   note?: string;
   realisasi?: 'Y' | 'N' | string | null;
   tanggal?: string;
-};
-
-
-
-const ymdToDate = (ymd: string) => {
-  const [y, m, d] = ymd.split('-').map(n => parseInt(n, 10));
-  return new Date(y, m - 1, d);
 };
 
 const dateToYmd = (dt: Date) => {
@@ -113,7 +112,11 @@ export default function VisitGabunganScreen({ navigation }: any) {
   // ===== Skeleton Loading =====
   const skeletonPulse = useRef(new Animated.Value(0.3)).current;
   const skeletonData = useMemo(
-    () => Array.from({ length: 5 }, (_, i) => ({ id: `skeleton-${i}`, isSkeleton: true } as any)),
+    () =>
+      Array.from(
+        { length: 5 },
+        (_, i) => ({ id: `skeleton-${i}`, isSkeleton: true } as any),
+      ),
     [],
   );
 
@@ -171,8 +174,7 @@ export default function VisitGabunganScreen({ navigation }: any) {
   const [tanggalAkhir, setTanggalAkhir] = useState<string>(
     currentMonthRange.end,
   );
-  const [showAwal, setShowAwal] = useState(false);
-  const [showAkhir, setShowAkhir] = useState(false);
+  const [showRangePicker, setShowRangePicker] = useState(false);
 
   // ===== data =====
   const [data, setData] = useState<RekapVisitItem[]>([]);
@@ -490,11 +492,23 @@ export default function VisitGabunganScreen({ navigation }: any) {
                 ]}
               />
               {/* Tanggal Skeleton */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  marginTop: 4,
+                }}
+              >
                 <Animated.View
                   style={[
                     styles.skeletonBar,
-                    { width: 14, height: 14, borderRadius: 7, opacity: skeletonPulse },
+                    {
+                      width: 14,
+                      height: 14,
+                      borderRadius: 7,
+                      opacity: skeletonPulse,
+                    },
                   ]}
                 />
                 <Animated.View
@@ -509,7 +523,12 @@ export default function VisitGabunganScreen({ navigation }: any) {
             <Animated.View
               style={[
                 styles.skeletonBar,
-                { width: 60, height: 24, borderRadius: 12, opacity: skeletonPulse },
+                {
+                  width: 60,
+                  height: 24,
+                  borderRadius: 12,
+                  opacity: skeletonPulse,
+                },
               ]}
             />
           </View>
@@ -577,7 +596,11 @@ export default function VisitGabunganScreen({ navigation }: any) {
             onPress={() => navigation.navigate('Home')}
             activeOpacity={0.85}
           >
-            <Text style={styles.backBtnText}>Kembali</Text>
+            <MaterialIcons
+              name="arrow-back-ios-new"
+              size={18}
+              color={THEME.primary}
+            />
           </TouchableOpacity>
           <View style={styles.headerTitleWrap}>
             <Text style={styles.title}>Visit</Text>
@@ -631,68 +654,56 @@ export default function VisitGabunganScreen({ navigation }: any) {
           </View>
         </View>
 
-        <View style={styles.row2}>
-          <View style={styles.col}>
-            <Text style={styles.label}>Tanggal Awal</Text>
-            <TouchableOpacity
-              style={styles.dateSelect}
-              onPress={() => setShowAwal(true)}
-              activeOpacity={0.9}
-            >
-              <Text style={styles.dateText}>
+        {/* Date Range Setting Field */}
+        <View style={{ marginTop: 2 }}>
+          <Text style={styles.label}>Rentang Tanggal</Text>
+          <TouchableOpacity
+            style={styles.datePickerCard}
+            onPress={() => setShowRangePicker(true)}
+            activeOpacity={0.8}
+          >
+            <View style={styles.datePickerCol}>
+              <Text style={styles.datePickerDateText} numberOfLines={1}>
                 {formatDisplayDate(tanggalAwal)}
               </Text>
-              <MaterialIcons name="edit-calendar" color={THEME.ink} size={18} />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.col}>
-            <Text style={styles.label}>Tanggal Akhir</Text>
-            <TouchableOpacity
-              style={styles.dateSelect}
-              onPress={() => setShowAkhir(true)}
-              activeOpacity={0.9}
-            >
-              <Text style={styles.dateText}>
+            </View>
+            <View style={styles.datePickerArrowWrap}>
+              <MaterialIcons
+                name="arrow-forward"
+                size={14}
+                color={THEME.muted}
+              />
+            </View>
+            <View style={styles.datePickerCol}>
+              <Text style={styles.datePickerDateText} numberOfLines={1}>
                 {formatDisplayDate(tanggalAkhir)}
               </Text>
-              <MaterialIcons name="edit-calendar" color={THEME.ink} size={18} />
-            </TouchableOpacity>
-          </View>
+            </View>
+          </TouchableOpacity>
         </View>
       </View>
 
-      {showAwal && (
-        <DateTimePicker
-          value={ymdToDate(tanggalAwal)}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={(event: any, selected?: Date) => {
-            setShowAwal(false);
-            if (selected) setTanggalAwal(dateToYmd(selected));
-          }}
-        />
-      )}
-
-      {showAkhir && (
-        <DateTimePicker
-          value={ymdToDate(tanggalAkhir)}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={(event: any, selected?: Date) => {
-            setShowAkhir(false);
-            if (selected) setTanggalAkhir(dateToYmd(selected));
-          }}
-        />
-      )}
+      {/* Modal Kalender Pemilihan Rentang Tanggal (Theme PlanToday) */}
+      <DateRangePickerModal
+        visible={showRangePicker}
+        onClose={() => setShowRangePicker(false)}
+        initialStartDate={tanggalAwal}
+        initialEndDate={tanggalAkhir}
+        primaryColor={THEME.primary}
+        rangeBgColor="rgba(79, 70, 229, 0.12)"
+        onConfirm={(start, end) => {
+          setTanggalAwal(start);
+          setTanggalAkhir(end);
+        }}
+      />
 
       <Text style={styles.smallHint}>
         {loading ? (
           'Memuat data...'
         ) : (
           <>
-            Menampilkan: <Text style={{ fontWeight: '900' }}>{data.length}</Text>{' '}
-            data
+            Menampilkan:{' '}
+            <Text style={{ fontWeight: '900' }}>{data.length}</Text> data
           </>
         )}
       </Text>
@@ -716,7 +727,9 @@ export default function VisitGabunganScreen({ navigation }: any) {
 
       <FlatList
         data={loading ? skeletonData : data}
-        keyExtractor={(item: any, index) => item.isSkeleton ? `skeleton-${index}` : String(item.id ?? index)}
+        keyExtractor={(item: any, index) =>
+          item.isSkeleton ? `skeleton-${index}` : String(item.id ?? index)
+        }
         renderItem={renderItem}
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={
@@ -823,54 +836,49 @@ export default function VisitGabunganScreen({ navigation }: any) {
                   <>
                     <Text style={styles.modalLabel}>Sales</Text>
                     <View style={styles.modalReadonlyRow}>
-                      <Text style={styles.modalReadonlyText}>{namaUser || '-'}</Text>
+                      <Text style={styles.modalReadonlyText}>
+                        {namaUser || '-'}
+                      </Text>
                     </View>
                   </>
                 )}
               </View>
             </View>
 
-            <View style={styles.row2}>
-              <View style={styles.col}>
-                <Text style={styles.modalLabel}>Tanggal Awal</Text>
-                <TouchableOpacity
-                  style={styles.modalDateSelect}
-                  onPress={() => setShowAwal(true)}
-                  activeOpacity={0.9}
-                >
-                  <Text style={styles.modalDateText}>
+            {/* Date Range Setting Field di Modal Filter */}
+            <View style={{ marginTop: 2 }}>
+              <Text style={styles.modalLabel}>Rentang Tanggal</Text>
+              <TouchableOpacity
+                style={styles.datePickerCard}
+                onPress={() => setShowRangePicker(true)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.datePickerCol}>
+                  <Text style={styles.datePickerDateText} numberOfLines={1}>
                     {formatDisplayDate(tanggalAwal)}
                   </Text>
+                </View>
+                <View style={styles.datePickerArrowWrap}>
                   <MaterialIcons
-                    name="edit-calendar"
-                    color={THEME.ink}
-                    size={18}
+                    name="arrow-forward"
+                    size={14}
+                    color={THEME.muted}
                   />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.col}>
-                <Text style={styles.modalLabel}>Tanggal Akhir</Text>
-                <TouchableOpacity
-                  style={styles.modalDateSelect}
-                  onPress={() => setShowAkhir(true)}
-                  activeOpacity={0.9}
-                >
-                  <Text style={styles.modalDateText}>
+                </View>
+                <View style={styles.datePickerCol}>
+                  <Text style={styles.datePickerDateText} numberOfLines={1}>
                     {formatDisplayDate(tanggalAkhir)}
                   </Text>
-                  <MaterialIcons
-                    name="edit-calendar"
-                    color={THEME.ink}
-                    size={18}
-                  />
-                </TouchableOpacity>
-              </View>
+                </View>
+              </TouchableOpacity>
             </View>
 
             <View style={[styles.row2, { marginTop: 14 }]}>
               <TouchableOpacity
-                style={[styles.modalBtnCompact, { backgroundColor: THEME.accent }]}
+                style={[
+                  styles.modalBtnCompact,
+                  { backgroundColor: THEME.accent },
+                ]}
                 onPress={() => {
                   runGuardedPress('visit:modal-refresh', () => {
                     setOpenFilter(false);
@@ -1048,21 +1056,17 @@ const styles = StyleSheet.create({
   },
   headerTitleWrap: { flex: 1, alignItems: 'center' },
   backBtn: {
-    backgroundColor: THEME.soft,
+    width: 38,
+    height: 38,
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: THEME.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: THEME.line,
   },
-  backBtnText: {
-    color: THEME.primary,
-    fontWeight: '900',
-    fontSize: 12,
-    letterSpacing: 0.2,
-  },
   headerRightSpacer: {
-    minWidth: 70,
+    width: 38,
   },
   headerCard: {
     backgroundColor: THEME.card,
@@ -1078,7 +1082,7 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 25,
+    fontSize: 20,
     fontWeight: '900',
     color: THEME.ink,
     letterSpacing: 0.2,
@@ -1138,6 +1142,44 @@ const styles = StyleSheet.create({
     height: 44,
   },
   dateText: { flex: 1, color: THEME.ink, fontSize: 13, fontWeight: '800' },
+
+  // Date Range Card – Interactive Field
+  datePickerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: THEME.soft,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: THEME.line,
+    paddingHorizontal: 10,
+    height: 44,
+  },
+  datePickerCol: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  datePickerLabel: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: THEME.muted,
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+    textAlign: 'center',
+  },
+  datePickerDateText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: THEME.ink,
+    textAlign: 'center',
+  },
+  datePickerArrowWrap: {
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   empty: {
     textAlign: 'center',
@@ -1204,7 +1246,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOpacity: 0.10,
+    shadowOpacity: 0.1,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
     elevation: 3,

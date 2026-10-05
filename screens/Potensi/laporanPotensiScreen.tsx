@@ -2,7 +2,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
-  Platform,
   RefreshControl,
   StatusBar,
   StyleSheet,
@@ -12,7 +11,7 @@ import {
   View,
   ScrollView,
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateRangePickerModal from '../../components/DateRangePickerModal';
 import LinearGradient from 'react-native-linear-gradient';
 import Toast from 'react-native-toast-message';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -77,8 +76,7 @@ export default function LaporanPotensiScreen({ navigation, route }: any) {
 
   const [startDate, setStartDate] = useState(initialRange.startDate);
   const [endDate, setEndDate] = useState(initialRange.endDate);
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [showRangePicker, setShowRangePicker] = useState(false);
 
   const [search, setSearch] = useState('');
   const [selectedSales, setSelectedSales] = useState<string>('');
@@ -89,13 +87,13 @@ export default function LaporanPotensiScreen({ navigation, route }: any) {
   const [rawItems, setRawItems] = useState<PotensiListItem[]>([]);
   const [availableSales, setAvailableSales] = useState<string[]>([]);
 
-  // Hanya item berstatus POTENSI (atau null/kosong) yang dihitung ke total potensi
+  // Item aktif adalah item yang belum CLOSE dan belum BATAL
   const openItems = useMemo(() => {
     return rawItems.filter(it => {
       const s = String(it.pot_status || it.status || 'POTENSI')
         .trim()
         .toUpperCase();
-      return s === 'POTENSI' || !s;
+      return s !== 'CLOSE' && s !== 'BATAL';
     });
   }, [rawItems]);
 
@@ -136,9 +134,18 @@ export default function LaporanPotensiScreen({ navigation, route }: any) {
         const items = res.data || [];
         setRawItems(items);
 
-        if (res.meta?.filter_options?.sales) {
-          setAvailableSales(res.meta.filter_options.sales);
-        }
+        const salesList =
+          res.meta?.filter_options?.sales &&
+          res.meta.filter_options.sales.length > 0
+            ? res.meta.filter_options.sales
+            : Array.from(
+                new Set(
+                  items
+                    .map(it => it.sal_nama || it.sales_nama)
+                    .filter(Boolean),
+                ),
+              ).sort();
+        setAvailableSales(salesList as string[]);
         setHasLoadedOnce(true);
       } catch (err: any) {
         console.error('[LaporanPotensiScreen][loadData] Error:', err);
@@ -195,7 +202,7 @@ export default function LaporanPotensiScreen({ navigation, route }: any) {
         bg: '#DCFCE7',
         border: '#86EFAC',
         text: '#15803D',
-        label: 'CLOSE (DEAL)',
+        label: 'CLOSE',
       };
     }
     if (s === 'BATAL') {
@@ -215,9 +222,11 @@ export default function LaporanPotensiScreen({ navigation, route }: any) {
   };
 
   const renderPotensiCard = ({ item }: { item: PotensiListItem }) => {
-    const status = item.pot_status || item.status || 'POTENSI';
+    const status = String(item.pot_status || item.status || 'POTENSI')
+      .trim()
+      .toUpperCase();
     const badge = getStatusBadgeConfig(status);
-    const isOpen = status === 'POTENSI';
+    const isOpen = status !== 'CLOSE' && status !== 'BATAL';
     const isBatal = status === 'BATAL';
     const namaItem = item.pot_nama_item || item.nama_item || '-';
     const penNomor = item.pot_pen_nomor || item.pen_nomor;
@@ -363,13 +372,14 @@ export default function LaporanPotensiScreen({ navigation, route }: any) {
             onPress={() => navigation.navigate('Potensi')}
             activeOpacity={0.8}
           >
-            <Text style={styles.backBtnText}>Kembali</Text>
+            <MaterialIcons
+              name="arrow-back-ios-new"
+              size={18}
+              color={THEME.primary}
+            />
           </TouchableOpacity>
           <View style={styles.headerTitleWrap}>
             <Text style={styles.title}>Laporan Potensi</Text>
-            <Text style={styles.subtitle}>
-              {formatDate(startDate)} - {formatDate(endDate)}
-            </Text>
           </View>
           <View style={styles.headerRightSpacer} />
         </View>
@@ -377,23 +387,30 @@ export default function LaporanPotensiScreen({ navigation, route }: any) {
 
       {/* Filter Card */}
       <View style={styles.headerCard}>
-        {/* Date Row */}
-        <View style={styles.dateRow}>
+        {/* Date Range Setting Field */}
+        <View style={styles.datePickerWrap}>
           <TouchableOpacity
-            style={styles.dateChip}
-            onPress={() => setShowStartPicker(true)}
-            activeOpacity={0.85}
+            style={styles.datePickerCard}
+            onPress={() => setShowRangePicker(true)}
+            activeOpacity={0.8}
           >
-            <Text style={styles.dateChipLabel}>Mulai</Text>
-            <Text style={styles.dateChipValue}>{formatDate(startDate)}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.dateChip}
-            onPress={() => setShowEndPicker(true)}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.dateChipLabel}>Sampai</Text>
-            <Text style={styles.dateChipValue}>{formatDate(endDate)}</Text>
+            <View style={styles.datePickerCol}>
+              <Text style={styles.datePickerDateText} numberOfLines={1}>
+                {formatDate(startDate)}
+              </Text>
+            </View>
+            <View style={styles.datePickerArrowWrap}>
+              <MaterialIcons
+                name="arrow-forward"
+                size={14}
+                color={THEME.muted}
+              />
+            </View>
+            <View style={styles.datePickerCol}>
+              <Text style={styles.datePickerDateText} numberOfLines={1}>
+                {formatDate(endDate)}
+              </Text>
+            </View>
           </TouchableOpacity>
         </View>
 
@@ -535,15 +552,28 @@ export default function LaporanPotensiScreen({ navigation, route }: any) {
       <View
         style={[
           styles.bottomTotalBar,
-          { paddingBottom: Math.max(insets.bottom, 14) },
+          { paddingBottom: Math.max(insets.bottom, 12) },
         ]}
       >
         <View style={styles.bottomTotalLeft}>
-          <Text style={styles.bottomTotalLabel}>Total Nominal Potensi</Text>
-          <Text style={styles.bottomTotalCount}>
-            {openItems.length} Item Potensi ({formatDate(startDate)} -{' '}
-            {formatDate(endDate)})
-          </Text>
+          <Text style={styles.bottomTotalLabel}>Total Potensi Aktif</Text>
+          <View style={styles.bottomBadgeRow}>
+            <View style={styles.bottomCountBadge}>
+              <MaterialIcons
+                name="trending-up"
+                size={13}
+                color={THEME.primary}
+              />
+              <Text style={styles.bottomCountText}>
+                {openItems.length} Item
+              </Text>
+            </View>
+            {rawItems.length !== openItems.length && (
+              <Text style={styles.bottomSubCount}>
+                dari {rawItems.length} total
+              </Text>
+            )}
+          </View>
         </View>
         <View style={styles.bottomTotalRight}>
           <Text style={styles.bottomTotalValue}>
@@ -553,29 +583,19 @@ export default function LaporanPotensiScreen({ navigation, route }: any) {
       </View>
 
       {/* Date Pickers */}
-      {showStartPicker && (
-        <DateTimePicker
-          value={new Date(startDate)}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={(event, selected) => {
-            setShowStartPicker(false);
-            if (selected) setStartDate(toYmd(selected));
-          }}
-        />
-      )}
-
-      {showEndPicker && (
-        <DateTimePicker
-          value={new Date(endDate)}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={(event, selected) => {
-            setShowEndPicker(false);
-            if (selected) setEndDate(toYmd(selected));
-          }}
-        />
-      )}
+      {/* Modal Kalender Pemilihan Rentang Tanggal */}
+      <DateRangePickerModal
+        visible={showRangePicker}
+        onClose={() => setShowRangePicker(false)}
+        initialStartDate={startDate}
+        initialEndDate={endDate}
+        primaryColor={THEME.primary}
+        rangeBgColor="rgba(79, 70, 229, 0.12)"
+        onConfirm={(start, end) => {
+          setStartDate(start);
+          setEndDate(end);
+        }}
+      />
 
       {/* Modal Batal Potensi */}
       <ModalBatalPotensi
@@ -609,32 +629,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   backBtn: {
-    backgroundColor: THEME.soft,
+    width: 38,
+    height: 38,
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: THEME.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: THEME.line,
   },
   headerRightSpacer: {
-    minWidth: 74,
+    width: 38,
   },
   headerTitleWrap: {
     flex: 1,
     alignItems: 'center',
   },
   title: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '900',
     color: THEME.ink,
     letterSpacing: 0.2,
-    textAlign: 'center',
-  },
-  subtitle: {
-    marginTop: 6,
-    fontSize: 12,
-    color: THEME.muted,
-    fontWeight: '700',
     textAlign: 'center',
   },
   headerCard: {
@@ -646,30 +661,55 @@ const styles = StyleSheet.create({
     ...SHADOWS.card,
     marginBottom: 14,
   },
-  dateRow: {
-    flexDirection: 'row',
-    gap: 8,
+  label: {
+    color: THEME.muted,
+    fontSize: 11,
+    fontWeight: '800',
+    marginLeft: 4,
+    marginBottom: 4,
+    marginTop: 2,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  datePickerWrap: {
     marginBottom: 12,
   },
-  dateChip: {
-    flex: 1,
+  // Date Range Card – Interactive Field
+  datePickerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: THEME.soft,
     borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
     borderWidth: 1,
     borderColor: THEME.line,
+    paddingHorizontal: 10,
+    height: 44,
   },
-  dateChipLabel: {
-    fontSize: 11,
+  datePickerCol: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  datePickerLabel: {
+    fontSize: 9.5,
+    fontWeight: '700',
     color: THEME.muted,
-    fontWeight: '500',
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+    textAlign: 'center',
   },
-  dateChipValue: {
+  datePickerDateText: {
     fontSize: 13,
+    fontWeight: '800',
     color: THEME.ink,
-    fontWeight: '600',
-    marginTop: 2,
+    textAlign: 'center',
+  },
+  datePickerArrowWrap: {
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   searchBox: {
     flexDirection: 'row',
@@ -738,32 +778,66 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    ...SHADOWS.card,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 8,
   },
   bottomTotalLeft: {
     flex: 1,
+    justifyContent: 'center',
+    paddingRight: 8,
   },
   bottomTotalLabel: {
     fontSize: 11,
+    fontWeight: '800',
+    color: THEME.muted,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  bottomBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  bottomCountBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: `${THEME.primary}12`,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: `${THEME.primary}25`,
+  },
+  bottomCountText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: THEME.primary,
+  },
+  bottomSubCount: {
+    fontSize: 11,
     color: THEME.muted,
     fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  bottomTotalCount: {
-    fontSize: 12,
-    color: THEME.ink,
-    fontWeight: '700',
-    marginTop: 2,
   },
   bottomTotalRight: {
     alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   bottomTotalValue: {
     fontSize: 18,
     fontWeight: '900',
     color: THEME.primary,
-    letterSpacing: -0.3,
+    letterSpacing: 0.2,
+  },
+  bottomTotalStatusText: {
+    fontSize: 11,
+    color: THEME.muted,
+    fontWeight: '600',
+    marginTop: 2,
   },
 
   // Card List Styles

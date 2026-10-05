@@ -12,6 +12,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Toast from 'react-native-toast-message';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import api from '../../services/api';
 import { PENAWARAN_SHADOW, PENAWARAN_THEME } from '../Penawaran/penawaranTheme';
 
@@ -200,7 +201,11 @@ export default function EditCalonCustomerScreen({ navigation, route }: any) {
           onPress={() => navigation.goBack()}
           activeOpacity={0.9}
         >
-          <Text style={styles.backBtnText}>Kembali</Text>
+          <MaterialIcons
+            name="arrow-back-ios-new"
+            size={18}
+            color={THEME.primary}
+          />
         </TouchableOpacity>
         <Text style={styles.title}>Edit Data Customer</Text>
         <View style={styles.headerRightSpacer} />
@@ -415,9 +420,11 @@ const styles = StyleSheet.create({
   title: {
     color: THEME.ink,
     fontWeight: '900',
-    fontSize: 18,
+    fontSize: 20,
+    letterSpacing: 0.2,
+    textAlign: 'center',
   },
-  headerRightSpacer: { width: 88 },
+  headerRightSpacer: { width: 38 },
   content: { padding: 16, paddingBottom: 32 },
   card: {
     backgroundColor: THEME.card,
@@ -485,19 +492,13 @@ const styles = StyleSheet.create({
   submitBtnDisabled: { opacity: 0.5 },
   submitText: { color: '#fff', fontWeight: '800' },
   backBtn: {
-    backgroundColor: THEME.soft,
+    width: 38,
+    height: 38,
     borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
+    backgroundColor: THEME.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: THEME.line,
-    minWidth: 88,
-    alignItems: 'center',
-  },
-  backBtnText: {
-    color: THEME.primary,
-    fontWeight: '900',
-    fontSize: 12,
-    letterSpacing: 0.2,
   },
 });

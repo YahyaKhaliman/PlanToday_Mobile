@@ -15,6 +15,7 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import api from '../../services/api';
 import Toast from 'react-native-toast-message';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePressGuard } from '../../utils/usePressGuard';
 
@@ -195,7 +196,11 @@ export default function CariCustomerScreen({ navigation, route }: any) {
             onPress={() => navigation.goBack()}
             activeOpacity={0.85}
           >
-            <Text style={styles.backBtnText}>Kembali</Text>
+            <MaterialIcons
+              name="arrow-back-ios-new"
+              size={18}
+              color={THEME.primary}
+            />
           </TouchableOpacity>
           <View style={styles.headerTitleWrap}>
             <Text style={styles.title}>Cari Customer</Text>
@@ -332,24 +337,20 @@ const styles = StyleSheet.create({
   },
   headerTitleWrap: { flex: 1, alignItems: 'center' },
   backBtn: {
-    backgroundColor: THEME.soft,
+    width: 38,
+    height: 38,
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: THEME.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: THEME.line,
   },
-  backBtnText: {
-    color: THEME.primary,
-    fontWeight: '900',
-    fontSize: 12,
-    letterSpacing: 0.2,
-  },
   headerRightSpacer: {
-    minWidth: 70,
+    width: 38,
   },
   title: {
-    fontSize: 25,
+    fontSize: 20,
     fontWeight: '900',
     color: THEME.ink,
     letterSpacing: 0.2,

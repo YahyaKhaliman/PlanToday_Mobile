@@ -1,5 +1,11 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+} from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -71,7 +77,11 @@ export default function RekapCalonCustomerScreen({ navigation }: any) {
   // ===== Skeleton Loading =====
   const skeletonPulse = useRef(new Animated.Value(0.3)).current;
   const skeletonData = useMemo(
-    () => Array.from({ length: 5 }, (_, i) => ({ cc_kode: `skeleton-${i}`, isSkeleton: true } as any)),
+    () =>
+      Array.from(
+        { length: 5 },
+        (_, i) => ({ cc_kode: `skeleton-${i}`, isSkeleton: true } as any),
+      ),
     [],
   );
 
@@ -110,7 +120,7 @@ export default function RekapCalonCustomerScreen({ navigation }: any) {
   const SearchBox = useMemo(
     () => (
       <View style={styles.searchBox}>
-        <Text style={styles.searchIcon}>🔍</Text>
+        <MaterialIcons name="search" size={20} color={THEME.muted} />
 
         <TextInput
           value={keyword}
@@ -352,11 +362,23 @@ export default function RekapCalonCustomerScreen({ navigation }: any) {
                 ]}
               />
               {/* Alamat Skeleton */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  marginTop: 4,
+                }}
+              >
                 <Animated.View
                   style={[
                     styles.skeletonBar,
-                    { width: 14, height: 14, borderRadius: 7, opacity: skeletonPulse },
+                    {
+                      width: 14,
+                      height: 14,
+                      borderRadius: 7,
+                      opacity: skeletonPulse,
+                    },
                   ]}
                 />
                 <Animated.View
@@ -371,13 +393,23 @@ export default function RekapCalonCustomerScreen({ navigation }: any) {
                 <Animated.View
                   style={[
                     styles.skeletonBar,
-                    { width: 70, height: 22, borderRadius: 11, opacity: skeletonPulse },
+                    {
+                      width: 70,
+                      height: 22,
+                      borderRadius: 11,
+                      opacity: skeletonPulse,
+                    },
                   ]}
                 />
                 <Animated.View
                   style={[
                     styles.skeletonBar,
-                    { width: 90, height: 22, borderRadius: 11, opacity: skeletonPulse },
+                    {
+                      width: 90,
+                      height: 22,
+                      borderRadius: 11,
+                      opacity: skeletonPulse,
+                    },
                   ]}
                 />
               </View>
@@ -450,7 +482,11 @@ export default function RekapCalonCustomerScreen({ navigation }: any) {
             onPress={() => navigation.navigate('Home')}
             activeOpacity={0.85}
           >
-            <Text style={styles.backBtnText}>Kembali</Text>
+            <MaterialIcons
+              name="arrow-back-ios-new"
+              size={18}
+              color={THEME.primary}
+            />
           </TouchableOpacity>
           <View style={styles.headerTitleWrap}>
             <Text style={styles.title}>Customer</Text>
@@ -467,8 +503,8 @@ export default function RekapCalonCustomerScreen({ navigation }: any) {
           'Memuat data...'
         ) : (
           <>
-            Menampilkan: <Text style={{ fontWeight: '900' }}>{data.length}</Text>{' '}
-            data
+            Menampilkan:{' '}
+            <Text style={{ fontWeight: '900' }}>{data.length}</Text> data
           </>
         )}
       </Text>
@@ -743,24 +779,20 @@ const styles = StyleSheet.create({
   },
   headerTitleWrap: { flex: 1, alignItems: 'center' },
   backBtn: {
-    backgroundColor: THEME.soft,
+    width: 38,
+    height: 38,
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: THEME.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: THEME.line,
   },
-  backBtnText: {
-    color: THEME.primary,
-    fontWeight: '900',
-    fontSize: 12,
-    letterSpacing: 0.2,
-  },
   headerRightSpacer: {
-    minWidth: 70,
+    width: 38,
   },
   title: {
-    fontSize: 25,
+    fontSize: 20,
     fontWeight: '900',
     color: THEME.ink,
     letterSpacing: 0.2,

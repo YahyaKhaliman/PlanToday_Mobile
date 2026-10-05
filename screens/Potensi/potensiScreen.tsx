@@ -416,7 +416,11 @@ export default function PotensiScreen({ navigation }: any) {
             onPress={() => navigation.navigate('Home')}
             activeOpacity={0.85}
           >
-            <Text style={styles.backBtnText}>Kembali</Text>
+            <MaterialIcons
+              name="arrow-back-ios-new"
+              size={18}
+              color={THEME.primary}
+            />
           </TouchableOpacity>
           <View style={styles.headerTitleWrap}>
             <Text style={styles.title}>Potensi</Text>
@@ -504,7 +508,7 @@ export default function PotensiScreen({ navigation }: any) {
                 </TouchableOpacity>
               ) : (
                 <MaterialIcons
-                  name="arrow-drop-down"
+                  name="keyboard-arrow-down"
                   size={18}
                   color={THEME.muted}
                 />
@@ -620,11 +624,11 @@ export default function PotensiScreen({ navigation }: any) {
   const renderEmptyState = useMemo(
     () => (
       <View style={styles.emptyBox}>
-        <MaterialIcons name="not-interested" size={48} color={THEME.danger} />
-        <Text style={styles.emptyTitle}>Tidak Ada Kandidat</Text>
+        <MaterialIcons name="not-interested" size={48} color={THEME.muted} />
+        <Text style={styles.emptyTitle}>Penawaran/MAP Tidak Ditemukan</Text>
         <Text style={styles.emptySubtitle}>
           {search.trim() || activeTab !== 'ALL' || selectedSales
-            ? 'Tidak ada item kandidat yang sesuai dengan filter/pencarian ini.'
+            ? ''
             : 'Semua Penawaran / MAP yang memenuhi syarat sudah masuk ke Potensi atau sudah terbit SO/SPK.'}
         </Text>
       </View>
@@ -818,21 +822,17 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   backBtn: {
-    backgroundColor: THEME.soft,
+    width: 38,
+    height: 38,
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: THEME.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: THEME.line,
   },
-  backBtnText: {
-    color: THEME.primary,
-    fontWeight: '900',
-    fontSize: 12,
-    letterSpacing: 0.2,
-  },
   headerRightSpacer: {
-    minWidth: 70,
+    width: 38,
   },
   headerTopRow: {
     flexDirection: 'row',
@@ -845,7 +845,7 @@ const styles = StyleSheet.create({
   },
   title: {
     textAlign: 'center',
-    fontSize: 25,
+    fontSize: 20,
     fontWeight: '900',
     color: THEME.ink,
     letterSpacing: 0.2,

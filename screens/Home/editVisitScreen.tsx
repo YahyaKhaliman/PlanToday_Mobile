@@ -719,18 +719,44 @@ export default function EditVisitScreen({ navigation, route }: any) {
         <ScrollView
           contentContainerStyle={[
             styles.scroll,
-            { paddingBottom: 28 + insets.bottom },
+            {
+              paddingTop:
+                Platform.OS === 'android'
+                  ? (StatusBar.currentHeight || 0) + 4
+                  : (insets.top || 0) + 4,
+              paddingBottom: 28 + insets.bottom,
+            },
           ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.header}>
-            <Text style={styles.title}>
-              {isManager ? 'Detail Visit' : 'Visit'}
-            </Text>
-            <Text style={styles.subtitle}>
-              {isManager ? 'Informasi kunjungan sales' : 'Edit Kunjungan'}
-            </Text>
+          <View style={styles.headerTop}>
+            <View style={styles.headerTopRow}>
+              <TouchableOpacity
+                style={styles.backBtn}
+                onPress={() =>
+                  runGuardedPress('edit-visit:header-back', () =>
+                    navigation.navigate('Visit'),
+                  )
+                }
+                activeOpacity={0.8}
+              >
+                <MaterialIcons
+                  name="arrow-back-ios-new"
+                  size={18}
+                  color={THEME.primary}
+                />
+              </TouchableOpacity>
+              <View style={styles.headerTitleWrap}>
+                <Text style={styles.title}>
+                  {isManager ? 'Detail Visit' : 'Visit'}
+                </Text>
+                <Text style={styles.subtitle}>
+                  {isManager ? 'Informasi kunjungan sales' : 'Edit Kunjungan'}
+                </Text>
+              </View>
+              <View style={styles.headerRightSpacer} />
+            </View>
           </View>
 
           {/* Sales (cabang) */}
@@ -1078,9 +1104,28 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
   },
 
-  header: { alignItems: 'center', marginBottom: 12 },
+  headerTop: { marginBottom: 12 },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitleWrap: { flex: 1, alignItems: 'center' },
+  backBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: THEME.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: THEME.line,
+  },
+  headerRightSpacer: {
+    width: 38,
+  },
   title: {
-    fontSize: 25,
+    fontSize: 20,
     fontWeight: '900',
     color: THEME.ink,
     letterSpacing: 0.2,

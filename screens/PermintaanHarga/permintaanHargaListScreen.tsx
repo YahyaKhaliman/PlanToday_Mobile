@@ -21,7 +21,7 @@ import {
   View,
   ScrollView,
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateRangePickerModal from '../../components/DateRangePickerModal';
 import LinearGradient from 'react-native-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import Toast from 'react-native-toast-message';
@@ -272,8 +272,7 @@ export default function PermintaanHargaListScreen({ navigation, route }: any) {
       setEndDate(toYmd(end));
     }
   }, [route?.params?.month, route?.params?.year]);
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [showRangePicker, setShowRangePicker] = useState(false);
   const [showSearchFab, setShowSearchFab] = useState(false);
   const [openSearchMini, setOpenSearchMini] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -450,13 +449,6 @@ export default function PermintaanHargaListScreen({ navigation, route }: any) {
     return () => clearTimeout(timer);
   }, [loadData]);
 
-  const parseYmd = (ymd: string) => {
-    const [y, m, d] = String(ymd || '')
-      .split('-')
-      .map(Number);
-    return new Date(y, (m || 1) - 1, d || 1);
-  };
-
   const onPressItem = (item: PermintaanHargaItem) => {
     navigation.navigate('PermintaanHargaDetail', { nomor: item.nomor });
   };
@@ -465,38 +457,33 @@ export default function PermintaanHargaListScreen({ navigation, route }: any) {
     <View style={styles.headerWrap}>
       <View style={styles.headerTop}>
         <View style={styles.headerTopRow}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => navigation.navigate('Home')}
+            activeOpacity={0.85}
+          >
+            <MaterialIcons
+              name="arrow-back-ios-new"
+              size={18}
+              color={THEME.primary}
+            />
+          </TouchableOpacity>
           <View style={styles.headerTitleWrap}>
             <Text style={styles.title}>Permintaan Harga</Text>
             <Text style={styles.subtitle}>
               Periode {formatDate(startDate)} - {formatDate(endDate)}
             </Text>
           </View>
+          <View style={styles.headerRightSpacer} />
         </View>
       </View>
 
       <View style={styles.headerCard}>
-        <View style={styles.dateRow}>
-          <TouchableOpacity
-            style={styles.dateChip}
-            onPress={() => setShowStartPicker(true)}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.dateChipLabel}>Mulai</Text>
-            <Text style={styles.dateChipValue}>{formatDate(startDate)}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.dateChip}
-            onPress={() => setShowEndPicker(true)}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.dateChipLabel}>Sampai</Text>
-            <Text style={styles.dateChipValue}>{formatDate(endDate)}</Text>
-          </TouchableOpacity>
-        </View>
-
         <View style={styles.searchBox}>
+          <MaterialIcons name="search" size={20} color={THEME.muted} />
+
           <TextInput
-            placeholder="Cari nomor/nama/customer"
+            placeholder="Cari..."
             placeholderTextColor={THEME.muted}
             value={search}
             onChangeText={setSearch}
@@ -514,6 +501,33 @@ export default function PermintaanHargaListScreen({ navigation, route }: any) {
               />
             </TouchableOpacity>
           ) : null}
+        </View>
+
+        <View style={{ marginTop: 2 }}>
+          <Text style={styles.label}>Rentang Tanggal</Text>
+          <TouchableOpacity
+            style={styles.datePickerCard}
+            onPress={() => setShowRangePicker(true)}
+            activeOpacity={0.8}
+          >
+            <View style={styles.datePickerCol}>
+              <Text style={styles.datePickerDateText} numberOfLines={1}>
+                {formatDate(startDate)}
+              </Text>
+            </View>
+            <View style={styles.datePickerArrowWrap}>
+              <MaterialIcons
+                name="arrow-forward"
+                size={14}
+                color={THEME.muted}
+              />
+            </View>
+            <View style={styles.datePickerCol}>
+              <Text style={styles.datePickerDateText} numberOfLines={1}>
+                {formatDate(endDate)}
+              </Text>
+            </View>
+          </TouchableOpacity>
         </View>
 
         <TouchableOpacity
@@ -688,7 +702,9 @@ export default function PermintaanHargaListScreen({ navigation, route }: any) {
   return (
     <LinearGradient
       colors={[THEME.bgTop, THEME.bgBottom]}
-      style={[styles.container, { paddingTop: insets.top }]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.container}
     >
       <StatusBar
         barStyle="dark-content"
@@ -785,41 +801,18 @@ export default function PermintaanHargaListScreen({ navigation, route }: any) {
         showsVerticalScrollIndicator={false}
       />
 
-      {showStartPicker && (
-        <DateTimePicker
-          mode="date"
-          value={parseYmd(startDate)}
-          onChange={(_, d) => {
-            if (Platform.OS !== 'ios') setShowStartPicker(false);
-            if (!d) return;
-            const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
-              2,
-              '0',
-            )}-${String(d.getDate()).padStart(2, '0')}`;
-            setStartDate(ymd);
-            if (ymd > endDate) setEndDate(ymd);
-          }}
-          maximumDate={parseYmd(endDate)}
-        />
-      )}
-
-      {showEndPicker && (
-        <DateTimePicker
-          mode="date"
-          value={parseYmd(endDate)}
-          onChange={(_, d) => {
-            if (Platform.OS !== 'ios') setShowEndPicker(false);
-            if (!d) return;
-            const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
-              2,
-              '0',
-            )}-${String(d.getDate()).padStart(2, '0')}`;
-            setEndDate(ymd);
-            if (ymd < startDate) setStartDate(ymd);
-          }}
-          minimumDate={parseYmd(startDate)}
-        />
-      )}
+      <DateRangePickerModal
+        visible={showRangePicker}
+        onClose={() => setShowRangePicker(false)}
+        initialStartDate={startDate}
+        initialEndDate={endDate}
+        primaryColor={THEME.primary}
+        rangeBgColor="rgba(79, 70, 229, 0.12)"
+        onConfirm={(start, end) => {
+          setStartDate(start);
+          setEndDate(end);
+        }}
+      />
 
       {showSearchFab && (
         <TouchableOpacity
@@ -859,10 +852,11 @@ export default function PermintaanHargaListScreen({ navigation, route }: any) {
               <TextInput
                 value={search}
                 onChangeText={setSearch}
-                placeholder="Cari nomor/nama/customer"
+                placeholder="Cari..."
                 placeholderTextColor={THEME.muted}
                 style={styles.searchInput}
               />
+              <MaterialIcons name="search" size={16} color={THEME.muted} />
               {search.trim() ? (
                 <TouchableOpacity
                   style={styles.clearSearchButton}
@@ -908,7 +902,7 @@ export default function PermintaanHargaListScreen({ navigation, route }: any) {
                 <View style={styles.legendModalTextWrap}>
                   <Text style={styles.legendModalStatusName}>BELUM</Text>
                   <Text style={styles.legendModalStatusDesc}>
-                    Tidak muncul di kalkulasi harga
+                    Pengajuan ke MO terlebih dahulu
                   </Text>
                 </View>
               </View>
@@ -1011,10 +1005,12 @@ const styles = StyleSheet.create({
   },
   headerTitleWrap: { flex: 1, alignItems: 'center' },
   backBtn: {
-    backgroundColor: THEME.soft,
+    width: 38,
+    height: 38,
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: THEME.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: THEME.line,
   },
@@ -1025,14 +1021,15 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   headerRightSpacer: {
-    minWidth: 70,
+    width: 38,
   },
   title: {
-    fontSize: 25,
+    fontSize: 20,
     fontWeight: '900',
     color: THEME.ink,
     letterSpacing: 0.2,
     marginTop: 0,
+    textAlign: 'center',
   },
   subtitle: {
     marginTop: 6,
@@ -1110,22 +1107,52 @@ const styles = StyleSheet.create({
     padding: 14,
     ...PENAWARAN_SHADOW.card,
   },
-  dateRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  dateChip: {
-    flex: 1,
+  label: {
+    color: THEME.muted,
+    fontSize: 11,
+    fontWeight: '800',
+    marginLeft: 4,
+    marginBottom: 4,
+    marginTop: 6,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  // Date Range Card – Interactive Field
+  datePickerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: THEME.soft,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: THEME.line,
-    borderRadius: 14,
-    backgroundColor: THEME.soft,
     paddingHorizontal: 10,
-    paddingVertical: 9,
+    height: 44,
   },
-  dateChipLabel: { color: THEME.muted, fontSize: 11, fontWeight: '700' },
-  dateChipValue: {
-    color: THEME.ink,
+  datePickerCol: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  datePickerLabel: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: THEME.muted,
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+    textAlign: 'center',
+  },
+  datePickerDateText: {
     fontSize: 13,
     fontWeight: '800',
-    marginTop: 2,
+    color: THEME.ink,
+    textAlign: 'center',
+  },
+  datePickerArrowWrap: {
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   searchBox: {
     marginTop: 12,

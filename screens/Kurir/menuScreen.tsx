@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Modal from 'react-native-modal';
 import LinearGradient from 'react-native-linear-gradient';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useAuth } from '../../context/authContext';
 import { usePressGuard } from '../../utils/usePressGuard';
 
@@ -146,7 +147,11 @@ export default function KurirMenuScreen({ navigation }: any) {
                 onPress={() => navigation.navigate('Home')}
                 activeOpacity={0.85}
               >
-                <Text style={styles.backBtnText}>Kembali</Text>
+                <MaterialIcons
+                  name="arrow-back-ios-new"
+                  size={18}
+                  color={THEME.primary}
+                />
               </TouchableOpacity>
               <View style={styles.headerCenter}>
                 <Text style={styles.brandTextBig}>PlanToday</Text>
@@ -323,24 +328,20 @@ const styles = StyleSheet.create({
   },
   headerCenter: { flex: 1, alignItems: 'center' },
   backBtn: {
-    backgroundColor: '#F1F5F9',
+    width: 38,
+    height: 38,
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: THEME.line,
   },
-  backBtnText: {
-    color: THEME.primary,
-    fontWeight: '900',
-    fontSize: 12,
-    letterSpacing: 0.2,
-  },
   headerRightSpacer: {
-    minWidth: 70,
+    width: 38,
   },
   brandTextBig: {
-    fontSize: 26,
+    fontSize: 20,
     fontWeight: '900',
     color: THEME.ink,
     letterSpacing: 0.5,

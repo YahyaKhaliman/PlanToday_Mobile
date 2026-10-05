@@ -159,7 +159,7 @@ export default function AchievementDetailUserRangeScreen() {
   return (
     <LinearGradient
       colors={[THEME.bgTop, THEME.bgBottom]}
-      style={[styles.container, { paddingBottom: insets.bottom + 10 }]}
+      style={styles.container}
     >
       <StatusBar
         barStyle="dark-content"
@@ -167,18 +167,39 @@ export default function AchievementDetailUserRangeScreen() {
         translucent
       />
 
+      {/* HEADER */}
+      <View style={styles.headerWrap}>
+        <View style={styles.headerTop}>
+          <View style={styles.headerTopRow}>
+            <TouchableOpacity
+              style={styles.backBtn}
+              onPress={() => navigation.goBack()}
+              activeOpacity={0.85}
+            >
+              <MaterialIcons
+                name="arrow-back-ios-new"
+                size={18}
+                color={THEME.primary}
+              />
+            </TouchableOpacity>
+            <View style={styles.headerTitleWrap}>
+              <Text style={styles.title}>Detail Achievement</Text>
+              <Text style={styles.subTitle} numberOfLines={1}>
+                {nama} • {jabatan}
+              </Text>
+            </View>
+            <View style={styles.headerRightSpacer} />
+          </View>
+        </View>
+      </View>
+
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 16 }}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: insets.bottom + 16 },
+        ]}
       >
-        {/* HEADER */}
-        <View style={styles.header}>
-          <Text style={styles.title}>Detail Achievement</Text>
-          <Text style={styles.subTitle} numberOfLines={1}>
-            {nama} • {jabatan}
-          </Text>
-        </View>
-
         {/* CARD */}
         <View style={styles.card}>
           {/* PROGRESS + RINGKASAN 2-KOLOM */}
@@ -230,12 +251,6 @@ export default function AchievementDetailUserRangeScreen() {
                 <Text style={styles.summaryValue}>{rupiahFull(realisasi)}</Text>
               </View>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Total SPK</Text>
-                <Text style={styles.summaryValue}>
-                  {loading ? '...' : `${allSpkList.length} SPK`}
-                </Text>
-              </View>
-              <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Selisih</Text>
                 <Text
                   style={[
@@ -246,6 +261,12 @@ export default function AchievementDetailUserRangeScreen() {
                   {rupiahFull(selisih)}
                 </Text>
               </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Total SPK</Text>
+                <Text style={styles.summaryValue}>
+                  {loading ? '...' : `${allSpkList.length} SPK`}
+                </Text>
+              </View>
             </View>
           </View>
 
@@ -253,7 +274,7 @@ export default function AchievementDetailUserRangeScreen() {
 
           {/* DAFTAR SPK REALISASI */}
           <View style={styles.spkSection}>
-            <Text style={styles.sectionTitle}>Daftar Realisasi SPK</Text>
+            <Text style={styles.sectionTitle}>Daftar SPK</Text>
             {loading ? (
               <View style={{ gap: 10 }}>
                 {[1, 2, 3].map(item => (
@@ -357,16 +378,6 @@ export default function AchievementDetailUserRangeScreen() {
           </View>
         </View>
       </ScrollView>
-
-      {/* BUTTON KEMBALI */}
-      <TouchableOpacity
-        activeOpacity={0.9}
-        onPress={() => navigation.goBack()}
-        style={styles.backButton}
-      >
-        <MaterialIcons name="arrow-back" size={20} color={THEME.ink} />
-        <Text style={styles.backButtonText}>Kembali</Text>
-      </TouchableOpacity>
     </LinearGradient>
   );
 }
@@ -374,24 +385,48 @@ export default function AchievementDetailUserRangeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: Platform.OS === 'android' ? 54 : 18,
-    paddingHorizontal: 20,
   },
-
-  header: { marginBottom: 12, alignItems: 'center' },
+  headerWrap: {
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    paddingHorizontal: 20,
+    paddingBottom: 10,
+  },
+  headerTop: { marginBottom: 10 },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitleWrap: { flex: 1, alignItems: 'center' },
+  backBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: THEME.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: THEME.line,
+  },
+  headerRightSpacer: {
+    width: 38,
+  },
   title: {
-    fontSize: 25,
+    fontSize: 20,
     fontWeight: '900',
     color: THEME.ink,
     letterSpacing: 0.2,
     textAlign: 'center',
   },
   subTitle: {
-    color: THEME.ink,
-    fontSize: 17,
-    fontWeight: '800',
-    marginTop: 2,
+    color: THEME.muted,
+    fontSize: 12,
+    marginTop: 6,
+    fontWeight: '700',
     textAlign: 'center',
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
   },
   card: {
     backgroundColor: THEME.card,
@@ -465,7 +500,7 @@ const styles = StyleSheet.create({
   negative: { color: '#DC2626' },
 
   spkSection: {
-    marginTop: 6,
+    marginTop: 3,
   },
   sectionTitle: {
     color: THEME.ink,
@@ -557,18 +592,4 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
   },
-
-  backButton: {
-    marginTop: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    height: 52,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    borderWidth: 1,
-    borderColor: THEME.line,
-  },
-  backButtonText: { color: THEME.ink, fontSize: 14, fontWeight: '900' },
 });

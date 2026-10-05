@@ -610,26 +610,39 @@ export default function VisitScreen({ navigation, route }: any) {
         <ScrollView
           contentContainerStyle={[
             styles.scroll,
-            { paddingBottom: 28 + insets.bottom },
+            {
+              paddingTop:
+                Platform.OS === 'android'
+                  ? (StatusBar.currentHeight || 0) + 4
+                  : (insets.top || 0) + 4,
+              paddingBottom: 28 + insets.bottom,
+            },
           ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.headerArea}>
-            <TouchableOpacity
-              style={styles.backBtn}
-              onPress={() =>
-                runGuardedPress('add-visit:header-back', () =>
-                  navigation.navigate('Visit'),
-                )
-              }
-            >
-              <Text style={styles.backBtnText}>Kembali</Text>
-            </TouchableOpacity>
-
-            <View style={styles.header}>
-              <Text style={styles.title}>Visit</Text>
-              <Text style={styles.subtitle}>Input Kunjungan</Text>
+          <View style={styles.headerTop}>
+            <View style={styles.headerTopRow}>
+              <TouchableOpacity
+                style={styles.backBtn}
+                onPress={() =>
+                  runGuardedPress('add-visit:header-back', () =>
+                    navigation.navigate('Visit'),
+                  )
+                }
+                activeOpacity={0.8}
+              >
+                <MaterialIcons
+                  name="arrow-back-ios-new"
+                  size={18}
+                  color={THEME.primary}
+                />
+              </TouchableOpacity>
+              <View style={styles.headerTitleWrap}>
+                <Text style={styles.title}>Visit</Text>
+                <Text style={styles.subtitle}>Input Kunjungan</Text>
+              </View>
+              <View style={styles.headerRightSpacer} />
             </View>
           </View>
 
@@ -915,40 +928,38 @@ const styles = StyleSheet.create({
 
   scroll: {
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'android' ? 54 : 18,
+    paddingTop:
+      Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 4 : 4,
     paddingBottom: 28,
   },
 
-  headerArea: {
-    position: 'relative',
-    justifyContent: 'center',
+  headerTop: { marginBottom: 10 },
+  headerTopRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 48,
-    marginBottom: 12,
+    justifyContent: 'center',
   },
+  headerTitleWrap: { flex: 1, alignItems: 'center' },
   backBtn: {
-    position: 'absolute',
-    left: 0,
-    backgroundColor: THEME.soft,
+    width: 38,
+    height: 38,
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: THEME.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: THEME.line,
   },
-  backBtnText: {
-    color: THEME.primary,
-    fontWeight: '900',
-    fontSize: 12,
-    letterSpacing: 0.2,
+  headerRightSpacer: {
+    width: 38,
   },
 
-  header: { alignItems: 'center' },
   title: {
-    fontSize: 25,
+    fontSize: 20,
     fontWeight: '900',
     color: THEME.ink,
     letterSpacing: 0.2,
+    textAlign: 'center',
   },
   subtitle: {
     color: THEME.muted,

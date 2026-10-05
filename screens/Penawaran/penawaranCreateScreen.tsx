@@ -282,9 +282,51 @@ export default function PenawaranCreateScreen({ navigation, route }: any) {
     String(draftFromRoute?.keterangan || ''),
   );
   const [note, setNote] = useState(String(draftFromRoute?.note || ''));
+
+  const extractHariFromNote = (text: string): string => {
+    const match = text.match(/surat penawaran berlaku\s+(\d+)\s+hari/i);
+    return match ? match[1] : '';
+  };
+
+  const [berlakuHari, setBerlakuHari] = useState<string>(() =>
+    extractHariFromNote(String(draftFromRoute?.note || '')),
+  );
+
+  const updateBerlakuHari = (hariInput: string) => {
+    const cleanDigits = onlyDigits(hariInput);
+    setBerlakuHari(cleanDigits);
+
+    setNote(prevNote => {
+      const regex = /surat penawaran berlaku\s+\d*\s*hari/i;
+      if (!cleanDigits) {
+        return prevNote.replace(regex, '').replace(/^\n+|\n+$/g, '');
+      }
+      const newSentence = `Surat penawaran berlaku ${cleanDigits} hari`;
+      if (regex.test(prevNote)) {
+        return prevNote.replace(regex, newSentence);
+      }
+      if (!prevNote.trim()) {
+        return newSentence;
+      }
+      return `${newSentence}\n${prevNote.trim()}`;
+    });
+  };
+
+  const handleNoteChange = (text: string) => {
+    setNote(text);
+    const parsedHari = extractHariFromNote(text);
+    if (parsedHari !== berlakuHari) {
+      setBerlakuHari(parsedHari);
+    }
+  };
   const [statusHarga, setStatusHarga] = useState<number>(() => {
     const raw = (draftFromRoute as any)?.status_harga;
-    return raw !== undefined && raw !== null ? Number(raw) || 0 : 0;
+    if (raw !== undefined && raw !== null) return Number(raw) || 0;
+    const firstDetail = draftFromRoute?.details?.[0] as any;
+    if (firstDetail?.is_include_ppn !== undefined) {
+      return firstDetail.is_include_ppn ? 1 : 0;
+    }
+    return 0;
   });
 
   const [isCustomerLockedByPermintaan, setIsCustomerLockedByPermintaan] =
@@ -596,10 +638,8 @@ export default function PenawaranCreateScreen({ navigation, route }: any) {
         is_include_ppn: isIncPpn,
       });
 
-      // Otomatis sinkronkan status PPN penawaran jika terdeteksi Include PPN dari kalkulasi permintaan
-      if (isIncPpn) {
-        setStatusHarga(1);
-      }
+      // Otomatis sinkronkan status PPN penawaran mengikuti status PPN permintaan harga
+      setStatusHarga(isIncPpn ? 1 : 0);
 
       const pickedCustomerKode = toUpper(
         String(selected.customer_kode || '').trim(),
@@ -924,8 +964,13 @@ export default function PenawaranCreateScreen({ navigation, route }: any) {
         <TouchableOpacity
           style={styles.backBtn}
           onPress={() => navigation.navigate('PenawaranList')}
+          activeOpacity={0.8}
         >
-          <Text style={styles.backBtnText}>Kembali</Text>
+          <MaterialIcons
+            name="arrow-back-ios-new"
+            size={18}
+            color={THEME.primary}
+          />
         </TouchableOpacity>
 
         <View style={styles.headerTextWrap}>
@@ -939,196 +984,13 @@ export default function PenawaranCreateScreen({ navigation, route }: any) {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Header</Text>
-
-          <Text style={styles.label}>Tanggal</Text>
-          <TouchableOpacity
-            style={styles.inputButton}
-            onPress={() => setShowDatePicker(true)}
-          >
-            <Text style={styles.inputButtonText}>
-              {formatDateLabel(tanggal)}
-            </Text>
-          </TouchableOpacity>
-
-          <Text style={styles.label}>Sales</Text>
-          <View style={styles.row}>
-            <View style={[styles.inputWrap, { flex: 1, marginBottom: 0 }]}>
-              <TextInput
-                value={sales}
-                editable={isManager}
-                onChangeText={t => {
-                  if (!isManager) return;
-                  setSales(toUpper(t));
-                  if (salesKode) setSalesKode('');
-                }}
-                placeholder="Pilih Sales"
-                placeholderTextColor={THEME.muted}
-                style={styles.input}
-              />
-            </View>
-
-            {isManager && (
-              <TouchableOpacity
-                onPress={() =>
-                  runGuardedPress('penawaran-create:go-search-sales', () =>
-                    navigation.navigate('CariSalesPenawaran', {
-                      keyword: sales,
-                      draft: buildDraft(),
-                    }),
-                  )
-                }
-                style={styles.btnSoft}
-                activeOpacity={0.9}
-              >
-                <Text style={styles.btnSoftText}>CARI</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-          {!!salesKode && (
-            <Text style={styles.helper}>Kode Sales: {salesKode}</Text>
-          )}
-
-          <Text style={styles.label}>
-            No. Penawaran (kosongkan jika penawaran baru)
-          </Text>
-          <View style={styles.row}>
-            <View style={[styles.inputWrap, { flex: 1, marginBottom: 0 }]}>
-              <TextInput
-                value={nomorPenawaranSearch}
-                onChangeText={t => {
-                  setNomorPenawaranSearch(toUpper(t));
-                  if (
-                    selectedExistingNomor &&
-                    toUpper(t).trim() !== selectedExistingNomor
-                  ) {
-                    setSelectedExistingNomor('');
-                  }
-                }}
-                style={styles.input}
-                placeholder="Cari/pilih nomor penawaran"
-                placeholderTextColor={THEME.muted}
-              />
-            </View>
-            {!!nomorPenawaranSearch.trim() && (
-              <TouchableOpacity
-                onPress={() => {
-                  setNomorPenawaranSearch('');
-                  setSelectedExistingNomor('');
-                }}
-                style={styles.btnSoft}
-                activeOpacity={0.9}
-              >
-                <Text style={styles.btnSoftText}>CLEAR</Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              onPress={() =>
-                runGuardedPress('penawaran-create:go-search-nomor', () =>
-                  navigation.navigate('CariNomorPenawaran', {
-                    keyword: nomorPenawaranSearch,
-                    draft: buildDraft(),
-                  }),
-                )
-              }
-              style={styles.btnSoft}
-              activeOpacity={0.9}
-            >
-              <Text style={styles.btnSoftText}>CARI</Text>
-            </TouchableOpacity>
-          </View>
-
-          {!!selectedExistingNomor && (
-            <Text style={styles.helper}>
-              Nomor terpilih: {selectedExistingNomor} (submit akan membuka data
-              existing)
-            </Text>
-          )}
-
-          <Text style={styles.label}>Tipe</Text>
-          <TouchableOpacity
-            style={styles.inputButton}
-            onPress={() => setShowTipeOptions(prev => !prev)}
-          >
-            <View style={styles.dropdownTriggerRow}>
-              <Text style={styles.inputButtonText}>{tipe || '-'}</Text>
-              <Text style={styles.dropdownArrowText}>
-                {showTipeOptions ? '▲' : '▼'}
-              </Text>
-            </View>
-          </TouchableOpacity>
-          {showTipeOptions && (
-            <View style={styles.dropdownWrap}>
-              {['', 'Medium', 'Premium'].map(opt => (
-                <TouchableOpacity
-                  key={`tipe-${opt || 'kosong'}`}
-                  style={styles.dropdownItem}
-                  onPress={() => {
-                    setTipe(opt);
-                    setShowTipeOptions(false);
-                  }}
-                >
-                  <Text style={styles.dropdownItemText}>{opt || '-'}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-
-          <Text style={styles.label}>Perusahaan</Text>
-          <TouchableOpacity
-            style={styles.inputButton}
-            onPress={() => setShowPerusahaanOptions(prev => !prev)}
-            disabled={loadingPerusahaanOptions}
-          >
-            <View style={styles.dropdownTriggerRow}>
-              <Text style={styles.inputButtonText}>
-                {loadingPerusahaanOptions
-                  ? 'Memuat perusahaan...'
-                  : perusahaan || 'Pilih Perusahaan'}
-              </Text>
-              <Text style={styles.dropdownArrowText}>
-                {showPerusahaanOptions ? '▲' : '▼'}
-              </Text>
-            </View>
-          </TouchableOpacity>
-          {showPerusahaanOptions && (
-            <View style={styles.dropdownWrap}>
-              {perusahaanOptions.map(opt => (
-                <TouchableOpacity
-                  key={`perusahaan-${opt.kode}`}
-                  style={styles.dropdownItem}
-                  onPress={() => {
-                    setPerusahaanKode(opt.kode);
-                    setPerusahaan(opt.nama);
-                    setShowPerusahaanOptions(false);
-                  }}
-                >
-                  <Text style={styles.dropdownItemText}>{opt.nama}</Text>
-                </TouchableOpacity>
-              ))}
-              {!loadingPerusahaanOptions && perusahaanOptions.length === 0 && (
-                <View style={styles.dropdownItem}>
-                  <Text style={styles.dropdownItemText}>
-                    Data perusahaan tidak tersedia
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
-
-          {!!perusahaanKode && (
-            <Text style={styles.helper}>Kode: {perusahaanKode}</Text>
-          )}
-        </View>
-
-        {/* CARD 2: PENGISIAN DETAIL ITEM & PERMINTAAN HARGA (DI ATAS) */}
+        {/* CARD 1: PERMINTAAN HARGA & ITEM PENAWARAN (DI ATAS) */}
         <View style={styles.card}>
           <View style={styles.rowBetween}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.cardTitle}>Detail Item & Permintaan Harga</Text>
+              <Text style={styles.cardTitle}>Permintaan Harga & Item Penawaran</Text>
               <Text style={styles.helperInfoText}>
-                Pilih No. Permintaan untuk mengisi otomatis data barang, customer, divisi, dan status PPN.
+                Pilih No. Permintaan Harga untuk mengisi otomatis data Penawaran.
               </Text>
             </View>
           </View>
@@ -1234,11 +1096,6 @@ export default function PenawaranCreateScreen({ navigation, route }: any) {
                   <View style={styles.kalkulasiBadgeRow}>
                     {!!item.nomor_kalkulasi && (
                       <View style={styles.kalkulasiBadge}>
-                        <MaterialIcons
-                          name="calculate"
-                          size={14}
-                          color="#0284c7"
-                        />
                         <Text style={styles.kalkulasiBadgeText}>
                           Ref Kalkulasi: {item.nomor_kalkulasi}
                         </Text>
@@ -1402,9 +1259,9 @@ export default function PenawaranCreateScreen({ navigation, route }: any) {
           />
         </View>
 
-        {/* CARD 3: KETERANGAN LANJUTAN & PENUTUP (DI BAWAH) */}
+        {/* CARD 2: TUJUAN PENAWARAN */}
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Keterangan Lanjutan</Text>
+          <Text style={styles.cardTitle}>Tujuan Penawaran</Text>
 
           <Text style={styles.label}>Customer</Text>
           {!isCustomerLockedByPermintaan ? (
@@ -1465,10 +1322,225 @@ export default function PenawaranCreateScreen({ navigation, route }: any) {
             </View>
           </View>
 
-          {/* Pengaturan Status Pajak (PPN) */}
-          <Text style={[styles.label, { marginTop: 12 }]}>
-            Status Pajak (PPN)
+          <Text style={[styles.label, { marginTop: 12 }]}>Kepada (Up)</Text>
+          <TextInput
+            value={up}
+            onChangeText={setUp}
+            style={styles.input}
+            placeholder="Up (contoh: Bpk. Bambang)"
+            placeholderTextColor={THEME.muted}
+          />
+        </View>
+
+        {/* CARD 3: INFORMASI SURAT */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Informasi Surat</Text>
+
+          <Text style={styles.label}>Perusahaan</Text>
+          <TouchableOpacity
+            style={styles.inputButton}
+            onPress={() => setShowPerusahaanOptions(prev => !prev)}
+            disabled={loadingPerusahaanOptions}
+          >
+            <View style={styles.dropdownTriggerRow}>
+              <Text style={styles.inputButtonText}>
+                {loadingPerusahaanOptions
+                  ? 'Memuat perusahaan...'
+                  : perusahaan || 'Pilih Perusahaan'}
+              </Text>
+              <Text style={styles.dropdownArrowText}>
+                {showPerusahaanOptions ? '▲' : '▼'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+          {showPerusahaanOptions && (
+            <View style={styles.dropdownWrap}>
+              {perusahaanOptions.map(opt => (
+                <TouchableOpacity
+                  key={`perusahaan-${opt.kode}`}
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setPerusahaanKode(opt.kode);
+                    setPerusahaan(opt.nama);
+                    setShowPerusahaanOptions(false);
+                  }}
+                >
+                  <Text style={styles.dropdownItemText}>{opt.nama}</Text>
+                </TouchableOpacity>
+              ))}
+              {!loadingPerusahaanOptions && perusahaanOptions.length === 0 && (
+                <View style={styles.dropdownItem}>
+                  <Text style={styles.dropdownItemText}>
+                    Data perusahaan tidak tersedia
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {!!perusahaanKode && (
+            <Text style={styles.helper}>Kode: {perusahaanKode}</Text>
+          )}
+
+          <Text style={styles.label}>Tanda Tangan</Text>
+          <TextInput
+            value={ttd}
+            onChangeText={setTtd}
+            style={styles.input}
+            placeholder="Tanda Tangan"
+            placeholderTextColor={THEME.muted}
+          />
+
+          <Text style={styles.label}>Jabatan Tanda Tangan</Text>
+          <TextInput
+            value={ttdJabatan}
+            onChangeText={setTtdJabatan}
+            editable
+            style={styles.input}
+            placeholder="Jabatan Tanda Tangan"
+            placeholderTextColor={THEME.muted}
+          />
+
+          <Text style={styles.label}>Tipe Penawaran</Text>
+          <TouchableOpacity
+            style={styles.inputButton}
+            onPress={() => setShowTipeOptions(prev => !prev)}
+          >
+            <View style={styles.dropdownTriggerRow}>
+              <Text style={styles.inputButtonText}>{tipe || '-'}</Text>
+              <Text style={styles.dropdownArrowText}>
+                {showTipeOptions ? '▲' : '▼'}
+              </Text>
+            </View>
+          </TouchableOpacity>
+          {showTipeOptions && (
+            <View style={styles.dropdownWrap}>
+              {['', 'Medium', 'Premium'].map(opt => (
+                <TouchableOpacity
+                  key={`tipe-${opt || 'kosong'}`}
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setTipe(opt);
+                    setShowTipeOptions(false);
+                  }}
+                >
+                  <Text style={styles.dropdownItemText}>{opt || '-'}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+
+          <Text style={styles.label}>Tanggal Surat</Text>
+          <TouchableOpacity
+            style={styles.inputButton}
+            onPress={() => setShowDatePicker(true)}
+          >
+            <Text style={styles.inputButtonText}>
+              {formatDateLabel(tanggal)}
+            </Text>
+          </TouchableOpacity>
+
+          <Text style={styles.label}>
+            No. Penawaran (kosongkan jika penawaran baru)
           </Text>
+          <View style={styles.row}>
+            <View style={[styles.inputWrap, { flex: 1, marginBottom: 0 }]}>
+              <TextInput
+                value={nomorPenawaranSearch}
+                onChangeText={t => {
+                  setNomorPenawaranSearch(toUpper(t));
+                  if (
+                    selectedExistingNomor &&
+                    toUpper(t).trim() !== selectedExistingNomor
+                  ) {
+                    setSelectedExistingNomor('');
+                  }
+                }}
+                style={styles.input}
+                placeholder="Cari/pilih nomor penawaran"
+                placeholderTextColor={THEME.muted}
+              />
+            </View>
+            {!!nomorPenawaranSearch.trim() && (
+              <TouchableOpacity
+                onPress={() => {
+                  setNomorPenawaranSearch('');
+                  setSelectedExistingNomor('');
+                }}
+                style={styles.btnSoft}
+                activeOpacity={0.9}
+              >
+                <Text style={styles.btnSoftText}>CLEAR</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              onPress={() =>
+                runGuardedPress('penawaran-create:go-search-nomor', () =>
+                  navigation.navigate('CariNomorPenawaran', {
+                    keyword: nomorPenawaranSearch,
+                    draft: buildDraft(),
+                  }),
+                )
+              }
+              style={styles.btnSoft}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.btnSoftText}>CARI</Text>
+            </TouchableOpacity>
+          </View>
+
+          {!!selectedExistingNomor && (
+            <Text style={styles.helper}>
+              Nomor terpilih: {selectedExistingNomor} (submit akan membuka data
+              existing)
+            </Text>
+          )}
+
+          <Text style={styles.label}>Sales</Text>
+          <View style={styles.row}>
+            <View style={[styles.inputWrap, { flex: 1, marginBottom: 0 }]}>
+              <TextInput
+                value={sales}
+                editable={isManager}
+                onChangeText={t => {
+                  if (!isManager) return;
+                  setSales(toUpper(t));
+                  if (salesKode) setSalesKode('');
+                }}
+                placeholder="Pilih Sales"
+                placeholderTextColor={THEME.muted}
+                style={styles.input}
+              />
+            </View>
+
+            {isManager && (
+              <TouchableOpacity
+                onPress={() =>
+                  runGuardedPress('penawaran-create:go-search-sales', () =>
+                    navigation.navigate('CariSalesPenawaran', {
+                      keyword: sales,
+                      draft: buildDraft(),
+                    }),
+                  )
+                }
+                style={styles.btnSoft}
+                activeOpacity={0.9}
+              >
+                <Text style={styles.btnSoftText}>CARI</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          {!!salesKode && (
+            <Text style={styles.helper}>Kode Sales: {salesKode}</Text>
+          )}
+        </View>
+
+        {/* CARD 4: KETENTUAN & CATATAN */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Ketentuan & Catatan</Text>
+
+          {/* Pengaturan Status Pajak (PPN) */}
+          <Text style={styles.label}>Status Pajak (PPN)</Text>
           <View style={styles.ppnSelectorWrap}>
             <TouchableOpacity
               style={[
@@ -1585,20 +1657,11 @@ export default function PenawaranCreateScreen({ navigation, route }: any) {
           </View>
           <Text style={styles.ppnNoteHint}>
             {statusHarga === 1
-              ? '💡 Pada PDF Penawaran tercantum: "* Note : Harga sudah termasuk PPN"'
-              : '💡 Pada PDF Penawaran tercantum: "* Note : Harga belum termasuk PPN"'}
+              ? '* Note pada PDF Penawaran: "Harga sudah termasuk PPN"'
+              : '* Note pada PDF Penawaran: "Harga belum termasuk PPN"'}
           </Text>
 
-          <Text style={[styles.label, { marginTop: 12 }]}>Up</Text>
-          <TextInput
-            value={up}
-            onChangeText={setUp}
-            style={styles.input}
-            placeholder="Up (contoh: Bpk. Bambang)"
-            placeholderTextColor={THEME.muted}
-          />
-
-          <Text style={styles.label}>Keterangan</Text>
+          <Text style={[styles.label, { marginTop: 12 }]}>Keterangan</Text>
           <TextInput
             value={keterangan}
             onChangeText={t => setKeterangan(t)}
@@ -1608,37 +1671,58 @@ export default function PenawaranCreateScreen({ navigation, route }: any) {
           />
 
           <Text style={styles.label}>Note</Text>
+          <View style={styles.berlakuCard}>
+            <View style={styles.berlakuRow}>
+              <Text style={styles.berlakuLabel}>Surat penawaran berlaku</Text>
+              <View style={styles.berlakuInputWrap}>
+                <TextInput
+                  value={berlakuHari}
+                  onChangeText={updateBerlakuHari}
+                  placeholder="..."
+                  placeholderTextColor={THEME.muted}
+                  keyboardType="numeric"
+                  style={styles.berlakuInput}
+                />
+              </View>
+              <Text style={styles.berlakuSuffix}>hari</Text>
+            </View>
+
+            <View style={styles.berlakuPresetRow}>
+              {['3', '7', '14', '30'].map(val => (
+                <TouchableOpacity
+                  key={`preset-${val}`}
+                  style={[
+                    styles.berlakuPresetChip,
+                    berlakuHari === val && styles.berlakuPresetChipActive,
+                  ]}
+                  onPress={() => updateBerlakuHari(val)}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[
+                      styles.berlakuPresetText,
+                      berlakuHari === val && styles.berlakuPresetTextActive,
+                    ]}
+                  >
+                    {val} Hari
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
           <TextInput
             value={note}
-            onChangeText={t => setNote(t)}
-            style={[styles.input, styles.noteInput]}
-            placeholder="Note"
+            onChangeText={handleNoteChange}
+            style={[styles.input, styles.noteInput, { marginTop: 8 }]}
+            placeholder="Surat penawaran berlaku ... hari"
             placeholderTextColor={THEME.muted}
             multiline
             textAlignVertical="top"
           />
-
-          <Text style={styles.label}>Tanda Tangan</Text>
-          <TextInput
-            value={ttd}
-            onChangeText={setTtd}
-            style={styles.input}
-            placeholder="Tanda Tangan"
-            placeholderTextColor={THEME.muted}
-          />
-
-          <Text style={styles.label}>Jabatan Tanda Tangan</Text>
-          <TextInput
-            value={ttdJabatan}
-            onChangeText={setTtdJabatan}
-            editable
-            style={styles.input}
-            placeholder="Jabatan Tanda Tangan"
-            placeholderTextColor={THEME.muted}
-          />
         </View>
 
-        {/* CARD 4: RINGKASAN TOTAL & SUBMIT */}
+        {/* CARD 5: RINGKASAN TOTAL & SUBMIT */}
         <View style={styles.card}>
           <View style={styles.rowBetween}>
             <Text style={styles.totalCardLabel}>Total Estimasi:</Text>
@@ -1648,11 +1732,6 @@ export default function PenawaranCreateScreen({ navigation, route }: any) {
           </View>
 
           <View style={styles.totalStatusWrap}>
-            <MaterialIcons
-              name={statusHarga === 1 ? 'check-circle' : 'info'}
-              size={15}
-              color={statusHarga === 1 ? '#16a34a' : '#0284c7'}
-            />
             <Text
               style={[
                 styles.totalStatusText,
@@ -1660,8 +1739,8 @@ export default function PenawaranCreateScreen({ navigation, route }: any) {
               ]}
             >
               {statusHarga === 1
-                ? 'Status Penawaran: Harga Sudah Termasuk PPN (INC PPN)'
-                : 'Status Penawaran: Harga Belum Termasuk PPN (EXC PPN)'}
+                ? 'Status: Harga Sudah Termasuk PPN (INC PPN)'
+                : 'Status: Harga Belum Termasuk PPN (EXC PPN)'}
             </Text>
           </View>
 
@@ -2030,26 +2109,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerRightSpacer: {
-    minWidth: 74,
+    width: 38,
   },
   backBtn: {
-    backgroundColor: THEME.soft,
+    width: 38,
+    height: 38,
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: THEME.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: THEME.line,
-  },
-  backBtnText: {
-    color: THEME.primary,
-    fontWeight: '900',
-    fontSize: 12,
-    letterSpacing: 0.2,
   },
   title: {
     color: THEME.ink,
     fontWeight: '900',
-    fontSize: 18,
+    fontSize: 20,
+    letterSpacing: 0.2,
     textAlign: 'center',
   },
   content: {
@@ -2690,5 +2766,73 @@ const styles = StyleSheet.create({
   totalStatusText: {
     fontSize: 12,
     fontWeight: '700',
+  },
+  berlakuCard: {
+    backgroundColor: THEME.soft,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: THEME.line,
+    padding: 10,
+    marginTop: 2,
+    marginBottom: 4,
+  },
+  berlakuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  berlakuLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: THEME.ink,
+  },
+  berlakuInputWrap: {
+    width: 54,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: THEME.line,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+  },
+  berlakuInput: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: THEME.ink,
+    textAlign: 'center',
+    padding: 0,
+    margin: 0,
+  },
+  berlakuSuffix: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: THEME.ink,
+  },
+  berlakuPresetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+  },
+  berlakuPresetChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: THEME.line,
+  },
+  berlakuPresetChipActive: {
+    backgroundColor: THEME.primary,
+    borderColor: THEME.primary,
+  },
+  berlakuPresetText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: THEME.ink,
+  },
+  berlakuPresetTextActive: {
+    color: '#fff',
   },
 });

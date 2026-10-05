@@ -13,7 +13,7 @@ import {
   View,
   ScrollView,
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateRangePickerModal from '../../components/DateRangePickerModal';
 import LinearGradient from 'react-native-linear-gradient';
 import Toast from 'react-native-toast-message';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -43,13 +43,6 @@ const getCurrentMonth = () => {
   };
 };
 
-const parseYmd = (ymd: string) => {
-  const [y, m, d] = String(ymd || '')
-    .split('-')
-    .map(Number);
-  return new Date(y, (m || 1) - 1, d || 1);
-};
-
 const formatDate = (ymd?: string) => {
   if (!ymd) return '-';
   const [y, m, d] = ymd.split('-').map(Number);
@@ -74,9 +67,10 @@ export default function TrackingSpkScreen({ route, navigation }: any) {
       const start = new Date(pYear, pMonth - 1, 1);
       const end = new Date(pYear, pMonth, 0);
       const toYmdLocal = (d: Date) =>
-        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-          d.getDate(),
-        ).padStart(2, '0')}`;
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+          2,
+          '0',
+        )}-${String(d.getDate()).padStart(2, '0')}`;
       return { startDate: toYmdLocal(start), endDate: toYmdLocal(end) };
     }
     return getCurrentMonth();
@@ -92,15 +86,15 @@ export default function TrackingSpkScreen({ route, navigation }: any) {
       const start = new Date(pYear, pMonth - 1, 1);
       const end = new Date(pYear, pMonth, 0);
       const toYmdLocal = (d: Date) =>
-        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
-          d.getDate(),
-        ).padStart(2, '0')}`;
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+          2,
+          '0',
+        )}-${String(d.getDate()).padStart(2, '0')}`;
       setStartDate(toYmdLocal(start));
       setEndDate(toYmdLocal(end));
     }
   }, [route?.params?.month, route?.params?.year]);
-  const [showStartPicker, setShowStartPicker] = useState(false);
-  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [showRangePicker, setShowRangePicker] = useState(false);
   const [search, setSearch] = useState('');
   const [appliedSearch, setAppliedSearch] = useState('');
   const [rawItems, setRawItems] = useState<TrackingSpkListItem[]>([]);
@@ -111,8 +105,9 @@ export default function TrackingSpkScreen({ route, navigation }: any) {
       const order = Number(item.spk_jumlah) || 0;
       const realisasi = Number(item.realisasi_total) || 0;
       if (filterStatus === 'belum') return realisasi < 0.01;
-      if (filterStatus === 'sudah') return realisasi >= (order - 0.01);
-      if (filterStatus === 'proses') return realisasi >= 0.01 && realisasi < (order - 0.01);
+      if (filterStatus === 'sudah') return realisasi >= order - 0.01;
+      if (filterStatus === 'proses')
+        return realisasi >= 0.01 && realisasi < order - 0.01;
       return true;
     });
   }, [rawItems, filterStatus]);
@@ -126,7 +121,7 @@ export default function TrackingSpkScreen({ route, navigation }: any) {
       const realisasi = Number(item.realisasi_total) || 0;
       if (realisasi < 0.01) {
         belumCount++;
-      } else if (realisasi >= (order - 0.01)) {
+      } else if (realisasi >= order - 0.01) {
         sudahCount++;
       } else {
         prosesCount++;
@@ -218,22 +213,6 @@ export default function TrackingSpkScreen({ route, navigation }: any) {
     if (loading || isSearchSubmitting) return;
     loadList(true);
   }, [isSearchSubmitting, loadList, loading]);
-
-  const onChangeStartDate = (_: any, selectedDate?: Date) => {
-    if (Platform.OS !== 'ios') setShowStartPicker(false);
-    if (!selectedDate) return;
-    const ymd = toYmd(selectedDate);
-    setStartDate(ymd);
-    if (ymd > endDate) setEndDate(ymd);
-  };
-
-  const onChangeEndDate = (_: any, selectedDate?: Date) => {
-    if (Platform.OS !== 'ios') setShowEndPicker(false);
-    if (!selectedDate) return;
-    const ymd = toYmd(selectedDate);
-    if (ymd < startDate) setStartDate(ymd);
-    setEndDate(ymd);
-  };
 
   const renderItem = useCallback(
     ({ item, index }: { item: TrackingSpkListItem; index: number }) => {
@@ -340,7 +319,11 @@ export default function TrackingSpkScreen({ route, navigation }: any) {
                   onPress={() => navigation.navigate('Home')}
                   activeOpacity={0.85}
                 >
-                  <Text style={styles.backBtnText}>Kembali</Text>
+                  <MaterialIcons
+                    name="arrow-back-ios-new"
+                    size={18}
+                    color={THEME.primary}
+                  />
                 </TouchableOpacity>
                 <View style={styles.headerTitleWrap}>
                   <Text style={styles.title}>Tracking SPK</Text>
@@ -350,28 +333,30 @@ export default function TrackingSpkScreen({ route, navigation }: any) {
             </View>
 
             <View style={styles.filterCard}>
-              {/* Compact date row */}
-              <View style={styles.dateRow}>
+              {/* Date Range Setting Field */}
+              <View style={styles.datePickerWrap}>
                 <TouchableOpacity
-                  style={styles.dateChip}
-                  onPress={() => setShowStartPicker(true)}
-                  activeOpacity={0.85}
+                  style={styles.datePickerCard}
+                  onPress={() => setShowRangePicker(true)}
+                  activeOpacity={0.8}
                 >
-                  <Text style={styles.dateChipLabel}>Dari</Text>
-                  <Text style={styles.dateChipValue}>
-                    {formatDate(startDate)}
-                  </Text>
-                </TouchableOpacity>
-                <Text style={styles.dateSeparator}>—</Text>
-                <TouchableOpacity
-                  style={styles.dateChip}
-                  onPress={() => setShowEndPicker(true)}
-                  activeOpacity={0.85}
-                >
-                  <Text style={styles.dateChipLabel}>Sampai</Text>
-                  <Text style={styles.dateChipValue}>
-                    {formatDate(endDate)}
-                  </Text>
+                  <View style={styles.datePickerCol}>
+                    <Text style={styles.datePickerDateText} numberOfLines={1}>
+                      {formatDate(startDate)}
+                    </Text>
+                  </View>
+                  <View style={styles.datePickerArrowWrap}>
+                    <MaterialIcons
+                      name="arrow-forward"
+                      size={14}
+                      color={THEME.muted}
+                    />
+                  </View>
+                  <View style={styles.datePickerCol}>
+                    <Text style={styles.datePickerDateText} numberOfLines={1}>
+                      {formatDate(endDate)}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               </View>
 
@@ -454,7 +439,13 @@ export default function TrackingSpkScreen({ route, navigation }: any) {
                         activeOpacity={0.8}
                         onPress={() => setFilterStatus(opt)}
                       >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 6,
+                          }}
+                        >
                           {opt === 'all' ? (
                             <MaterialIcons
                               name="format-list-bulleted"
@@ -462,7 +453,14 @@ export default function TrackingSpkScreen({ route, navigation }: any) {
                               color={active ? THEME.primary : THEME.muted}
                             />
                           ) : (
-                            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: dotColor }} />
+                            <View
+                              style={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: 4,
+                                backgroundColor: dotColor,
+                              }}
+                            />
                           )}
                           <Text
                             style={[
@@ -493,22 +491,19 @@ export default function TrackingSpkScreen({ route, navigation }: any) {
         ListEmptyComponent={listEmptyComponent}
       />
 
-      {showStartPicker && (
-        <DateTimePicker
-          value={parseYmd(startDate)}
-          mode="date"
-          display="default"
-          onChange={onChangeStartDate}
-        />
-      )}
-      {showEndPicker && (
-        <DateTimePicker
-          value={parseYmd(endDate)}
-          mode="date"
-          display="default"
-          onChange={onChangeEndDate}
-        />
-      )}
+      {/* Modal Kalender Pemilihan Rentang Tanggal */}
+      <DateRangePickerModal
+        visible={showRangePicker}
+        onClose={() => setShowRangePicker(false)}
+        initialStartDate={startDate}
+        initialEndDate={endDate}
+        primaryColor={THEME.primary}
+        rangeBgColor="rgba(79, 70, 229, 0.12)"
+        onConfirm={(start, end) => {
+          setStartDate(start);
+          setEndDate(end);
+        }}
+      />
     </LinearGradient>
   );
 }
@@ -533,7 +528,7 @@ const TrackingSpkRow = memo(
           bgColor: 'rgba(239, 68, 68, 0.08)',
         };
       }
-      if (realisasi >= (order - 0.01)) {
+      if (realisasi >= order - 0.01) {
         return {
           label: 'CLOSE',
           color: '#10B981',
@@ -710,26 +705,22 @@ const styles = StyleSheet.create({
   },
   headerTitleWrap: { flex: 1, alignItems: 'center' },
   backBtn: {
-    backgroundColor: THEME.soft,
+    width: 38,
+    height: 38,
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: THEME.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: THEME.line,
   },
-  backBtnText: {
-    color: THEME.primary,
-    fontWeight: '900',
-    fontSize: 12,
-    letterSpacing: 0.2,
-  },
   headerRightSpacer: {
-    minWidth: 70,
+    width: 38,
   },
   headerWrap: { marginBottom: 10 },
   title: {
     textAlign: 'center',
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '900',
     color: THEME.ink,
     letterSpacing: 0.2,
@@ -743,37 +734,55 @@ const styles = StyleSheet.create({
     padding: 12,
     ...PENAWARAN_SHADOW.card,
   },
-  dateRow: {
+  label: {
+    color: THEME.muted,
+    fontSize: 11,
+    fontWeight: '800',
+    marginLeft: 4,
+    marginBottom: 4,
+    marginTop: 6,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  datePickerWrap: {
+    marginTop: 2,
+  },
+  // Date Range Card – Interactive Field
+  datePickerCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-  },
-  dateSeparator: {
-    color: THEME.muted,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  dateChip: {
-    flex: 1,
+    justifyContent: 'center',
+    backgroundColor: THEME.soft,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: THEME.line,
     paddingHorizontal: 10,
-    paddingVertical: 7,
-    backgroundColor: THEME.soft,
+    height: 44,
   },
-  dateChipLabel: {
-    color: THEME.muted,
-    fontSize: 10,
+  datePickerCol: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  datePickerLabel: {
+    fontSize: 9.5,
     fontWeight: '700',
-    textTransform: 'uppercase' as const,
+    color: THEME.muted,
     letterSpacing: 0.3,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+    textAlign: 'center',
   },
-  dateChipValue: {
-    color: THEME.ink,
-    marginTop: 1,
-    fontSize: 12,
+  datePickerDateText: {
+    fontSize: 13,
     fontWeight: '800',
+    color: THEME.ink,
+    textAlign: 'center',
+  },
+  datePickerArrowWrap: {
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   searchRow: {
     marginTop: 10,

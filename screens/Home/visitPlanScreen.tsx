@@ -1,5 +1,11 @@
 /* eslint-disable react-native/no-inline-styles */
-import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+} from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -15,7 +21,7 @@ import {
   Animated,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateRangePickerModal from '../../components/DateRangePickerModal';
 import api from '../../services/api';
 import { useAuth } from '../../context/authContext';
 import { Linking } from 'react-native';
@@ -47,13 +53,6 @@ type Karyawan = {
   kar_nama: string;
   kar_cabang: string;
   kar_jabatan: string;
-};
-
-
-
-const ymdToDate = (ymd: string) => {
-  const [y, m, d] = ymd.split('-').map(n => parseInt(n, 10));
-  return new Date(y, m - 1, d);
 };
 
 const dateToYmd = (dt: Date) => {
@@ -114,7 +113,11 @@ export default function VisitPlanGabunganScreen({ navigation }: any) {
   // ===== Skeleton Loading =====
   const skeletonPulse = useRef(new Animated.Value(0.3)).current;
   const skeletonData = useMemo(
-    () => Array.from({ length: 5 }, (_, i) => ({ id: `skeleton-${i}`, isSkeleton: true } as any)),
+    () =>
+      Array.from(
+        { length: 5 },
+        (_, i) => ({ id: `skeleton-${i}`, isSkeleton: true } as any),
+      ),
     [],
   );
 
@@ -184,8 +187,7 @@ export default function VisitPlanGabunganScreen({ navigation }: any) {
   const [tanggalAkhir, setTanggalAkhir] = useState<string>(
     currentMonthRange.end,
   );
-  const [showAwal, setShowAwal] = useState(false);
-  const [showAkhir, setShowAkhir] = useState(false);
+  const [showRangePicker, setShowRangePicker] = useState(false);
 
   // ===== data =====
   const [data, setData] = useState<RekapItem[]>([]);
@@ -518,11 +520,23 @@ export default function VisitPlanGabunganScreen({ navigation }: any) {
                 ]}
               />
               {/* Tanggal Skeleton */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  marginTop: 4,
+                }}
+              >
                 <Animated.View
                   style={[
                     styles.skeletonBar,
-                    { width: 14, height: 14, borderRadius: 7, opacity: skeletonPulse },
+                    {
+                      width: 14,
+                      height: 14,
+                      borderRadius: 7,
+                      opacity: skeletonPulse,
+                    },
                   ]}
                 />
                 <Animated.View
@@ -537,7 +551,12 @@ export default function VisitPlanGabunganScreen({ navigation }: any) {
             <Animated.View
               style={[
                 styles.skeletonBar,
-                { width: 60, height: 24, borderRadius: 12, opacity: skeletonPulse },
+                {
+                  width: 60,
+                  height: 24,
+                  borderRadius: 12,
+                  opacity: skeletonPulse,
+                },
               ]}
             />
           </View>
@@ -602,7 +621,11 @@ export default function VisitPlanGabunganScreen({ navigation }: any) {
             onPress={() => navigation.navigate('Home')}
             activeOpacity={0.85}
           >
-            <Text style={styles.backBtnText}>Kembali</Text>
+            <MaterialIcons
+              name="arrow-back-ios-new"
+              size={18}
+              color={THEME.primary}
+            />
           </TouchableOpacity>
           <View style={styles.headerTitleWrap}>
             <Text style={styles.title}>Visit Plan</Text>
@@ -656,60 +679,48 @@ export default function VisitPlanGabunganScreen({ navigation }: any) {
           </View>
         </View>
 
-        <View style={styles.row2}>
-          <View style={styles.col}>
-            <Text style={styles.label}>Tanggal Awal</Text>
-            <TouchableOpacity
-              style={styles.dateSelect}
-              onPress={() => setShowAwal(true)}
-              activeOpacity={0.9}
-            >
-              <Text style={styles.dateText}>
+        {/* Date Range Setting Field */}
+        <View style={{ marginTop: 2 }}>
+          <Text style={styles.label}>Rentang Tanggal</Text>
+          <TouchableOpacity
+            style={styles.datePickerCard}
+            onPress={() => setShowRangePicker(true)}
+            activeOpacity={0.8}
+          >
+            <View style={styles.datePickerCol}>
+              <Text style={styles.datePickerDateText} numberOfLines={1}>
                 {formatDisplayDate(tanggalAwal)}
               </Text>
-              <MaterialIcons name="edit-calendar" color={THEME.ink} size={18} />
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.col}>
-            <Text style={styles.label}>Tanggal Akhir</Text>
-            <TouchableOpacity
-              style={styles.dateSelect}
-              onPress={() => setShowAkhir(true)}
-              activeOpacity={0.9}
-            >
-              <Text style={styles.dateText}>
+            </View>
+            <View style={styles.datePickerArrowWrap}>
+              <MaterialIcons
+                name="arrow-forward"
+                size={14}
+                color={THEME.muted}
+              />
+            </View>
+            <View style={styles.datePickerCol}>
+              <Text style={styles.datePickerDateText} numberOfLines={1}>
                 {formatDisplayDate(tanggalAkhir)}
               </Text>
-              <MaterialIcons name="edit-calendar" color={THEME.ink} size={18} />
-            </TouchableOpacity>
-          </View>
+            </View>
+          </TouchableOpacity>
         </View>
       </View>
 
-      {showAwal && (
-        <DateTimePicker
-          value={ymdToDate(tanggalAwal)}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={(event: any, selected?: Date) => {
-            setShowAwal(false);
-            if (selected) setTanggalAwal(dateToYmd(selected));
-          }}
-        />
-      )}
-
-      {showAkhir && (
-        <DateTimePicker
-          value={ymdToDate(tanggalAkhir)}
-          mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-          onChange={(event: any, selected?: Date) => {
-            setShowAkhir(false);
-            if (selected) setTanggalAkhir(dateToYmd(selected));
-          }}
-        />
-      )}
+      {/* Modal Kalender Pemilihan Rentang Tanggal */}
+      <DateRangePickerModal
+        visible={showRangePicker}
+        onClose={() => setShowRangePicker(false)}
+        initialStartDate={tanggalAwal}
+        initialEndDate={tanggalAkhir}
+        primaryColor={THEME.primary}
+        rangeBgColor="rgba(79, 70, 229, 0.12)"
+        onConfirm={(start, end) => {
+          setTanggalAwal(start);
+          setTanggalAkhir(end);
+        }}
+      />
 
       <View style={styles.rowHint}>
         <TouchableOpacity
@@ -741,7 +752,8 @@ export default function VisitPlanGabunganScreen({ navigation }: any) {
           ) : (
             <>
               Menampilkan:{' '}
-              <Text style={{ fontWeight: '900' }}>{filteredData.length}</Text> data
+              <Text style={{ fontWeight: '900' }}>{filteredData.length}</Text>{' '}
+              data
             </>
           )}
         </Text>
@@ -765,7 +777,9 @@ export default function VisitPlanGabunganScreen({ navigation }: any) {
 
       <FlatList
         data={loading ? skeletonData : filteredData}
-        keyExtractor={(item, index) => item.isSkeleton ? `skeleton-${index}` : String(item.id)}
+        keyExtractor={(item, index) =>
+          item.isSkeleton ? `skeleton-${index}` : String(item.id)
+        }
         renderItem={renderItem}
         ListHeaderComponent={ListHeader}
         ListEmptyComponent={
@@ -927,42 +941,36 @@ export default function VisitPlanGabunganScreen({ navigation }: any) {
               </View>
             </View>
 
-            <View style={styles.row2}>
-              <View style={styles.col}>
-                <Text style={styles.modalLabel}>Tanggal Awal</Text>
-                <TouchableOpacity
-                  style={styles.modalDateSelect}
-                  onPress={() => setShowAwal(true)}
-                  activeOpacity={0.9}
-                >
-                  <Text style={styles.modalDateText}>
+            {/* Date Range Setting Field – Rata Tengah (Modal Filter) */}
+            <View style={{ marginTop: 6 }}>
+              <Text style={styles.modalLabel}>Rentang Tanggal</Text>
+              <TouchableOpacity
+                style={styles.datePickerCard}
+                onPress={() => setShowRangePicker(true)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.datePickerCol}>
+                  <Text style={styles.datePickerLabel}>Mulai</Text>
+                  <Text style={styles.datePickerDateText} numberOfLines={1}>
                     {formatDisplayDate(tanggalAwal)}
                   </Text>
-                  <MaterialIcons
-                    name="edit-calendar"
-                    color={THEME.ink}
-                    size={18}
-                  />
-                </TouchableOpacity>
-              </View>
+                </View>
 
-              <View style={styles.col}>
-                <Text style={styles.modalLabel}>Tanggal Akhir</Text>
-                <TouchableOpacity
-                  style={styles.modalDateSelect}
-                  onPress={() => setShowAkhir(true)}
-                  activeOpacity={0.9}
-                >
-                  <Text style={styles.modalDateText}>
+                <View style={styles.datePickerArrowWrap}>
+                  <MaterialIcons
+                    name="arrow-forward"
+                    size={13}
+                    color={THEME.muted}
+                  />
+                </View>
+
+                <View style={styles.datePickerCol}>
+                  <Text style={styles.datePickerLabel}>Selesai</Text>
+                  <Text style={styles.datePickerDateText} numberOfLines={1}>
                     {formatDisplayDate(tanggalAkhir)}
                   </Text>
-                  <MaterialIcons
-                    name="edit-calendar"
-                    color={THEME.ink}
-                    size={18}
-                  />
-                </TouchableOpacity>
-              </View>
+                </View>
+              </TouchableOpacity>
             </View>
 
             <View style={[styles.row2, { marginTop: 14 }]}>
@@ -1149,21 +1157,17 @@ const styles = StyleSheet.create({
   },
   headerTitleWrap: { flex: 1, alignItems: 'center' },
   backBtn: {
-    backgroundColor: THEME.soft,
+    width: 38,
+    height: 38,
     borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    backgroundColor: THEME.soft,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: THEME.line,
   },
-  backBtnText: {
-    color: THEME.primary,
-    fontWeight: '900',
-    fontSize: 12,
-    letterSpacing: 0.2,
-  },
   headerRightSpacer: {
-    minWidth: 70,
+    width: 38,
   },
   headerCard: {
     backgroundColor: THEME.card,
@@ -1179,7 +1183,7 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 25,
+    fontSize: 20,
     fontWeight: '900',
     color: THEME.ink,
     letterSpacing: 0.2,
@@ -1288,6 +1292,200 @@ const styles = StyleSheet.create({
     height: 44,
   },
   dateText: { flex: 1, color: THEME.ink, fontSize: 13, fontWeight: '800' },
+
+  modernDateCard: {
+    marginTop: 10,
+    backgroundColor: '#F4F3FF',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(79,70,229,0.18)',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: THEME.primary,
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 1,
+  },
+  modernDateColStart: {
+    flex: 1,
+    justifyContent: 'center',
+    borderLeftWidth: 2,
+    borderLeftColor: THEME.primary,
+    paddingLeft: 8,
+  },
+  modernDateColEnd: {
+    flex: 1,
+    justifyContent: 'center',
+    borderRightWidth: 2,
+    borderRightColor: THEME.accent,
+    paddingRight: 8,
+  },
+  modernDateBadgeText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: THEME.primary,
+    letterSpacing: 0.8,
+    marginBottom: 3,
+    textTransform: 'uppercase',
+  },
+  modernDateValueText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: THEME.ink,
+    letterSpacing: 0.1,
+  },
+  modernDateVDivider: {
+    width: 1,
+    height: 34,
+    backgroundColor: 'rgba(79,70,229,0.18)',
+    marginHorizontal: 12,
+  },
+
+  // Dot Accent Date Range Card styles (kept for reference – comment out if not used)
+  /*
+  dotDateCard: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: THEME.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: THEME.line,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  dotDateCol: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  dotDateLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 3,
+  },
+  dotDateDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  dotDateLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: THEME.primary,
+    letterSpacing: 0.4,
+  },
+  dotDateValue: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: THEME.ink,
+  },
+  dotDateDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: THEME.line,
+    marginHorizontal: 14,
+  },
+  */
+
+  // Pill Style Date Card (minimal icons)
+  pillDateCard: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F7FF', // soft pastel background matching theme
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: THEME.line,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  pillDateCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  pillDateLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: THEME.muted,
+    letterSpacing: 0.3,
+  },
+  pillDateValue: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: THEME.ink,
+  },
+  pillDateDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: THEME.line,
+    marginHorizontal: 8,
+  },
+
+  // Date Range Card – Interactive Field
+  datePickerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: THEME.soft,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: THEME.line,
+    paddingHorizontal: 10,
+    height: 44,
+  },
+  datePickerCol: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  datePickerLabel: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: THEME.muted,
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+    textAlign: 'center',
+  },
+  datePickerDateText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: THEME.ink,
+    textAlign: 'center',
+  },
+  datePickerArrowWrap: {
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modernDateCalendarIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: THEME.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 6,
+    shadowColor: THEME.primary,
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
 
   cardItem: {
     backgroundColor: THEME.card,
